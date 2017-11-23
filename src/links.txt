@@ -1,0 +1,5 @@
+https://github.com/FastLED/FastLED/wiki/Basic-usage
+
+https://www.tf2sounds.com/#s=2
+
+https://www.amazon.com/WINGONEER-Player-Module-Arduino-DFPlay/dp/B06XHJNN1V/ref=sr_1_2?ie=UTF8&qid=1508802467&sr=8-2&keywords=arduino+dfplay
