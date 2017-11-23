@@ -1,5 +1,5 @@
 #include "battlepoint.h"
-
+  
 DeadbandTimer::DeadbandTimer(){
   lastEvent = 0;
 }
