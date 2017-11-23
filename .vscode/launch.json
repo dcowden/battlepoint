@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "gdb",
+            "request": "launch",
+            "cwd": "${workspaceRoot}",
+            "name": "PlatformIO Debugger",
+            "target": "/home/dcowden/gitwork/battlepoint-pio/.pioenvs/uno/firmware.elf",
+            "gdbpath": "/home/dcowden/.platformio/penv/bin/piodebuggdb",
+            "autorun": [ "source .pioinit" ]
+        }
+    ]
+}
