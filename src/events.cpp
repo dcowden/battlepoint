@@ -9,7 +9,7 @@
 #define DEFAULT_GAME_TIME 60
 #define DEFAULT_BUTTON_SECONDS 5
 #define DEFAULT_START_DELAY 5
-
+  
 EventManager::EventManager(DFRobotDFPlayerMini* player,
           DeadbandTimer* captureTimer,
           DeadbandTimer* contestTimer,
