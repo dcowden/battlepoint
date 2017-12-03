@@ -14,6 +14,7 @@ ControlPoint::ControlPoint(LedMeter* ownerMeter, LedMeter* captureMeter,
 }
 
 void ControlPoint::init(int secondsToCapture){
+   
    _secondsToCapture = secondsToCapture;
    _enableBluCapture = true;
    _enableRedCapture = true;   
@@ -42,6 +43,7 @@ void ControlPoint::init(int secondsToCapture){
 
 void ControlPoint::setRedCapture(boolean redCapture){
   _enableRedCapture = redCapture;
+
 }
 
 void ControlPoint::setBluCapture(boolean bluCapture){

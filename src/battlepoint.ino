@@ -16,17 +16,17 @@
 ////////////////////////////
 //PIN DEFINITIONS and hardware setup
 ////////////////////////////
-#define RED_BTN_PIN 2
-#define BLU_BTN_PIN 3
+#define RED_BTN_PIN 4
+#define BLU_BTN_PIN 9
 #define CONTROL_POINT_LED_PIN 5
-#define TIMER_LED_PIN 6
-#define SOFTSERIAL_TX 8
-#define SOFTSERIAL_RX 9
-#define BLU_LED_PIN 10
-#define RED_LED_PIN 11
-#define RANDOM_SEED_PIN 15
-#define VOLTAGE_CHECK_PIN 16
-#define BRIGHTNESS_PIN 17
+#define TIMER_LED_PIN 10
+#define SOFTSERIAL_TX 2
+#define SOFTSERIAL_RX 3
+#define BLU_LED_PIN 9
+#define RED_LED_PIN 10
+#define RANDOM_SEED_PIN 5
+#define VOLTAGE_CHECK_PIN 7
+#define BRIGHTNESS_PIN 6
 #define CONTROL_POINT_LED_CNT 41      //( 0:20: owner, 21-40: capture )
 #define TIMER_LED_CNT 40   //(0-30: timer1, 31-60: timer2 )
 #define BLU_SWITCH_LED_CNT 1 
@@ -103,7 +103,8 @@ SSD1306AsciiWire oled;
 LcdDisplay lcd_display = LcdDisplay(&oled);
 
 void setup() {
-
+    Serial.begin(SERIALBAUD);
+/**
   loadSettings();
   
   Wire.begin();                
@@ -169,10 +170,11 @@ void setup() {
   lcd_display.sprintfLine(6,F("(c)Dcowden,%d"),2017);
   FastLED.delay(SPLASH_MILLIS);
   FastLED.setBrightness(BRIGHTNESS);
-
+  **/
 }
 
 void loadSettings(){
+  
   SettingsData data = {
      //overall options
      BP_VERSION,
@@ -205,7 +207,8 @@ void blu_btn_isr(){
 }
 
 void loop(){
-
+  Serial.println("Test!!");
+  /**
   btn = getButton(); 
   switch (appMode)
   {
@@ -264,6 +267,8 @@ void loop(){
   //uint8_t brightness = get_brightness_knob();  
   FastLED.setBrightness(brightness);
   FastLED.delay(LOOP_DELAY);  
+
+  **/
 }
 
 int get_brightness_knob(){

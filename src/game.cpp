@@ -1,5 +1,5 @@
 #include "battlepoint.h"
-#include <LiquidCrystal.h>
+
 #define END_GAME_FLASH_INTERVAL 80
 #define END_GAME_FLASH_SECONDS 15
 /**

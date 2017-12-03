@@ -1,7 +1,7 @@
 #ifndef BP_CP_H
 #define BP_CP_H
 #include <FastLED.h>
-#include "Arduino.h"
+#include <ESP8266WiFi.h>
 #include "util.h"
 #include "DFRobotDFPlayerMini.h"
 

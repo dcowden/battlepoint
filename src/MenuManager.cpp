@@ -1,5 +1,5 @@
 #include "MenuManager.h"
-#include <avr/pgmspace.h>
+
 
 MenuManager::MenuManager(const MenuItem *root, unsigned char itemCount)
 {
@@ -30,7 +30,7 @@ char *MenuManager::getParentItemName(char *buf)
 
   if (msi != 0)
   {
-    strcpy_P(buf, (char *)pgm_read_word(&(msi->menu[msi->itemIndexPos].name)));
+    strcpy(buf, (char *)msi->menu[msi->itemIndexPos].name);
   }
   return buf;
 }
@@ -38,25 +38,25 @@ char *MenuManager::getParentItemName(char *buf)
 // ---------------------------------------------------
 char *MenuManager::getItemName(char *buf, unsigned char idx)
 {
-  return strcpy_P(buf, (char *)pgm_read_word(&(currentMenu[idx].name)));
+  return strcpy(buf, (char *)currentMenu[idx].name);
 }
 
 // ---------------------------------------------------
 unsigned char MenuManager::itemHasChildren(unsigned char idx)
 {
-  return pgm_read_byte(&(currentMenu[idx].childItemCount)) > 0;
+  return currentMenu[idx].childItemCount > 0;
 }
 
 // ---------------------------------------------------
 char *MenuManager::getCurrentItemName(char *buf)
 {
-  return strcpy_P(buf, (char *)pgm_read_word(&(currentMenu[currentMenuItemIndexPos].name)));
+  return strcpy(buf, (char *)currentMenu[currentMenuItemIndexPos].name);
 }
 
 // ---------------------------------------------------
 const unsigned char MenuManager::getCurrentItemCmdId()
 {
-  return pgm_read_byte(&(currentMenu[currentMenuItemIndexPos].id));
+  return currentMenu[currentMenuItemIndexPos].id;
 }
 
 // ---------------------------------------------------

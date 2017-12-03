@@ -1,5 +1,6 @@
-#include <Arduino.h>
+
 #include <FastLED.h>
+#include <ESP8266WiFi.h>
 #ifndef BP_UTIL_H
 #define BP_UTIL_H
 #define RED 1

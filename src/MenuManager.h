@@ -1,6 +1,6 @@
 #ifndef MenuManager_h_
 #define MenuManager_h_
-
+#include <ESP8266WiFi.h>
 #define MENU_MANAGER_1_0
 
 typedef struct MenuItem {

@@ -6,7 +6,7 @@
             "request": "launch",
             "cwd": "${workspaceRoot}",
             "name": "PlatformIO Debugger",
-            "target": "/home/dcowden/gitwork/battlepoint-pio/.pioenvs/uno/firmware.elf",
+            "target": "/home/dcowden/gitwork/battlepoint-pio/.pioenvs/nodemcu/firmware.elf",
             "gdbpath": "/home/dcowden/.platformio/penv/bin/piodebuggdb",
             "autorun": [ "source .pioinit" ]
         }
