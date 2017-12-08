@@ -497,7 +497,7 @@ U 1 1 5A29AE03
 P 9100 3200
 F 0 "R3" V 9180 3200 50  0000 C CNN
 F 1 "2K" V 9100 3200 50  0000 C CNN
-F 2 "Resistors_ThroughHole:Resistor_Horizontal_RM7mm" V 9030 3200 50  0001 C CNN
+F 2 "Resistors_ThroughHole:Resistor_Vertical_RM5mm" V 9030 3200 50  0001 C CNN
 F 3 "" H 9100 3200 50  0000 C CNN
 	1    9100 3200
 	1    0    0    -1  
@@ -508,7 +508,7 @@ U 1 1 5A29AEF5
 P 9100 3700
 F 0 "R4" V 9180 3700 50  0000 C CNN
 F 1 "330" V 9100 3700 50  0000 C CNN
-F 2 "Resistors_ThroughHole:Resistor_Horizontal_RM7mm" V 9030 3700 50  0001 C CNN
+F 2 "Resistors_ThroughHole:Resistor_Vertical_RM5mm" V 9030 3700 50  0001 C CNN
 F 3 "" H 9100 3700 50  0000 C CNN
 	1    9100 3700
 	1    0    0    -1  
@@ -519,7 +519,7 @@ U 1 1 5A29AF42
 P 9100 4200
 F 0 "R5" V 9180 4200 50  0000 C CNN
 F 1 "620" V 9100 4200 50  0000 C CNN
-F 2 "Resistors_ThroughHole:Resistor_Horizontal_RM7mm" V 9030 4200 50  0001 C CNN
+F 2 "Resistors_ThroughHole:Resistor_Vertical_RM5mm" V 9030 4200 50  0001 C CNN
 F 3 "" H 9100 4200 50  0000 C CNN
 	1    9100 4200
 	1    0    0    -1  
@@ -530,7 +530,7 @@ U 1 1 5A29AFA4
 P 9100 4650
 F 0 "R6" V 9180 4650 50  0000 C CNN
 F 1 "1K" V 9100 4650 50  0000 C CNN
-F 2 "Resistors_ThroughHole:Resistor_Horizontal_RM7mm" V 9030 4650 50  0001 C CNN
+F 2 "Resistors_ThroughHole:Resistor_Vertical_RM5mm" V 9030 4650 50  0001 C CNN
 F 3 "" H 9100 4650 50  0000 C CNN
 	1    9100 4650
 	1    0    0    -1  
@@ -541,7 +541,7 @@ U 1 1 5A29BC9C
 P 9100 5050
 F 0 "R7" V 9180 5050 50  0000 C CNN
 F 1 "3.3K" V 9100 5050 50  0000 C CNN
-F 2 "Resistors_ThroughHole:Resistor_Horizontal_RM7mm" V 9030 5050 50  0001 C CNN
+F 2 "Resistors_ThroughHole:Resistor_Vertical_RM5mm" V 9030 5050 50  0001 C CNN
 F 3 "" H 9100 5050 50  0000 C CNN
 	1    9100 5050
 	1    0    0    -1  
@@ -673,21 +673,7 @@ Wire Wire Line
 Wire Wire Line
 	5400 2000 5400 2100
 Wire Wire Line
-	5500 2000 5500 2050
-Wire Wire Line
-	5500 2050 6250 2050
-Wire Wire Line
-	6250 2050 6250 2000
-Wire Wire Line
-	6350 2000 6350 2050
-Wire Wire Line
-	6350 2050 7350 2050
-Wire Wire Line
-	7450 2050 7450 2100
-Wire Wire Line
-	7450 2100 8200 2100
-Wire Wire Line
-	8200 2100 8200 2050
+	8200 2050 8200 2700
 Wire Wire Line
 	2850 1900 3050 1900
 Wire Wire Line
@@ -702,24 +688,6 @@ Wire Wire Line
 	2000 2400 2000 2150
 Wire Wire Line
 	2000 2150 2050 2150
-Wire Wire Line
-	2350 2300 3050 2300
-Wire Wire Line
-	2600 2300 2600 2500
-Wire Wire Line
-	2600 2500 2150 2500
-Wire Wire Line
-	2150 2500 2150 2150
-Wire Wire Line
-	2350 2300 2350 2150
-Wire Wire Line
-	2000 2500 2100 2500
-Wire Wire Line
-	2100 2500 2100 2600
-Wire Wire Line
-	2100 2600 2250 2600
-Wire Wire Line
-	2250 2600 2250 2150
 Wire Wire Line
 	800  1550 800  1950
 Wire Wire Line
@@ -821,4 +789,35 @@ Wire Wire Line
 	1600 3600 1900 3600
 Wire Wire Line
 	1600 3700 1900 3700
+NoConn ~ 8300 2050
+Wire Wire Line
+	5500 2000 5500 2700
+Wire Wire Line
+	5500 2700 6250 2700
+Wire Wire Line
+	6250 2700 6250 2000
+Wire Wire Line
+	6350 2000 6350 2700
+Wire Wire Line
+	6350 2700 7350 2700
+Wire Wire Line
+	7350 2700 7350 2050
+Wire Wire Line
+	7450 2050 7450 2700
+Wire Wire Line
+	7450 2700 8200 2700
+Wire Wire Line
+	3050 2300 2150 2300
+Wire Wire Line
+	2150 2300 2150 2150
+Connection ~ 2350 2300
+Wire Wire Line
+	2350 2150 2350 2300
+Connection ~ 2250 2700
+Wire Wire Line
+	2250 2150 2250 2700
+Text GLabel 1600 4100 0    60   Input ~ 0
+A4
+Wire Wire Line
+	1600 4100 1900 4100
 $EndSCHEMATC
