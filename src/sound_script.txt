@@ -1,0 +1,30 @@
+#common stuff
+Contest begins in 2 minutes
+Contest begins in 1 minute
+Contest begins in 30 seconds
+Contest begins in 20 seconds
+Contest begins in 10 seconds
+The control point is being contested!
+Overtime!
+5
+4
+3
+2
+1
+The contest has begun. Get moving!
+Contest terminated. What are you doing?
+
+#<color>
+Alert! <color> is capturing the control point!
+<color> has nearly captured the control point!
+<color> has captured the control point!
+<color> victory in 1 minute
+<color> victory in 30 seconds
+<color> victory in 20 seconds
+<color> victory in 10 seconds
+The contest belongs to <color>!
+<color> has won the contest!
+Victory! <color> has won the contest!
+<color> is victorious!
+
+
