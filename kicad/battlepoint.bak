@@ -30,6 +30,7 @@ LIBS:contrib
 LIBS:valves
 LIBS:arduino
 LIBS:rur
+LIBS:battlepoint-cache
 EELAYER 25 0
 EELAYER END
 $Descr A4 11693 8268
@@ -361,7 +362,7 @@ F 3 "" H 3150 6900 50  0000 C CNN
 	1    0    0    -1  
 $EndComp
 Text GLabel 2900 6300 0    60   Input ~ 0
-A4
+A2
 Text GLabel 1600 3600 0    60   Input ~ 0
 SCL
 Text GLabel 1600 3700 0    60   Input ~ 0
@@ -625,9 +626,9 @@ Wire Wire Line
 Wire Wire Line
 	4500 4400 4750 4400
 Wire Wire Line
-	3050 2500 3050 2700
+	3050 2700 3050 2500
 Wire Wire Line
-	3050 2700 2000 2700
+	2000 2700 3050 2700
 Wire Wire Line
 	2000 2700 2000 2500
 Wire Wire Line
@@ -690,7 +691,7 @@ Wire Wire Line
 Wire Wire Line
 	1600 3700 1900 3700
 Wire Wire Line
-	3050 2300 2150 2300
+	2150 2300 3050 2300
 Wire Wire Line
 	2150 2300 2150 2150
 Connection ~ 2350 2300
@@ -699,8 +700,6 @@ Wire Wire Line
 Connection ~ 2250 2700
 Wire Wire Line
 	2250 2150 2250 2700
-Wire Wire Line
-	1600 4100 1900 4100
 Wire Wire Line
 	5250 1900 5250 2250
 Wire Wire Line
@@ -811,4 +810,131 @@ Wire Wire Line
 	2650 1900 2700 1900
 Wire Wire Line
 	2650 2000 3050 2000
+Text GLabel 1600 4300 0    60   Input ~ 0
+A2
+Wire Wire Line
+	1600 4300 1900 4300
+$Comp
+L LM7805CT U4
+U 1 1 5A3497DA
+P 6150 4950
+F 0 "U4" H 5950 5150 50  0000 C CNN
+F 1 "L4940" H 6150 5150 50  0000 L CNN
+F 2 "Power_Integrations:TO-220" H 6150 5050 50  0000 C CIN
+F 3 "" H 6150 4950 50  0000 C CNN
+	1    6150 4950
+	1    0    0    -1  
+$EndComp
+$Comp
+L C C5
+U 1 1 5A3498C1
+P 6900 5250
+F 0 "C5" H 6925 5350 50  0000 L CNN
+F 1 "22uf" H 6925 5150 50  0000 L CNN
+F 2 "Capacitors_ThroughHole:C_Radial_D7.5_L11.2_P2.5" H 6938 5100 50  0001 C CNN
+F 3 "" H 6900 5250 50  0000 C CNN
+	1    6900 5250
+	1    0    0    -1  
+$EndComp
+$Comp
+L CONN_01X02 P20
+U 1 1 5A349E9A
+P 5150 4950
+F 0 "P20" H 5150 5100 50  0000 C CNN
+F 1 "AUX_PWR" V 5250 4950 50  0000 C CNN
+F 2 "Terminal_Blocks:TerminalBlock_Pheonix_MPT-2.54mm_2pol" H 5150 4950 50  0001 C CNN
+F 3 "" H 5150 4950 50  0000 C CNN
+	1    5150 4950
+	-1   0    0    1   
+$EndComp
+$Comp
+L +5V #PWR024
+U 1 1 5A349FFE
+P 6550 4400
+F 0 "#PWR024" H 6550 4250 50  0001 C CNN
+F 1 "+5V" H 6550 4540 50  0000 C CNN
+F 2 "" H 6550 4400 50  0000 C CNN
+F 3 "" H 6550 4400 50  0000 C CNN
+	1    6550 4400
+	1    0    0    -1  
+$EndComp
+$Comp
+L GND #PWR025
+U 1 1 5A34A05D
+P 6150 5650
+F 0 "#PWR025" H 6150 5400 50  0001 C CNN
+F 1 "GND" H 6150 5500 50  0000 C CNN
+F 2 "" H 6150 5650 50  0000 C CNN
+F 3 "" H 6150 5650 50  0000 C CNN
+	1    6150 5650
+	1    0    0    -1  
+$EndComp
+Connection ~ 6150 5650
+Wire Wire Line
+	6150 5650 6150 5200
+Wire Wire Line
+	6900 5400 6300 5400
+Wire Wire Line
+	6300 5400 6300 5650
+Wire Wire Line
+	6300 5650 5700 5650
+Wire Wire Line
+	5350 5000 5350 5650
+Wire Wire Line
+	5350 5650 6150 5650
+Connection ~ 6900 5100
+$Comp
+L CONN_01X02 P30
+U 1 1 5A3511C7
+P 6850 4600
+F 0 "P30" H 6850 4750 50  0000 C CNN
+F 1 "EXT_PWR_JP" V 6950 4600 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02" H 6850 4600 50  0001 C CNN
+F 3 "" H 6850 4600 50  0000 C CNN
+	1    6850 4600
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	6550 4400 6550 4550
+Wire Wire Line
+	6550 4550 6650 4550
+Wire Wire Line
+	6550 4900 6900 4900
+Connection ~ 6550 4900
+Wire Wire Line
+	6900 4900 6900 5100
+Wire Wire Line
+	6900 5100 6650 5100
+Wire Wire Line
+	6650 5100 6650 4650
+$Comp
+L C C7
+U 1 1 5A3538CC
+P 5700 5300
+F 0 "C7" H 5725 5400 50  0000 L CNN
+F 1 "0.1uf" H 5725 5200 50  0000 L CNN
+F 2 "Capacitors_ThroughHole:C_Rect_L4_W2.5_P2.5" H 5738 5150 50  0001 C CNN
+F 3 "" H 5700 5300 50  0000 C CNN
+	1    5700 5300
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	5750 4900 5700 4900
+Wire Wire Line
+	5700 4900 5700 5150
+$Comp
+L GND #PWR?
+U 1 1 5A3547E8
+P 5600 5500
+F 0 "#PWR?" H 5600 5250 50  0001 C CNN
+F 1 "GND" H 5600 5350 50  0000 C CNN
+F 2 "" H 5600 5500 50  0000 C CNN
+F 3 "" H 5600 5500 50  0000 C CNN
+	1    5600 5500
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	5700 5450 5600 5450
+Wire Wire Line
+	5600 5450 5600 5500
 $EndSCHEMATC
