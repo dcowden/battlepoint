@@ -1,5 +1,5 @@
 {
     "terminal.integrated.env.linux": {
-        "PATH": "/home/dcowden/.platformio/penv/bin:/home/dcowden/bin:/home/dcowden/.local/bin:/home/dcowden/bin:/home/dcowden/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/usr/lib/jvm/java-8-oracle/bin:/usr/lib/jvm/java-8-oracle/db/bin:/usr/lib/jvm/java-8-oracle/jre/bin"
+        "PATH": "/home/dcowden/.platformio/penv/bin:/home/dcowden/bin:/home/dcowden/.local/bin:/home/dcowden/bin:/home/dcowden/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/usr/lib/jvm/java-8-oracle/bin:/usr/lib/jvm/java-8-oracle/db/bin:/usr/lib/jvm/java-8-oracle/jre/bin:/snap/bin:/usr/lib/jvm/java-8-oracle/bin:/usr/lib/jvm/java-8-oracle/db/bin:/usr/lib/jvm/java-8-oracle/jre/bin"
     }
 }

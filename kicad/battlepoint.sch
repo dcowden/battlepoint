@@ -30,6 +30,7 @@ LIBS:contrib
 LIBS:valves
 LIBS:arduino
 LIBS:rur
+LIBS:battlepoint-cache
 EELAYER 25 0
 EELAYER END
 $Descr A4 11693 8268
@@ -288,9 +289,9 @@ Text GLabel 1100 1650 3    60   Input ~ 0
 D10
 Text GLabel 1500 1700 3    60   Input ~ 0
 D11
-Text GLabel 2850 1900 0    60   Input ~ 0
+Text GLabel 2650 1900 0    60   Input ~ 0
 D8
-Text GLabel 2850 2000 0    60   Input ~ 0
+Text GLabel 2650 2000 0    60   Input ~ 0
 D9
 NoConn ~ 3050 2100
 NoConn ~ 3050 2200
@@ -361,7 +362,7 @@ F 3 "" H 3150 6900 50  0000 C CNN
 	1    0    0    -1  
 $EndComp
 Text GLabel 2900 6300 0    60   Input ~ 0
-A4
+A2
 Text GLabel 1600 3600 0    60   Input ~ 0
 SCL
 Text GLabel 1600 3700 0    60   Input ~ 0
@@ -625,10 +626,6 @@ Wire Wire Line
 Wire Wire Line
 	4500 4400 4750 4400
 Wire Wire Line
-	2850 1900 3050 1900
-Wire Wire Line
-	2850 2000 3050 2000
-Wire Wire Line
 	3050 2500 3050 2700
 Wire Wire Line
 	3050 2700 2000 2700
@@ -703,8 +700,6 @@ Wire Wire Line
 Connection ~ 2250 2700
 Wire Wire Line
 	2250 2150 2250 2700
-Wire Wire Line
-	1600 4100 1900 4100
 Wire Wire Line
 	5250 1900 5250 2250
 Wire Wire Line
@@ -798,4 +793,25 @@ Wire Wire Line
 	8550 4650 8550 5050
 Wire Wire Line
 	8550 5050 8750 5050
+$Comp
+L R R10
+U 1 1 5A2EF399
+P 2850 1900
+F 0 "R10" V 2930 1900 50  0000 C CNN
+F 1 "1K" V 2850 1900 50  0000 C CNN
+F 2 "Resistors_ThroughHole:Resistor_Horizontal_RM7mm" V 2780 1900 50  0001 C CNN
+F 3 "" H 2850 1900 50  0000 C CNN
+	1    2850 1900
+	0    1    1    0   
+$EndComp
+Wire Wire Line
+	3000 1900 3050 1900
+Wire Wire Line
+	2650 1900 2700 1900
+Wire Wire Line
+	2650 2000 3050 2000
+Text GLabel 1600 4300 0    60   Input ~ 0
+A2
+Wire Wire Line
+	1600 4300 1900 4300
 $EndSCHEMATC
