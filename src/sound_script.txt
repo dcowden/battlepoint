@@ -14,7 +14,7 @@ Overtime!
 The contest has begun. Get moving!
 Contest terminated. What are you doing?
 
-#<color>
+#<color> ( need Red and Blue )
 Alert! <color> is capturing the control point!
 <color> has nearly captured the control point!
 <color> has captured the control point!
