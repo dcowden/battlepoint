@@ -13,48 +13,59 @@
 #include "sound.h"
 #include "lcd_helper.h"
 
-////////////////////////////
-//PIN DEFINITIONS and hardware setup
-////////////////////////////
-#define RED_BTN_PIN 2
-#define BLU_BTN_PIN 3
-#define LED_PIN 5
-//#define TIMER_LED_PIN 10
-#define SOFTSERIAL_TX 8
-#define SOFTSERIAL_RX 9
-#define BLU_LED_PIN 10
-#define RED_LED_PIN 11
-//#define RANDOM_SEED_PIN 5
-#define VOLTAGE_CHECK_PIN 16
-//#define BRIGHTNESS_PIN 6
-#define LED_CNT 81
-//#define CONTROL_POINT_LED_CNT 41      //( 0:20: owner, 21-40: capture )
-//#define TIMER_LED_CNT 40   //(0-30: timer1, 31-60: timer2 )
+/////////////////////////////
+// Hardware Setup
+/////////////////////////////
 #define BLU_SWITCH_LED_CNT 1 
 #define RED_SWITCH_LED_CNT 2
-#define OLED_I2C_ADDRESS 0x3C
-
-////////App Constants
+#define NUM_TIMER1_LEDS 20
+#define NUM_TIMER2_LEDS 20
+#define NUM_CAPTURE_LEDS 20
+#define NUM_OWNER_LEDS 21
 #define BATTERY_LOW_VOLTAGE 6.2F
-#define DFPLAYER_BAUD 9600
+
+
+/////////////////////////////
+// Software Defaults
+// Change to suit your needs
+////////////////////////////
 #define SERIALBAUD 57600
-#define BRIGHTNESS 50
-#define LOOP_DELAY 100
-#define DFPLAYER_VOLUME 10
-#define SPLASH_MILLIS 1000
-#define GAME_END_MILLIS 5000
-#define BP_VERSION 243
 #define DEFAULT_CAPTURE_SECONDS 20
 #define DEFAULT_GAME_TIME 60
 #define DEFAULT_BUTTON_SECONDS 5
 #define DEFAULT_START_DELAY 5
 #define DEFAULT_MODE 0
 #define CONFIG_START 0
-////////////////////////
+#define BRIGHTNESS 50
 
-CRGB leds[LED_CNT];
-//CRGB control_point_leds [CONTROL_POINT_LED_CNT];
-//CRGB timer_leds [TIMER_LED_CNT];
+////////////////////////////
+//PIN DEFINITIONS and hardware setup
+//Generally dont change these unless
+//you also change the board wiring
+////////////////////////////
+#define RED_BTN_PIN 2
+#define BLU_BTN_PIN 3
+#define LED_PIN 5
+#define SOFTSERIAL_TX 8
+#define SOFTSERIAL_RX 9
+#define BLU_LED_PIN 10
+#define RED_LED_PIN 11
+#define VOLTAGE_CHECK_PIN 16
+#define OLED_I2C_ADDRESS 0x3C
+
+////////////////////////
+////////App Constants
+////////////////////////
+#define DFPLAYER_BAUD 9600
+
+#define LOOP_DELAY 100
+#define DFPLAYER_VOLUME 10
+#define SPLASH_MILLIS 1000
+#define GAME_END_MILLIS 5000
+#define BP_VERSION 243
+
+
+CRGB leds[NUM_TIMER1_LEDS + NUM_TIMER2_LEDS + NUM_CAPTURE_LEDS + NUM_OWNER_LEDS];
 CRGB blu_switch_leds [BLU_SWITCH_LED_CNT];
 CRGB red_switch_leds [RED_SWITCH_LED_CNT];
 
@@ -65,7 +76,7 @@ enum AppModeValues
   APP_PROCESS_MENU_CMD
 };
 
-SoftwareSerial mySoftwareSerial(SOFTSERIAL_RX, SOFTSERIAL_TX); // RX, TX
+SoftwareSerial mySoftwareSerial(SOFTSERIAL_RX, SOFTSERIAL_TX);
 DFRobotDFPlayerMini myDFPlayer;
 
 byte appMode = APP_MENU_MODE;
@@ -77,10 +88,10 @@ uint8_t brightness = BRIGHTNESS;
 void refreshMenuDisplay (byte refreshMode);
 byte getNavAction();
 
-LedMeter timer1Meter = LedMeter(leds,0,20);
-LedMeter timer2Meter = LedMeter(leds,20,20);
-LedMeter ownerMeter = LedMeter(leds,40,21);
-LedMeter captureMeter = LedMeter(leds,61,20);
+LedMeter timer1Meter = LedMeter(leds,0,NUM_TIMER1_LEDS);
+LedMeter timer2Meter = LedMeter(leds,NUM_TIMER1_LEDS,NUM_TIMER2_LEDS);
+LedMeter ownerMeter = LedMeter(leds,NUM_TIMER1_LEDS+NUM_TIMER2_LEDS,NUM_OWNER_LEDS);
+LedMeter captureMeter = LedMeter(leds,NUM_TIMER1_LEDS+NUM_TIMER2_LEDS+NUM_OWNER_LEDS,NUM_CAPTURE_LEDS);
 
 
 LedMeter bluSwitch = LedMeter(blu_switch_leds,0,BLU_SWITCH_LED_CNT);
@@ -150,9 +161,8 @@ void setup() {
   pinMode(BLU_BTN_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(BLU_BTN_PIN), blu_btn_isr, CHANGE);
 
-  //pinMode(BRIGHTNESS_PIN,INPUT);
-  FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, LED_CNT);
-  //FastLED.addLeds<NEOPIXEL, TIMER_LED_PIN>(timer_leds, TIMER_LED_CNT);
+  
+  FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, NUM_TIMER1_LEDS + NUM_TIMER2_LEDS + NUM_CAPTURE_LEDS + NUM_OWNER_LEDS);
   FastLED.addLeds<NEOPIXEL, BLU_LED_PIN>(blu_switch_leds, BLU_SWITCH_LED_CNT);
   FastLED.addLeds<NEOPIXEL, RED_LED_PIN>(red_switch_leds, RED_SWITCH_LED_CNT);
   
@@ -162,10 +172,7 @@ void setup() {
 
     //Set volume value. From 0 to 30
   myDFPlayer.volume(volume);
-  //randomSeed(analogRead(RANDOM_SEED_PIN));
   long r = random(18000,25000);
-  //Serial.println("Random Number");
-  //Serial.println(r/1000);
   myDFPlayer.loop((int)r/1000); 
 
   lcd_display.printLine(0,F("BattlePoint v0.1"));
@@ -277,19 +284,12 @@ void loop(){
   }
   display_voltage();
   myDFPlayer.volume(volume);
-  //uint8_t brightness = get_brightness_knob();  
   FastLED.setBrightness(brightness);
   FastLED.delay(LOOP_DELAY);  
 
   
 }
 
-/**
-int get_brightness_knob(){
-  int brightness = analogRead(BRIGHTNESS_PIN);
-  return brightness/4;
-}
-**/
 void display_voltage(){
   float voltage = check_supply_voltage();
   char str_temp[6];
