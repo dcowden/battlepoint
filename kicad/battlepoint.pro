@@ -1,4 +1,4 @@
-update=Wed 06 Dec 2017 07:23:19 PM EST
+update=Mon 11 Dec 2017 12:50:23 PM EST
 version=1
 last_client=kicad
 [pcbnew]
@@ -60,3 +60,13 @@ LibName28=contrib
 LibName29=valves
 LibName30=arduino
 LibName31=rur
+[schematic_editor]
+version=1
+PageLayoutDescrFile=
+PlotDirectoryName=
+SubpartIdSeparator=0
+SubpartFirstId=65
+NetFmtName=Pcbnew
+SpiceForceRefPrefix=0
+SpiceUseNetNumbers=0
+LabSize=60
