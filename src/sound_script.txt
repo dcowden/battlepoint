@@ -7,13 +7,11 @@ Battle begins in 20 seconds
 Battle begins in 10 seconds
 The battle point is being contested!
 Overtime!
-5
-4
-3
-2
-1
+5.. 4.. 3.. 2.. 1(!)
 The battle  has begun. Get moving!
 Battle terminated. What are you doing?
+
+Background music ( ideally 5 tracks, >= 1 minute each)
 
 #<color> ( need Red and Blue and Green )
 Alert! <color> is capturing the battle point!
