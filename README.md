@@ -25,9 +25,27 @@ A real-life capture the flag controller
  * More room between OLED board and Button board ( they overlap now)
  * Bigger Channels for lights. Maybe just keep the back partially open
  * more room around buttons. they tend to get tangled with wires
+ * The bezel needs to cover the non-interactive part of the OLED display
 
 ## Programming
  * make # of lights on each strand configurable
  * change defaults to 20 lights on each strand
  * remove debug
+ * in cp mode, we have captured the control point shouldnt play, since victory is immediate
+ * in KOTH, the countdown gets behind the numbers. better to just play the countdown as one recording
+
+
+ # Enhancements
+
+ ## Easier to make and higher mast
+ The led strips should be in a mast that extends upwards, making it easier to make and better visibilty too
+
+ ## Three Player Mode
+Three player mode would require another LED strip and another button. The rules are as follows:
+
+in **KOTH** each color tracks separately. the first time to run their timer out wins
+in **AD** mode  two teams are attacking and one is defending. But the winning team is the one which accumulates the most time towards the capture.
+in **CP** mode the point tracks all three colors separately
+
+
  
