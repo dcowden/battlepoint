@@ -18,19 +18,20 @@
 ////////////////////////////
 #define RED_BTN_PIN 2
 #define BLU_BTN_PIN 3
-#define CONTROL_POINT_LED_PIN 5
-#define TIMER_LED_PIN 6
+#define LED_PIN 5
+//#define TIMER_LED_PIN 10
 #define SOFTSERIAL_TX 8
 #define SOFTSERIAL_RX 9
 #define BLU_LED_PIN 10
 #define RED_LED_PIN 11
-#define RANDOM_SEED_PIN 15
+//#define RANDOM_SEED_PIN 5
 #define VOLTAGE_CHECK_PIN 16
-#define BRIGHTNESS_PIN 17
-#define CONTROL_POINT_LED_CNT 41      //( 0:20: owner, 21-40: capture )
-#define TIMER_LED_CNT 40   //(0-30: timer1, 31-60: timer2 )
+//#define BRIGHTNESS_PIN 6
+#define LED_CNT 81
+//#define CONTROL_POINT_LED_CNT 41      //( 0:20: owner, 21-40: capture )
+//#define TIMER_LED_CNT 40   //(0-30: timer1, 31-60: timer2 )
 #define BLU_SWITCH_LED_CNT 1 
-#define RED_SWITCH_LED_CNT 1
+#define RED_SWITCH_LED_CNT 2
 #define OLED_I2C_ADDRESS 0x3C
 
 ////////App Constants
@@ -51,8 +52,9 @@
 #define CONFIG_START 0
 ////////////////////////
 
-CRGB control_point_leds [CONTROL_POINT_LED_CNT];
-CRGB timer_leds [TIMER_LED_CNT];
+CRGB leds[LED_CNT];
+//CRGB control_point_leds [CONTROL_POINT_LED_CNT];
+//CRGB timer_leds [TIMER_LED_CNT];
 CRGB blu_switch_leds [BLU_SWITCH_LED_CNT];
 CRGB red_switch_leds [RED_SWITCH_LED_CNT];
 
@@ -75,13 +77,14 @@ uint8_t brightness = BRIGHTNESS;
 void refreshMenuDisplay (byte refreshMode);
 byte getNavAction();
 
+LedMeter timer1Meter = LedMeter(leds,0,20);
+LedMeter timer2Meter = LedMeter(leds,20,20);
+LedMeter ownerMeter = LedMeter(leds,40,21);
+LedMeter captureMeter = LedMeter(leds,61,20);
 
-LedMeter captureMeter = LedMeter(control_point_leds,0,21);
-LedMeter ownerMeter = LedMeter(control_point_leds,21,20);
-LedMeter timer1Meter = LedMeter(timer_leds,0,20);
-LedMeter timer2Meter = LedMeter(timer_leds,20,20);
-LedMeter bluSwitch = LedMeter(blu_switch_leds,0,1);
-LedMeter redSwitch = LedMeter(red_switch_leds,0,1);
+
+LedMeter bluSwitch = LedMeter(blu_switch_leds,0,BLU_SWITCH_LED_CNT);
+LedMeter redSwitch = LedMeter(red_switch_leds,0,RED_SWITCH_LED_CNT);
 
 GameOptions game_options = GameOptions();
 
@@ -103,6 +106,7 @@ SSD1306AsciiWire oled;
 LcdDisplay lcd_display = LcdDisplay(&oled);
 
 void setup() {
+    Serial.begin(SERIALBAUD);
 
   loadSettings();
   
@@ -113,7 +117,6 @@ void setup() {
   oled.setFont(System5x7);
   oled.clear();
  
-
   mySoftwareSerial.begin(DFPLAYER_BAUD);
   Serial.begin(SERIALBAUD);
 
@@ -147,9 +150,9 @@ void setup() {
   pinMode(BLU_BTN_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(BLU_BTN_PIN), blu_btn_isr, CHANGE);
 
-  pinMode(BRIGHTNESS_PIN,INPUT);
-  FastLED.addLeds<NEOPIXEL, CONTROL_POINT_LED_PIN>(control_point_leds, CONTROL_POINT_LED_CNT);
-  FastLED.addLeds<NEOPIXEL, TIMER_LED_PIN>(timer_leds, TIMER_LED_CNT);
+  //pinMode(BRIGHTNESS_PIN,INPUT);
+  FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, LED_CNT);
+  //FastLED.addLeds<NEOPIXEL, TIMER_LED_PIN>(timer_leds, TIMER_LED_CNT);
   FastLED.addLeds<NEOPIXEL, BLU_LED_PIN>(blu_switch_leds, BLU_SWITCH_LED_CNT);
   FastLED.addLeds<NEOPIXEL, RED_LED_PIN>(red_switch_leds, RED_SWITCH_LED_CNT);
   
@@ -159,7 +162,7 @@ void setup() {
 
     //Set volume value. From 0 to 30
   myDFPlayer.volume(volume);
-  randomSeed(analogRead(RANDOM_SEED_PIN));
+  //randomSeed(analogRead(RANDOM_SEED_PIN));
   long r = random(18000,25000);
   //Serial.println("Random Number");
   //Serial.println(r/1000);
@@ -167,12 +170,21 @@ void setup() {
 
   lcd_display.printLine(0,F("BattlePoint v0.1"));
   lcd_display.sprintfLine(6,F("(c)Dcowden,%d"),2017);
+
+  #ifdef BP_DEBUG
+  Serial.print("Menu Written...");
+  #endif
+
   FastLED.delay(SPLASH_MILLIS);
   FastLED.setBrightness(BRIGHTNESS);
 
+  #ifdef BP_DEBUG
+  Serial.print("Setup Complete.");
+  #endif
 }
 
 void loadSettings(){
+  
   SettingsData data = {
      //overall options
      BP_VERSION,
@@ -205,6 +217,10 @@ void blu_btn_isr(){
 }
 
 void loop(){
+
+  #ifdef BP_DEBUG
+  Serial.println(analogRead(0));
+  #endif  
 
   btn = getButton(); 
   switch (appMode)
@@ -264,13 +280,16 @@ void loop(){
   //uint8_t brightness = get_brightness_knob();  
   FastLED.setBrightness(brightness);
   FastLED.delay(LOOP_DELAY);  
+
+  
 }
 
+/**
 int get_brightness_knob(){
   int brightness = analogRead(BRIGHTNESS_PIN);
   return brightness/4;
 }
-
+**/
 void display_voltage(){
   float voltage = check_supply_voltage();
   char str_temp[6];

@@ -36,6 +36,7 @@ Game::Game(  ControlPoint* controlPoint,
     _ownerMeter = ownerMeter;
     _captureMeter = captureMeter;
     _timer2->reverse();
+    _timer1->reverse();
 };
 //TRODO: should be same as endGame
 void Game::end(){
