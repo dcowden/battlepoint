@@ -1,30 +1,31 @@
 #common stuff
-Contest begins in 2 minutes
-Contest begins in 1 minute
-Contest begins in 30 seconds
-Contest begins in 20 seconds
-Contest begins in 10 seconds
-The control point is being contested!
+Battle countdown commencing...
+Battle begins in 2 minutes
+Battle begins in 1 minute
+Battle begins in 30 seconds
+Battle begins in 20 seconds
+Battle begins in 10 seconds
+The battle point is being contested!
 Overtime!
 5
 4
 3
 2
 1
-The contest has begun. Get moving!
-Contest terminated. What are you doing?
+The battle  has begun. Get moving!
+Battle terminated. What are you doing?
 
-#<color> ( need Red and Blue )
-Alert! <color> is capturing the control point!
-<color> has nearly captured the control point!
-<color> has captured the control point!
+#<color> ( need Red and Blue and Green )
+Alert! <color> is capturing the battle point!
+<color> has almost captured the battle point!
+<color> has captured the battle point!
 <color> victory in 1 minute
 <color> victory in 30 seconds
 <color> victory in 20 seconds
 <color> victory in 10 seconds
-The contest belongs to <color>!
-<color> has won the contest!
-Victory! <color> has won the contest!
+The battle belongs to <color>!
+<color> has won the battle!
+Victory! <color> has won the battle!
 <color> is victorious!
 
 

@@ -33,7 +33,7 @@ A real-life capture the flag controller
  * remove debug
  * in cp mode, we have captured the control point shouldnt play, since victory is immediate
  * in KOTH, the countdown gets behind the numbers. better to just play the countdown as one recording
-
+ * record new sounds
 
  # Enhancements
 
