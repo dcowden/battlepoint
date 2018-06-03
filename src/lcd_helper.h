@@ -3,16 +3,15 @@
  * Also includes some nice sprintf formatting helpers,
  * So that we can avoid buffers and other annoyting stuff.
  */
-#include <LiquidCrystal.h>
 #include "Arduino.h"
-#include "SSD1306AsciiWire.h"
+#include "SSD1306Wire.h"
 //#define COLS 17
 #ifndef LcdDisplay_cpp
 #define LcdDisplay_cpp
 
 class LcdDisplay{
    public:
-      LcdDisplay(SSD1306AsciiWire*  oled);
+      LcdDisplay(SSD1306Wire*  oled);
       void init();
       void clearLine(uint8_t lineNum);
       void clear();
@@ -23,7 +22,7 @@ class LcdDisplay{
 
    private: 
      void _printSpaces();
-     SSD1306AsciiWire*  _oled;
+     SSD1306Wire*  _oled;
      uint8_t _charWidth;
 };
 #endif

@@ -1,14 +1,29 @@
+// AUTOMATICALLY GENERATED FILE. PLEASE DO NOT MODIFY IT MANUALLY
+
+// PIO Unified Debugger
+//
+// Documentation: http://docs.platformio.org/page/plus/debugging.html
+// Configuration: http://docs.platformio.org/page/projectconf/section_env_debug.html
+
 {
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "gdb",
+            "type": "platformio-debug",
             "request": "launch",
-            "cwd": "${workspaceRoot}",
             "name": "PlatformIO Debugger",
-            "target": "/home/dcowden/gitwork/battlepoint-pio/.pioenvs/uno/firmware.elf",
-            "gdbpath": "/home/dcowden/.platformio/penv/bin/piodebuggdb",
-            "autorun": [ "source .pioinit" ]
+            "executable": "/home/dcowden/gitwork/battlepoint/.pioenvs/nodemcuv2/firmware.elf",
+            "toolchainBinDir": "/home/dcowden/.platformio/packages/toolchain-xtensa/bin",
+            "preLaunchTask": "PlatformIO: Pre-Debug",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "type": "platformio-debug",
+            "request": "launch",
+            "name": "PlatformIO Debugger (Skip Pre-Debug)",
+            "executable": "/home/dcowden/gitwork/battlepoint/.pioenvs/nodemcuv2/firmware.elf",
+            "toolchainBinDir": "/home/dcowden/.platformio/packages/toolchain-xtensa/bin",
+            "internalConsoleOptions": "openOnSessionStart"
         }
     ]
 }

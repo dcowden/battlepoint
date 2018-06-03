@@ -4,7 +4,7 @@
 #include "Arduino.h"
 #include "util.h"
 #include "DFRobotDFPlayerMini.h"
-
+#include "LedMeter.h"
 /////////////////////////////
 //Compile in debug here
 //////////////////////////////
@@ -32,34 +32,6 @@ class DeadbandTimer{
     boolean notInDeadband(long interval);
   private:
      long lastEvent;
-};
-
-class LedMeter {
-  //a meter which has two colors, and can represent a value between two boundaries
-  public:
-    LedMeter (CRGB* leds, uint8_t startIndex, uint8_t ledCount );
-    void setValue(int value );
-    void setMaxValue(int value);
-    void setToMax();
-    void setToMin();
-    void fgColor ( CRGB color );
-    void reverse();
-    void bgColor ( CRGB color );
-    int getValue();
-    int getMaxValue();
-    void init();
-  private:
-    CRGB* _leds;
-    uint8_t _ledCount;
-    boolean _reversed;
-    int _value;
-    int _maxValue;
-    uint8_t _startIndex;
-    uint8_t _endIndex;
-    CRGB _fgColor;
-    CRGB _bgColor;
-    void _update();
-
 };
 
 class GameOptions {

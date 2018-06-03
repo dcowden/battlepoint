@@ -1,16 +1,23 @@
+#include <Arduino.h>
+#define FASTLED_ESP8266_RAW_PIN_ORDER
 
 #include <Wire.h>
 #include "SSD1306Ascii.h"
 #include "SSD1306AsciiWire.h"
+#include <SSD1306Wire.h>
+#include <OLEDDisplayUi.h>
+#include "SoftwareSerial.h"
+#include "DFRobotDFPlayerMini.h"
 #include <EEPROM.h>
 #include <FastLED.h>
 #include "util.h"
 #include "battlepoint.h"
-#include "LcdKeypad.h"
-#include "MenuData.h"
+#include "LedMeter.h"
 #include "SoftwareSerial.h"
 #include "DFRobotDFPlayerMini.h"
 #include "sound.h"
+#include "MenuData.h"
+#include "LcdKeypad.h"
 #include "lcd_helper.h"
 
 ////////////////////////////
@@ -18,10 +25,10 @@
 ////////////////////////////
 #define RED_BTN_PIN 2
 #define BLU_BTN_PIN 3
-#define LED_PIN 5
+#define LED_PIN D8
 //#define TIMER_LED_PIN 10
-#define SOFTSERIAL_TX 8
-#define SOFTSERIAL_RX 9
+#define SOFTSERIAL_TX D1
+#define SOFTSERIAL_RX D2
 #define BLU_LED_PIN 10
 #define RED_LED_PIN 11
 //#define RANDOM_SEED_PIN 5
@@ -34,10 +41,11 @@
 #define RED_SWITCH_LED_CNT 2
 #define OLED_I2C_ADDRESS 0x3C
 
+
 ////////App Constants
 #define BATTERY_LOW_VOLTAGE 6.2F
 #define DFPLAYER_BAUD 9600
-#define SERIALBAUD 57600
+#define SERIALBAUD 115200
 #define BRIGHTNESS 50
 #define LOOP_DELAY 100
 #define DFPLAYER_VOLUME 10
@@ -50,8 +58,10 @@
 #define DEFAULT_START_DELAY 5
 #define DEFAULT_MODE 0
 #define CONFIG_START 0
-////////////////////////
 
+////////////////////////
+const int SDA_PIN = D3;
+const int SDC_PIN = D4;
 CRGB leds[LED_CNT];
 //CRGB control_point_leds [CONTROL_POINT_LED_CNT];
 //CRGB timer_leds [TIMER_LED_CNT];
@@ -77,10 +87,15 @@ uint8_t brightness = BRIGHTNESS;
 void refreshMenuDisplay (byte refreshMode);
 byte getNavAction();
 
-LedMeter timer1Meter = LedMeter(leds,0,20);
-LedMeter timer2Meter = LedMeter(leds,20,20);
-LedMeter ownerMeter = LedMeter(leds,40,21);
-LedMeter captureMeter = LedMeter(leds,61,20);
+LedRange timer1Range [1] = {  { 0, 20 } } ; 
+LedRange timer2Range [1] = {  { 21, 40 } } ;
+LedRange ownerRange [1] = {  { 41, 60 } } ;
+LedRange captureRange [1] = {  { 61, 80 } } ;
+
+LedMeter timer1Meter = LedMeter(leds,timer1Range,1);
+LedMeter timer2Meter = LedMeter(leds,timer2Range,1);
+LedMeter ownerMeter = LedMeter(leds,ownerRange,1);
+LedMeter captureMeter = LedMeter(leds,captureRange,1);
 
 
 LedMeter bluSwitch = LedMeter(blu_switch_leds,0,BLU_SWITCH_LED_CNT);
@@ -101,9 +116,42 @@ Proximity proximity(&game_options,RED_BTN_PIN,BLU_BTN_PIN);
 ControlPoint controlPoint = ControlPoint(&captureMeter,&ownerMeter,&eventManager,&bluSwitch,&redSwitch);
 Game game = Game(&controlPoint,&game_options,&eventManager,&proximity,&ownerMeter, &captureMeter, &timer1Meter,&timer2Meter);
 
-SSD1306AsciiWire oled;
-//this display basically lets us do fancy stuff
-LcdDisplay lcd_display = LcdDisplay(&oled);
+SSD1306Wire  display(OLED_I2C_ADDRESS, SDA_PIN, SDC_PIN);
+LcdDisplay lcd_display(&display);
+
+void loadSettings(){
+  
+  SettingsData data = {
+     //overall options
+     BP_VERSION,
+     DFPLAYER_VOLUME,
+     BRIGHTNESS,
+     
+     //game options
+     DEFAULT_GAME_TIME,
+     DEFAULT_MODE,
+     DEFAULT_CAPTURE_SECONDS,
+     DEFAULT_BUTTON_SECONDS,
+     DEFAULT_START_DELAY
+  };
+
+  if ( EEPROM.read(CONFIG_START) == BP_VERSION ){
+    for (unsigned int t=0; t<sizeof(data); t++)
+      *((char*)&data + t) = EEPROM.read(CONFIG_START + t);    
+  }
+  
+  volume = data.volume;
+  brightness = data.brightness;
+  game_options.init( data.mode, data.captureSeconds, data.captureButtonThresholdSeconds, data.timeLimitSeconds, data.startDelaySeconds);
+
+}
+void red_btn_isr(){
+  proximity.redButtonPress();
+}
+void blu_btn_isr(){
+  proximity.bluButtonPress();
+}
+
 
 void setup() {
     Serial.begin(SERIALBAUD);
@@ -111,11 +159,9 @@ void setup() {
   loadSettings();
   
   Wire.begin();                
-  oled.begin(&Adafruit128x64, OLED_I2C_ADDRESS);
-  lcd_display.init();
-  oled.set400kHz(); 
-  oled.setFont(System5x7);
-  oled.clear();
+  display.init();
+  display.clear();
+  display.display();
  
   mySoftwareSerial.begin(DFPLAYER_BAUD);
   Serial.begin(SERIALBAUD);
@@ -153,8 +199,8 @@ void setup() {
   //pinMode(BRIGHTNESS_PIN,INPUT);
   FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, LED_CNT);
   //FastLED.addLeds<NEOPIXEL, TIMER_LED_PIN>(timer_leds, TIMER_LED_CNT);
-  FastLED.addLeds<NEOPIXEL, BLU_LED_PIN>(blu_switch_leds, BLU_SWITCH_LED_CNT);
-  FastLED.addLeds<NEOPIXEL, RED_LED_PIN>(red_switch_leds, RED_SWITCH_LED_CNT);
+  //FastLED.addLeds<NEOPIXEL, BLU_LED_PIN>(blu_switch_leds, BLU_SWITCH_LED_CNT);
+  //FastLED.addLeds<NEOPIXEL, RED_LED_PIN>(red_switch_leds, RED_SWITCH_LED_CNT);
   
   #ifdef BP_DEBUG
   Serial.print("Queuing Background Track...");
@@ -183,37 +229,239 @@ void setup() {
   #endif
 }
 
-void loadSettings(){
-  
-  SettingsData data = {
-     //overall options
+void update_lcd_game_status(){
+
+  if ( game_options.getMode() == GAME_MODE_KOTH ){
+    lcd_display.sprintfLine(1,
+         F("R: %d  B: %d"),
+         game.getRedTimeLeftSeconds(),
+         game.getBluTimeLeftSeconds() );
+  }
+  else if ( game_options.getMode() == GAME_MODE_AD ){
+    lcd_display.sprintfLine(1,
+       F("T: %d"),game.getRedTimeLeftSeconds() );
+  }
+  else if ( game_options.getMode() == GAME_MODE_CP ){
+    lcd_display.sprintfLine(1,
+         F("R: %d  B: %d"),
+         game.getRedMillis(),
+         game.getBluMillis() );      
+  }
+  lcd_display.sprintfLine(2,
+    F("CP:%c OWN:%c ON:%c"),
+    team_text_char(controlPoint.getCapturing()),
+    team_text_char(controlPoint.getOwner()),
+    team_text_char(controlPoint.getOn()) );
+}
+
+float check_supply_voltage(){
+  int voltage_ad = analogRead(VOLTAGE_CHECK_PIN);
+  float voltage = voltage_ad * ( 5.00 / 1023.00 ) * 2.0;
+  return voltage;
+}
+
+void display_voltage(){
+  float voltage = check_supply_voltage();
+  char str_temp[6];
+  dtostrf(voltage, 4, 2, str_temp);
+  if ( voltage < BATTERY_LOW_VOLTAGE ){            
+    lcd_display.sprintfLine(5,F("LOW BATT: V: %s"),str_temp);        
+  }
+  else{
+    lcd_display.sprintfLine(5,F("+V: %s"),str_temp); 
+  }  
+}
+
+
+
+void save_settings(){
+   
+   SettingsData sd = {
      BP_VERSION,
-     DFPLAYER_VOLUME,
-     BRIGHTNESS,
+     //overall options
+     volume,
+     brightness,
      
      //game options
-     DEFAULT_GAME_TIME,
-     DEFAULT_MODE,
-     DEFAULT_CAPTURE_SECONDS,
-     DEFAULT_BUTTON_SECONDS,
-     DEFAULT_START_DELAY
-  };
+     game_options.getTimeLimitSeconds(),
+     game_options.getMode(),
+     game_options.getCaptureSeconds(),
+     game_options.getCaptureButtonThresholdSeconds(),
+     game_options.getStartDelaySeconds()     
+   };
+    for (unsigned int t=0; t<sizeof(sd); t++)
+        EEPROM.write(CONFIG_START + t, *((char*)&sd + t));
+}
 
-  if ( EEPROM.read(CONFIG_START) == BP_VERSION ){
-    for (unsigned int t=0; t<sizeof(data); t++)
-      *((char*)&data + t) = EEPROM.read(CONFIG_START + t);    
+int get_int_delta_from_btn(byte btn,uint8_t shortPressIncrement, uint8_t longPressIncrement){
+  int r = 0;
+  switch ( btn ){
+    case BUTTON_UP_PRESSED:{
+      r= shortPressIncrement;
+      break;}
+    case BUTTON_DOWN_PRESSED:{
+      r= -shortPressIncrement;
+      break;}
+    case BUTTON_UP_LONG_PRESSED:{
+      r=longPressIncrement;
+      break;}
+    case BUTTON_DOWN_LONG_PRESSED:{
+      r=-longPressIncrement;
+      break;}
   }
+  return r;
+}
+
+void handle_change_mode(){
+  int r = get_int_delta_from_btn(btn,1,1);
+  game_options.setMode(game_options.getMode()+r);      
   
-  volume = data.volume;
-  brightness = data.brightness;
-  game_options.init( data.mode, data.captureSeconds, data.captureButtonThresholdSeconds, data.timeLimitSeconds, data.startDelaySeconds);
+  char mode_text[6];
+  print_game_mode_text(mode_text, game_options.getMode()); 
+  lcd_display.sprintfLine(2,F("Mode: %s"),mode_text);
 
 }
-void red_btn_isr(){
-  proximity.redButtonPress();
+void handle_voltage_check(){
+  float voltage = check_supply_voltage();
+  char str_temp[6];
+  dtostrf(voltage, 4, 2, str_temp);
+  lcd_display.sprintfLine(2,F("+V: %s"),str_temp);
+
 }
-void blu_btn_isr(){
-  proximity.bluButtonPress();
+void handle_change_capture(){
+  int r = get_int_delta_from_btn(btn,1,10);
+  game_options.setCaptureSeconds(game_options.getCaptureSeconds()+r);
+  lcd_display.sprintfLine(2,F("Cap: %d"),game_options.getCaptureSeconds());
+}
+void handle_change_timelimit(){
+  int r = get_int_delta_from_btn(btn,5,30);      
+  game_options.setTimeLimitSeconds(game_options.getTimeLimitSeconds()+r);
+  lcd_display.sprintfLine(2,F("Time: %d"),game_options.getTimeLimitSeconds());
+}
+void handle_save_settings(){
+  save_settings();
+  lcd_display.printLine(2,F("Saved.") );
+
+}
+
+void handle_change_volume(){
+  int r = get_int_delta_from_btn(btn,5,10);
+  if ( volume > 100 ) volume = 100;
+  if ( volume < 0 ) volume = 0;      
+  volume = volume +r;
+  lcd_display.sprintfLine(2,F("Vol: %d"),volume);
+}
+void handle_change_brightness(){
+  int r = get_int_delta_from_btn(btn,5,10);
+  if ( brightness > 100 ) brightness = 100;
+  if ( brightness < 0 ) brightness = 0;      
+  brightness = brightness +r;
+  lcd_display.sprintfLine(2,F("Btness: %d"),brightness);
+}
+
+void handle_change_startdelay(){
+  int r = get_int_delta_from_btn(btn,1,10);      
+  game_options.setStartDelaySeconds(game_options.getStartDelaySeconds()+r);
+  lcd_display.sprintfLine(2,F("Delay: %d"),game_options.getStartDelaySeconds());
+ 
+}
+void handle_change_buttonduration(){
+  int r = get_int_delta_from_btn(btn,1,1);          
+  game_options.setCaptureButtonThresholdSeconds(game_options.getCaptureButtonThresholdSeconds()+r);
+  lcd_display.sprintfLine(2,F("Tap: %d"),game_options.getCaptureButtonThresholdSeconds());
+
+}
+void handle_start_game(){
+  //TODO: this really should move into the game itself
+  int start_delay = game_options.getStartDelaySeconds();
+  timer1Meter.init();
+  timer2Meter.init();
+  ownerMeter.init();
+  captureMeter.init();
+  
+  ownerMeter.setFgColor(CRGB::Yellow);
+  captureMeter.setFgColor(CRGB::Yellow);
+  timer1Meter.setFgColor(CRGB::Yellow);
+  timer2Meter.setFgColor(CRGB::Yellow);
+  timer1Meter.setMaxValue(start_delay);
+  ownerMeter.setMaxValue(10);
+  captureMeter.setMaxValue(10);
+  ownerMeter.setToMax();
+  captureMeter.setToMax();
+  timer2Meter.setMaxValue(start_delay);
+  lcd_display.printLine(1,F("Starting Game"));
+  eventManager.starting_game();
+  for ( int i=start_delay;i>0;i--){
+    lcd_display.sprintfLine(2,F("Starts in: %d s"),i );
+    eventManager.starts_in_seconds(i);
+    timer1Meter.setValue(i);
+    timer2Meter.setValue(i);
+    FastLED.show();
+    FastLED.delay(1000);
+  }      
+  game.start();  
+}
+
+
+
+
+
+//----------------------------------------------------------------------
+// Addition or removal of menu items in MenuData.h will require this method
+// to be modified accordingly. 
+byte processMenuCommand(byte cmdId)
+{
+  byte complete = false;  // set to true when menu command processing complete.
+  if (btn == BUTTON_SELECT_PRESSED)
+  {
+    complete = true;
+  }
+
+  switch (cmdId){
+    case mnuCmdmode: {
+      handle_change_mode();
+      break;
+    }
+    case mnuCmdcap: {
+      handle_change_capture();
+      break;
+    }
+    case mnuCmdtime: {
+      handle_change_timelimit();
+      break;
+    }
+    case mnuCmdstartdelay: {
+      handle_change_startdelay();
+      break;
+    }
+    case mnuCmdtapdur: {
+      handle_change_buttonduration();     
+      break;
+    }
+    case mnuCmdVolume: {
+      handle_change_volume();     
+      break;
+    }    
+    case mnuCmdBrightness: {
+      handle_change_brightness();     
+      break;
+    }     
+    case mnuCmdSaveSettings: {
+      handle_save_settings();
+      complete=true;     
+      break;
+    }    
+    case mnuCmdstart: {
+      handle_start_game();
+      appMode = APP_GAME_RUNNING;
+      break;
+    }
+    default:{
+      break;
+    }
+  
+  }
+  return complete;
 }
 
 void loop(){
@@ -290,233 +538,12 @@ int get_brightness_knob(){
   return brightness/4;
 }
 **/
-void display_voltage(){
-  float voltage = check_supply_voltage();
-  char str_temp[6];
-  dtostrf(voltage, 4, 2, str_temp);
-  if ( voltage < BATTERY_LOW_VOLTAGE ){            
-    lcd_display.sprintfLine(5,F("LOW BATT: V: %s"),str_temp);        
-  }
-  else{
-    lcd_display.sprintfLine(5,F("+V: %s"),str_temp); 
-  }  
-}
 
-float check_supply_voltage(){
-  int voltage_ad = analogRead(VOLTAGE_CHECK_PIN);
-  float voltage = voltage_ad * ( 5.00 / 1023.00 ) * 2.0;
-  return voltage;
-}
-void update_lcd_game_status(){
 
-  if ( game_options.getMode() == GAME_MODE_KOTH ){
-    lcd_display.sprintfLine(1,
-         F("R: %d  B: %d"),
-         game.getRedTimeLeftSeconds(),
-         game.getBluTimeLeftSeconds() );
-  }
-  else if ( game_options.getMode() == GAME_MODE_AD ){
-    lcd_display.sprintfLine(1,
-       F("T: %d"),game.getRedTimeLeftSeconds() );
-  }
-  else if ( game_options.getMode() == GAME_MODE_CP ){
-    lcd_display.sprintfLine(1,
-         F("R: %d  B: %d"),
-         game.getRedMillis(),
-         game.getBluMillis() );      
-  }
-  lcd_display.sprintfLine(2,
-    F("CP:%c OWN:%c ON:%c"),
-    team_text_char(controlPoint.getCapturing()),
-    team_text_char(controlPoint.getOwner()),
-    team_text_char(controlPoint.getOn()) );
-}
 
-//----------------------------------------------------------------------
-// Addition or removal of menu items in MenuData.h will require this method
-// to be modified accordingly. 
-byte processMenuCommand(byte cmdId)
-{
-  byte complete = false;  // set to true when menu command processing complete.
-  if (btn == BUTTON_SELECT_PRESSED)
-  {
-    complete = true;
-  }
 
-  switch (cmdId){
-    case mnuCmdmode: {
-      handle_change_mode();
-      break;
-    }
-    case mnuCmdcap: {
-      handle_change_capture();
-      break;
-    }
-    case mnuCmdtime: {
-      handle_change_timelimit();
-      break;
-    }
-    case mnuCmdstartdelay: {
-      handle_change_startdelay();
-      break;
-    }
-    case mnuCmdtapdur: {
-      handle_change_buttonduration();     
-      break;
-    }
-    case mnuCmdVolume: {
-      handle_change_volume();     
-      break;
-    }    
-    case mnuCmdBrightness: {
-      handle_change_brightness();     
-      break;
-    }     
-    case mnuCmdSaveSettings: {
-      handle_save_settings();
-      complete=true;     
-      break;
-    }    
-    case mnuCmdstart: {
-      handle_start_game();
-      appMode = APP_GAME_RUNNING;
-      break;
-    }
-    default:{
-      break;
-    }
-  
-  }
-  return complete;
-}
 
-void handle_change_mode(){
-  int r = get_int_delta_from_btn(btn,1,1);
-  game_options.setMode(game_options.getMode()+r);      
-  
-  char mode_text[6];
-  print_game_mode_text(mode_text, game_options.getMode()); 
-  lcd_display.sprintfLine(2,F("Mode: %s"),mode_text);
 
-}
-void handle_voltage_check(){
-  float voltage = check_supply_voltage();
-  char str_temp[6];
-  dtostrf(voltage, 4, 2, str_temp);
-  lcd_display.sprintfLine(2,F("+V: %s"),str_temp);
-
-}
-void handle_change_capture(){
-  int r = get_int_delta_from_btn(btn,1,10);
-  game_options.setCaptureSeconds(game_options.getCaptureSeconds()+r);
-  lcd_display.sprintfLine(2,F("Cap: %d"),game_options.getCaptureSeconds());
-}
-void handle_change_timelimit(){
-  int r = get_int_delta_from_btn(btn,5,30);      
-  game_options.setTimeLimitSeconds(game_options.getTimeLimitSeconds()+r);
-  lcd_display.sprintfLine(2,F("Time: %d"),game_options.getTimeLimitSeconds());
-}
-void handle_save_settings(){
-  save_settings();
-  lcd_display.printLine(2,F("Saved.") );
-
-}
-
-void handle_change_volume(){
-  int r = get_int_delta_from_btn(btn,5,10);
-  if ( volume > 100 ) volume = 100;
-  if ( volume < 0 ) volume = 0;      
-  volume = volume +r;
-  lcd_display.sprintfLine(2,F("Vol: %d"),volume);
-}
-void handle_change_brightness(){
-  int r = get_int_delta_from_btn(btn,5,10);
-  if ( brightness > 100 ) brightness = 100;
-  if ( brightness < 0 ) brightness = 0;      
-  brightness = brightness +r;
-  lcd_display.sprintfLine(2,F("Btness: %d"),brightness);
-}
-
-void handle_change_startdelay(){
-  int r = get_int_delta_from_btn(btn,1,10);      
-  game_options.setStartDelaySeconds(game_options.getStartDelaySeconds()+r);
-  lcd_display.sprintfLine(2,F("Delay: %d"),game_options.getStartDelaySeconds());
- 
-}
-void handle_change_buttonduration(){
-  int r = get_int_delta_from_btn(btn,1,1);          
-  game_options.setCaptureButtonThresholdSeconds(game_options.getCaptureButtonThresholdSeconds()+r);
-  lcd_display.sprintfLine(2,F("Tap: %d"),game_options.getCaptureButtonThresholdSeconds());
-
-}
-void handle_start_game(){
-  //TODO: this really should move into the game itself
-  int start_delay = game_options.getStartDelaySeconds();
-  timer1Meter.init();
-  timer2Meter.init();
-  ownerMeter.init();
-  captureMeter.init();
-  
-  ownerMeter.fgColor(CRGB::Yellow);
-  captureMeter.fgColor(CRGB::Yellow);
-  timer1Meter.fgColor(CRGB::Yellow);
-  timer2Meter.fgColor(CRGB::Yellow);
-  timer1Meter.setMaxValue(start_delay);
-  ownerMeter.setMaxValue(10);
-  captureMeter.setMaxValue(10);
-  ownerMeter.setToMax();
-  captureMeter.setToMax();
-  timer2Meter.setMaxValue(start_delay);
-  lcd_display.printLine(1,F("Starting Game"));
-  eventManager.starting_game();
-  for ( int i=start_delay;i>0;i--){
-    lcd_display.sprintfLine(2,F("Starts in: %d s"),i );
-    eventManager.starts_in_seconds(i);
-    timer1Meter.setValue(i);
-    timer2Meter.setValue(i);
-    FastLED.show();
-    FastLED.delay(1000);
-  }      
-  game.start();  
-}
-
-void save_settings(){
-   
-   SettingsData sd = {
-     BP_VERSION,
-     //overall options
-     volume,
-     brightness,
-     
-     //game options
-     game_options.getTimeLimitSeconds(),
-     game_options.getMode(),
-     game_options.getCaptureSeconds(),
-     game_options.getCaptureButtonThresholdSeconds(),
-     game_options.getStartDelaySeconds()     
-   };
-    for (unsigned int t=0; t<sizeof(sd); t++)
-        EEPROM.write(CONFIG_START + t, *((char*)&sd + t));
-}
-
-int get_int_delta_from_btn(byte btn,uint8_t shortPressIncrement, uint8_t longPressIncrement){
-  int r = 0;
-  switch ( btn ){
-    case BUTTON_UP_PRESSED:{
-      r= shortPressIncrement;
-      break;}
-    case BUTTON_DOWN_PRESSED:{
-      r= -shortPressIncrement;
-      break;}
-    case BUTTON_UP_LONG_PRESSED:{
-      r=longPressIncrement;
-      break;}
-    case BUTTON_DOWN_LONG_PRESSED:{
-      r=-longPressIncrement;
-      break;}
-  }
-  return r;
-}
 
 //----------------------------------------------------------------------
 // Callback to convert button press to navigation action.

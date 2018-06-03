@@ -1,5 +1,5 @@
 #include "battlepoint.h"
-#include <LiquidCrystal.h>
+#include "LedMeter.h"
 #define END_GAME_FLASH_INTERVAL 80
 #define END_GAME_FLASH_SECONDS 15
 /**
@@ -35,8 +35,8 @@ Game::Game(  ControlPoint* controlPoint,
     _timer2 = timer2;
     _ownerMeter = ownerMeter;
     _captureMeter = captureMeter;
-    _timer2->reverse();
-    _timer1->reverse();
+    //_timer2->reverse();
+    //_timer1->reverse();
 };
 //TRODO: should be same as endGame
 void Game::end(){
@@ -51,23 +51,23 @@ void Game::start(){
    
    _startTime = millis();
    if ( _gameOptions->getMode() == GAME_MODE_KOTH ){
-      _timer1->fgColor(CRGB::Red);
-      _timer1->bgColor(CRGB::Black);
-      _timer2->fgColor(CRGB::Blue);
-      _timer2->bgColor(CRGB::Black);
+      _timer1->setFgColor(CRGB::Red);
+      _timer1->setBgColor(CRGB::Black);
+      _timer2->setFgColor(CRGB::Blue);
+      _timer2->setBgColor(CRGB::Black);
    }
    else if ( _gameOptions->getMode() == GAME_MODE_AD ){
      _controlPoint->setRedCapture(false);
-     _timer1->fgColor(CRGB::Yellow);
-     _timer1->bgColor(CRGB::Black);
-     _timer2->fgColor(CRGB::Yellow);
-     _timer2->bgColor(CRGB::Black);
+     _timer1->setFgColor(CRGB::Yellow);
+     _timer1->setBgColor(CRGB::Black);
+     _timer2->setFgColor(CRGB::Yellow);
+     _timer2->setBgColor(CRGB::Black);
    }
    else{ //game mode CP
-     _timer1->fgColor(CRGB::Red);
-     _timer1->bgColor(CRGB::Black);
-     _timer2->fgColor(CRGB::Blue);
-     _timer2->bgColor(CRGB::Black);
+     _timer1->setFgColor(CRGB::Red);
+     _timer1->setBgColor(CRGB::Black);
+     _timer2->setFgColor(CRGB::Blue);
+     _timer2->setBgColor(CRGB::Black);
    }
 
     _winner = NOBODY;
@@ -86,8 +86,8 @@ void Game::endGame(uint8_t winner){
     Serial.println(F("Ending Game"));
     CRGB winnerColor = get_team_color(winner);
     _winner = winner;  
-    _timer1->fgColor(winnerColor);
-    _timer2->fgColor(winnerColor);
+    _timer1->setFgColor(winnerColor);
+    _timer2->setFgColor(winnerColor);
     _timer1->setToMax();
     _timer2->setToMax();
     _eventManager->victory(winner);
@@ -96,16 +96,16 @@ void Game::endGame(uint8_t winner){
     long start_time = millis();
     long end_flash_time = start_time + (long)END_GAME_FLASH_SECONDS*1000;
     while( millis() < end_flash_time ){
-        _timer1->fgColor(CRGB::Black);
-        _timer2->fgColor(CRGB::Black);
-        _ownerMeter->fgColor(CRGB::Black);
-        _captureMeter->fgColor(CRGB::Black);
+        _timer1->setFgColor(CRGB::Black);
+        _timer2->setFgColor(CRGB::Black);
+        _ownerMeter->setFgColor(CRGB::Black);
+        _captureMeter->setFgColor(CRGB::Black);
         FastLED.show();
         FastLED.delay(END_GAME_FLASH_INTERVAL);
-        _timer1->fgColor(winnerColor);
-        _timer2->fgColor(winnerColor);
-        _ownerMeter->fgColor(winnerColor);
-        _captureMeter->fgColor(winnerColor);
+        _timer1->setFgColor(winnerColor);
+        _timer2->setFgColor(winnerColor);
+        _ownerMeter->setFgColor(winnerColor);
+        _captureMeter->setFgColor(winnerColor);
         FastLED.show();
         FastLED.delay(END_GAME_FLASH_INTERVAL);                
     };

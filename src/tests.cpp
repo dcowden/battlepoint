@@ -9,16 +9,16 @@
   ownerMeter->init();
   timer1Meter->init();
   timer2Meter->init();
-  captureMeter->fgColor(CRGB::Red);
-  ownerMeter->fgColor(CRGB::Blue);
-  timer1Meter->fgColor(CRGB::Yellow);
-  timer2Meter->fgColor(CRGB::Green);  
+  captureMeter->setFgColor(CRGB::Red);
+  ownerMeter->setFgColor(CRGB::Blue);
+  timer1Meter->setFgColor(CRGB::Yellow);
+  timer2Meter->setFgColor(CRGB::Green);  
   captureMeter->setMaxValue(20);
   ownerMeter->setMaxValue(20);
   timer1Meter->setMaxValue(20);
   timer2Meter->setMaxValue(20);
-  captureMeter->reverse();
-  ownerMeter->reverse();  
+  //captureMeter->reverse();
+  //ownerMeter->reverse();  
  }
 
 void test_meters_loop(LedMeter* captureMeter, LedMeter* ownerMeter, LedMeter* timer1Meter, LedMeter* timer2Meter){
@@ -49,8 +49,8 @@ void test_buttons_loop(Proximity* proximity){
     ownerMeter->init();
     timer1Meter->init();
     timer2Meter->init();
-    captureMeter->bgColor(CRGB::Black);
-    ownerMeter->bgColor(CRGB::Black);
+    captureMeter->setBgColor(CRGB::Black);
+    ownerMeter->setBgColor(CRGB::Black);
     captureMeter->setMaxValue(captureSeconds);
     ownerMeter->setToMax();
     cp->init(captureSeconds);    

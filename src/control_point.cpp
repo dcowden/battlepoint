@@ -1,5 +1,5 @@
 #include "battlepoint.h"
-
+#include "LedMeter.h"
 #define OWNER_METER_MAX 10
 #define SWITCH_METER_MAX 10
 
@@ -31,8 +31,8 @@ void ControlPoint::init(int secondsToCapture){
    _redSwitch->init();
    _bluSwitch->setMaxValue(SWITCH_METER_MAX);
    _redSwitch->setMaxValue(SWITCH_METER_MAX);
-   _bluSwitch->fgColor(CRGB::Blue);
-   _redSwitch->fgColor(CRGB::Red);   
+   _bluSwitch->setFgColor(CRGB::Blue);
+   _redSwitch->setFgColor(CRGB::Red);   
    _bluSwitch->setToMax();
    _redSwitch->setToMax();
 
@@ -49,16 +49,16 @@ void ControlPoint::setBluCapture(boolean bluCapture){
 }    
 
 void ControlPoint::update_display(){
-  _captureMeter->fgColor(getCapturingColor());  
+  _captureMeter->setFgColor(getCapturingColor());  
   _captureMeter->setValue(_value/1000);
 
-  _ownerMeter->fgColor(getOwnerColor());
+  _ownerMeter->setFgColor(getOwnerColor());
   _ownerMeter->setToMax();
   
 }
 void ControlPoint::endGame(uint8_t winner){
-  _ownerMeter->fgColor(get_team_color(winner));
-  _captureMeter->fgColor(get_team_color(winner));
+  _ownerMeter->setFgColor(get_team_color(winner));
+  _captureMeter->setFgColor(get_team_color(winner));
   _ownerMeter->setToMax();
   _captureMeter->setToMax();
   
