@@ -33,14 +33,24 @@ void setupMeter(LedMeter* meter){
     }
 }
 
-void assert_leds_equal(CRGB* expected){
+void assert_leds_equal(CRGB* expected, int debug){
+    CRGB* debug_ptr = expected;
+    if ( debug == 1 ){
+        for (int i=0;i<LED_COUNT;i++,debug_ptr++){        
+            Serial.print("[expected=");
+            Serial.print(*debug_ptr);
+            Serial.print(",actual=");
+            Serial.print(leds[i]);
+            Serial.println("]");
+        }
+    }
     for (int i=0;i<LED_COUNT;i++,expected++){
         TEST_ASSERT_EQUAL(*expected,leds[i]);
     }
 }
 
 void test_meter_initially_all_black(void) {
-    assert_leds_equal(ALL_BLACK);
+    assert_leds_equal(ALL_BLACK,0);
 }
 
 void test_basic_meter_bounds(void){
@@ -49,116 +59,116 @@ void test_basic_meter_bounds(void){
 
 void test_basic_meter_zero(void){
     simpleMeter.setValue(0);
-    assert_leds_equal(ALL_BLACK);    
+    assert_leds_equal(ALL_BLACK,0);    
 }
 void test_basic_meter_max_value(void){
     simpleMeter.setValue(100);
-    assert_leds_equal(ALL_BLUE);
+    assert_leds_equal(ALL_BLUE,0);
 }
 
 void test_basic_meter_mid_value(void){
     simpleMeter.setValue(50);
     CRGB expected[LED_COUNT] = {CRGB::Blue, CRGB::Blue,CRGB::Blue,CRGB::Blue,
                                 CRGB::Black,CRGB::Black, CRGB::Black, CRGB::Black };
-    assert_leds_equal(expected);
+    assert_leds_equal(expected,0);
 }
 
 void test_basic_meter_nearly_full_value_still_isnt_full(void){
     simpleMeter.setValue(95);
     CRGB expected[LED_COUNT] = {CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue,
                                 CRGB::Blue,CRGB::Blue,CRGB::Blue, CRGB::Black };
-    assert_leds_equal(expected);
+    assert_leds_equal(expected,0);
 }
 
 void test_basic_meter_tiny_value_still_isnt_lit(void){
     simpleMeter.setValue(11);
-    assert_leds_equal(ALL_BLACK);
+    assert_leds_equal(ALL_BLACK,0);
 }
 
 void test_reversed_meter_zero(void){
     reversedMeter.setValue(0);
-    assert_leds_equal(ALL_BLACK);    
+    assert_leds_equal(ALL_BLACK,0);    
 }
 void test_reversed_meter_max_value(void){
     reversedMeter.setValue(100);
-    assert_leds_equal(ALL_BLUE);
+    assert_leds_equal(ALL_BLUE,0);
 }
 
 void test_reversed_meter_mid_value(void){
     reversedMeter.setValue(50);
     CRGB expected[LED_COUNT] = { CRGB::Black,CRGB::Black, CRGB::Black, CRGB::Black, 
                                 CRGB::Blue,CRGB::Blue,CRGB::Blue,CRGB::Blue };
-    assert_leds_equal(expected);
+    assert_leds_equal(expected,0);
 }
 
 void test_reversed_meter_nearly_full_value_still_isnt_full(void){
     reversedMeter.setValue(95);
     CRGB expected[LED_COUNT] = {CRGB::Black, CRGB::Blue,CRGB::Blue, CRGB::Blue,
                                 CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue };
-    assert_leds_equal(expected);
+    assert_leds_equal(expected,0);
 }
 
 void test_reversed_meter_tiny_value_still_isnt_lit(void){
     reversedMeter.setValue(11);
-    assert_leds_equal(ALL_BLACK);
+    assert_leds_equal(ALL_BLACK,0);
 }
 
 void test_double_meter_zero(void){
     twoRangeMeter.setValue(0);
-    assert_leds_equal(ALL_BLACK);    
+    assert_leds_equal(ALL_BLACK,0);    
 }
 
 void test_double_meter_max_value(void){
     twoRangeMeter.setValue(100);
-    assert_leds_equal(ALL_BLUE);
+    assert_leds_equal(ALL_BLUE,0);
 }
 
 void test_double_meter_mid_value(void){
     twoRangeMeter.setValue(50);
     CRGB expected[LED_COUNT] = { CRGB::Blue,CRGB::Blue, CRGB::Black, CRGB::Black,
                                  CRGB::Blue,CRGB::Blue, CRGB::Black, CRGB::Black };
-    assert_leds_equal(expected);
+    assert_leds_equal(expected,0);
 }
 
 void test_double_meter_nearly_full_value_still_isnt_full(void){
     twoRangeMeter.setValue(95);
     CRGB expected[LED_COUNT] = {CRGB::Blue,CRGB::Blue, CRGB::Blue,CRGB::Black, 
                                 CRGB::Blue,CRGB::Blue, CRGB::Blue,CRGB::Black };
-    assert_leds_equal(expected);
+    assert_leds_equal(expected,0);
 }
 
 void test_double_meter_tiny_value_still_isnt_lit(void){
     twoRangeMeter.setValue(18);
-    assert_leds_equal(ALL_BLACK);
+    assert_leds_equal(ALL_BLACK,0);
 }
 
 void test_mirrored_meter_zero(void){
-    twoRangeMeter.setValue(0);
-    assert_leds_equal(ALL_BLACK);    
+    mirroredRangeMeter.setValue(0);
+    assert_leds_equal(ALL_BLACK,0);    
 }
 
 void test_mirrored_meter_max_value(void){
-    twoRangeMeter.setValue(100);
-    assert_leds_equal(ALL_BLUE);
+    mirroredRangeMeter.setValue(100);
+    assert_leds_equal(ALL_BLUE,0);
 }
 
 void test_mirrored_meter_mid_value(void){
-    twoRangeMeter.setValue(50);
+    mirroredRangeMeter.setValue(50);
     CRGB expected[LED_COUNT] = { CRGB::Blue,CRGB::Blue, CRGB::Black, CRGB::Black,
                                  CRGB::Black,CRGB::Black, CRGB::Blue, CRGB::Blue };
-    assert_leds_equal(expected);
+    assert_leds_equal(expected,0);
 }
 
 void test_mirrored_meter_nearly_full_value_still_isnt_full(void){
-    twoRangeMeter.setValue(95);
+    mirroredRangeMeter.setValue(95);
     CRGB expected[LED_COUNT] = {CRGB::Blue,CRGB::Blue, CRGB::Blue,CRGB::Black, 
                                 CRGB::Black,CRGB::Blue, CRGB::Blue,CRGB::Blue };
-    assert_leds_equal(expected);
+    assert_leds_equal(expected,0);
 }
 
 void test_mirrored_meter_tiny_value_still_isnt_lit(void){
-    twoRangeMeter.setValue(18);
-    assert_leds_equal(ALL_BLACK);
+    mirroredRangeMeter.setValue(18);
+    assert_leds_equal(ALL_BLACK,0);
 }
 
 void setup() {
