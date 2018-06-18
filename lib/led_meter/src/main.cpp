@@ -67,7 +67,7 @@ void FastLEDshowTask(void *pvParameters)
 }
 
 //LedMeter t1 = LedMeter(leds,testRange1,2);
-LedMeter t2 = LedMeter(leds,testRange2,2);
+LedMeter t2 = LedMeter(leds,testRange2,2,CRGB::Blue,CRGB::Black);
 
 
 void setup() {
@@ -77,10 +77,7 @@ void setup() {
     //t1.setMaxValue(100);
     //t1.setBgColor(CRGB::Red);
     //t1.setBgColor(CRGB::Blue);
-    t2.setMaxValue(100);
-    t2.setFgColor(CRGB::Blue);
-    t2.setBgColor(CRGB::Black);
-    t2.init(); 
+ 
     FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, LED_CNT);
     FastLED.setBrightness(40);
 

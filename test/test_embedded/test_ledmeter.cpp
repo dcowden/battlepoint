@@ -7,16 +7,16 @@
 CRGB leds[LED_COUNT];
 
 LedRange testRange [1] = {  { 0, 7 } };
-LedMeter simpleMeter = LedMeter(leds,testRange,1);
+LedMeter simpleMeter = LedMeter(leds,testRange,1, CRGB::Blue, CRGB::Black);
 
 LedRange reversedTestRange [1] = {  { 7, 0 } };
-LedMeter reversedMeter = LedMeter(leds,reversedTestRange,1);
+LedMeter reversedMeter = LedMeter(leds,reversedTestRange,1, CRGB::Blue, CRGB::Black);
 
 LedRange doubleTestRange [2] = {  {0, 3}, { 4, 7}  };
-LedMeter twoRangeMeter = LedMeter(leds,doubleTestRange,2);
+LedMeter twoRangeMeter = LedMeter(leds,doubleTestRange,2, CRGB::Blue, CRGB::Black);
 
 LedRange mirroredTestRange [2] = {  {0, 3}, { 7, 4}  };
-LedMeter mirroredRangeMeter = LedMeter(leds,mirroredTestRange,2);
+LedMeter mirroredRangeMeter = LedMeter(leds,mirroredTestRange,2, CRGB::Blue, CRGB::Black);
 
 CRGB ALL_BLUE[LED_COUNT] = {CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue,
                             CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue };
@@ -24,10 +24,7 @@ CRGB ALL_BLUE[LED_COUNT] = {CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue,
 CRGB ALL_BLACK[LED_COUNT] = {CRGB::Black, CRGB::Black,CRGB::Black, CRGB::Black,
                             CRGB::Black, CRGB::Black,CRGB::Black, CRGB::Black };
 
-void setupMeter(LedMeter* meter){    
-    meter->setMaxValue(100);
-    meter->setBgColor(CRGB::Black);
-    meter->setFgColor(CRGB::Blue);
+void resetLEDS(){    
     for ( int i=0;i<LED_COUNT;i++){
         leds[i] = CRGB::Black;
     }
@@ -178,7 +175,7 @@ void setup() {
     UNITY_BEGIN();
 
     //simple meter tests
-    setupMeter(&simpleMeter);
+    resetLEDS();
     RUN_TEST(test_meter_initially_all_black);
     RUN_TEST(test_basic_meter_bounds);
     RUN_TEST(test_basic_meter_zero);
@@ -188,7 +185,7 @@ void setup() {
     RUN_TEST(test_basic_meter_tiny_value_still_isnt_lit);
 
     //reversed meter tests
-    setupMeter(&reversedMeter);
+    resetLEDS();
     RUN_TEST(test_reversed_meter_zero);
     RUN_TEST(test_reversed_meter_max_value);
     RUN_TEST(test_reversed_meter_mid_value);
@@ -196,7 +193,7 @@ void setup() {
     RUN_TEST(test_reversed_meter_tiny_value_still_isnt_lit);
 
     //tworange meter
-    setupMeter(&twoRangeMeter);
+    resetLEDS();
     RUN_TEST(test_double_meter_zero);
     RUN_TEST(test_double_meter_max_value);
     RUN_TEST(test_double_meter_mid_value);
@@ -204,7 +201,7 @@ void setup() {
     RUN_TEST(test_double_meter_tiny_value_still_isnt_lit);
 
     //two range, mirrored meter
-    setupMeter(&mirroredRangeMeter);
+    resetLEDS();
     RUN_TEST(test_mirrored_meter_zero);
     RUN_TEST(test_mirrored_meter_max_value);
     RUN_TEST(test_mirrored_meter_mid_value);
