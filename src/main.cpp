@@ -12,7 +12,7 @@
 #include <FastLED.h>
 #include "util.h"
 #include "battlepoint.h"
-#include "LedMeter.h"
+#include <LedMeter.h>
 #include "SoftwareSerial.h"
 #include "DFRobotDFPlayerMini.h"
 #include "sound.h"

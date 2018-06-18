@@ -13,7 +13,7 @@
             "request": "launch",
             "name": "PlatformIO Debugger",
             "executable": "/home/dcowden/gitwork/battlepoint/.pioenvs/nodemcuv2/firmware.elf",
-            "toolchainBinDir": "/home/dcowden/.platformio/packages/toolchain-xtensa/bin",
+            "toolchainBinDir": "/home/dcowden/.platformio/packages/toolchain-xtensa32/bin",
             "preLaunchTask": "PlatformIO: Pre-Debug",
             "internalConsoleOptions": "openOnSessionStart"
         },
@@ -22,7 +22,7 @@
             "request": "launch",
             "name": "PlatformIO Debugger (Skip Pre-Debug)",
             "executable": "/home/dcowden/gitwork/battlepoint/.pioenvs/nodemcuv2/firmware.elf",
-            "toolchainBinDir": "/home/dcowden/.platformio/packages/toolchain-xtensa/bin",
+            "toolchainBinDir": "/home/dcowden/.platformio/packages/toolchain-xtensa32/bin",
             "internalConsoleOptions": "openOnSessionStart"
         }
     ]
