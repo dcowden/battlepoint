@@ -50,8 +50,9 @@ void test_meter_initially_all_black(void) {
     assert_leds_equal(ALL_BLACK,0);
 }
 
-void test_basic_meter_bounds(void){
-    TEST_ASSERT_EQUAL(100, simpleMeter.getMaxValue());    
+void test_basic_meter_initial_state(void){
+    TEST_ASSERT_EQUAL(100, simpleMeter.getMaxValue()); 
+    TEST_ASSERT_EQUAL(0, simpleMeter.getValue());
 }
 
 void test_basic_meter_zero(void){
@@ -177,7 +178,7 @@ void setup() {
     //simple meter tests
     resetLEDS();
     RUN_TEST(test_meter_initially_all_black);
-    RUN_TEST(test_basic_meter_bounds);
+    RUN_TEST(test_basic_meter_initial_state);
     RUN_TEST(test_basic_meter_zero);
     RUN_TEST(test_basic_meter_max_value);
     RUN_TEST(test_basic_meter_mid_value);
