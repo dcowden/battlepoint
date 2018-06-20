@@ -12,11 +12,6 @@ LedMeter:: LedMeter(CRGB* new_leds, LedRange* new_ranges,
   init();
 };
 
-void LedMeter::init(){
-  setValue(0);
-  update();
-};
-
 void LedMeter::setValue(int new_value){
   value = new_value;
   update();

@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#define FASTLED_ALLOW_INTERRUPTS 0
 #include <FastLED.h>
 #ifndef LEDMETER_H
 #define LEDMETER_H
@@ -33,8 +32,7 @@ class LedMeter {
     int value;
     int maxValue;
     CRGB fgColor;
-    CRGB bgColor;
-    void init();    
+    CRGB bgColor;   
     void updateRange(LedRange* range);
 };
 #endif
