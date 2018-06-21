@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <FastLED.h>
-#ifndef LEDMETER_H
-#define LEDMETER_H
+#ifndef __INC_LEDMETER_H
+#define __INC_LEDMETER_H
 
 struct LedRange {
     //zero based
