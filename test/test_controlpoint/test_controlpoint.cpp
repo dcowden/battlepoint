@@ -1,172 +1,115 @@
 #include <Arduino.h>
-#include "LedMeter.h"
+#include "ControlPoint.h"
 #include <unity.h>
-#include <FastLED.h>
+#include <Teams.h>
 
-#define LED_COUNT 8
-CRGB leds[LED_COUNT];
-
-LedRange testRange [1] = {  { 0, 7 } };
-LedMeter simpleMeter = LedMeter(leds,testRange,1, CRGB::Blue, CRGB::Black);
-
-LedRange reversedTestRange [1] = {  { 7, 0 } };
-LedMeter reversedMeter = LedMeter(leds,reversedTestRange,1, CRGB::Blue, CRGB::Black);
-
-LedRange doubleTestRange [2] = {  {0, 3}, { 4, 7}  };
-LedMeter twoRangeMeter = LedMeter(leds,doubleTestRange,2, CRGB::Blue, CRGB::Black);
-
-LedRange mirroredTestRange [2] = {  {0, 3}, { 7, 4}  };
-LedMeter mirroredRangeMeter = LedMeter(leds,mirroredTestRange,2, CRGB::Blue, CRGB::Black);
-
-CRGB ALL_BLUE[LED_COUNT] = {CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue,
-                            CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue };
-
-CRGB ALL_BLACK[LED_COUNT] = {CRGB::Black, CRGB::Black,CRGB::Black, CRGB::Black,
-                            CRGB::Black, CRGB::Black,CRGB::Black, CRGB::Black };
-
-void resetLEDS(){    
-    for ( int i=0;i<LED_COUNT;i++){
-        leds[i] = CRGB::Black;
-    }
+void test_control_point_initial_value(void){
+    ControlPoint cp = ControlPoint();
+    cp.init(5);
+    TEST_ASSERT_FALSE(cp.isCaptured());
+    TEST_ASSERT_FALSE(cp.isContested());
+    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::RED));
+    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::BLU));
+    TEST_ASSERT_FALSE(cp.isOn(Team::RED));
+    TEST_ASSERT_FALSE(cp.isOn(Team::BLU));
+    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getOwner());
+    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing());
+    TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
 }
 
-void assert_leds_equal(CRGB* expected, int debug){
-    CRGB* debug_ptr = expected;
-    if ( debug == 1 ){
-        for (int i=0;i<LED_COUNT;i++,debug_ptr++){        
-            Serial.print("[expected=");
-            Serial.print(*debug_ptr);
-            Serial.print(",actual=");
-            Serial.print(leds[i]);
-            Serial.println("]");
-        }
-    }
-    for (int i=0;i<LED_COUNT;i++,expected++){
-        TEST_ASSERT_EQUAL(*expected,leds[i]);
-    }
+void test_basic_blu_capture(void ){
+    ControlPoint cp = ControlPoint();
+    TestProximity tp = TestProximity();
+    tp.setBluClose(true);
+    cp.init(1);
+    cp.update(&tp);
+    delay(200);
+    cp.update(&tp);
+    TEST_ASSERT_INT_WITHIN(1,20,cp.getPercentCaptured());
+    TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
+    TEST_ASSERT_FALSE(cp.isCaptured());
+    TEST_ASSERT_FALSE(cp.isContested());
+    TEST_ASSERT_FALSE(cp.isOn(Team::RED));
+    TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
+    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getOwner());
+    TEST_ASSERT_EQUAL(Team::BLU, cp.getCapturing());
+    delay(900);
+    cp.update(&tp);
+    //counter intuitieve: percent captured is reset to zero after capture
+    TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
+    TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
+    TEST_ASSERT_TRUE(cp.isCaptured());
+    TEST_ASSERT_FALSE(cp.isContested());
+    TEST_ASSERT_FALSE(cp.isOn(Team::RED));
+    TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
+    TEST_ASSERT_EQUAL(Team::BLU, cp.getOwner());
+    TEST_ASSERT_TRUE(cp.isCapturedBy(Team::BLU));
+    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing());
 }
 
-void test_meter_initially_all_black(void) {
-    assert_leds_equal(ALL_BLACK,0);
+void test_contested(void){
+    ControlPoint cp = ControlPoint();
+    TestProximity tp = TestProximity();
+    tp.setBluClose(true);
+    tp.setRedClose(true);
+    cp.init(1);
+    cp.update(&tp);
+    delay(200);
+    cp.update(&tp);
+    TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
+    TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
+    TEST_ASSERT_TRUE(cp.isOn(Team::RED));
+    TEST_ASSERT_FALSE(cp.isCaptured());
+    TEST_ASSERT_TRUE(cp.isContested());
+    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getOwner());
+    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::BLU));
+    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::RED));
+    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing());
 }
 
-void test_basic_meter_initial_state(void){
-    TEST_ASSERT_EQUAL(100, simpleMeter.getMaxValue()); 
-    TEST_ASSERT_EQUAL(0, simpleMeter.getValue());
+void test_count_back_down(void){
+    ControlPoint cp = ControlPoint();
+    TestProximity tp = TestProximity();
+    tp.setBluClose(true);
+    cp.init(1);
+    cp.update(&tp);
+    delay(200);
+    cp.update(&tp);
+    TEST_ASSERT_INT_WITHIN(1,20, cp.getPercentCaptured());
+    tp.setBluClose(false);
+    delay(100);
+    cp.update(&tp);
+    TEST_ASSERT_EQUAL(10, cp.getPercentCaptured());
+    delay(400);
+    cp.update(&tp);
+    TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
+    TEST_ASSERT_FALSE(cp.isOn(Team::BLU));
+    TEST_ASSERT_FALSE(cp.isOn(Team::RED));
+    TEST_ASSERT_FALSE(cp.isCaptured());
+    TEST_ASSERT_FALSE(cp.isContested());
+    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getOwner());
+    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::BLU));
+    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::RED));
+    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing());
 }
 
-void test_basic_meter_zero(void){
-    simpleMeter.setValue(0);
-    assert_leds_equal(ALL_BLACK,0);    
-}
-void test_basic_meter_max_value(void){
-    simpleMeter.setValue(100);
-    assert_leds_equal(ALL_BLUE,0);
-}
+void test_capture_disabled(void){
+    ControlPoint cp = ControlPoint();
+    cp.setBluCaptureEnabled(false);
+    cp.setRedCaptureEnabled(true);
+    TestProximity tp = TestProximity();
+    tp.setBluClose(true);
+    cp.init(1);
+    cp.update(&tp);
+    delay(200);
+    cp.update(&tp);
 
-void test_basic_meter_mid_value(void){
-    simpleMeter.setValue(50);
-    CRGB expected[LED_COUNT] = {CRGB::Blue, CRGB::Blue,CRGB::Blue,CRGB::Blue,
-                                CRGB::Black,CRGB::Black, CRGB::Black, CRGB::Black };
-    assert_leds_equal(expected,0);
-}
-
-void test_basic_meter_nearly_full_value_still_isnt_full(void){
-    simpleMeter.setValue(95);
-    CRGB expected[LED_COUNT] = {CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue,
-                                CRGB::Blue,CRGB::Blue,CRGB::Blue, CRGB::Black };
-    assert_leds_equal(expected,0);
-}
-
-void test_basic_meter_tiny_value_still_isnt_lit(void){
-    simpleMeter.setValue(11);
-    assert_leds_equal(ALL_BLACK,0);
-}
-
-void test_reversed_meter_zero(void){
-    reversedMeter.setValue(0);
-    assert_leds_equal(ALL_BLACK,0);    
-}
-void test_reversed_meter_max_value(void){
-    reversedMeter.setValue(100);
-    assert_leds_equal(ALL_BLUE,0);
-}
-
-void test_reversed_meter_mid_value(void){
-    reversedMeter.setValue(50);
-    CRGB expected[LED_COUNT] = { CRGB::Black,CRGB::Black, CRGB::Black, CRGB::Black, 
-                                CRGB::Blue,CRGB::Blue,CRGB::Blue,CRGB::Blue };
-    assert_leds_equal(expected,0);
-}
-
-void test_reversed_meter_nearly_full_value_still_isnt_full(void){
-    reversedMeter.setValue(95);
-    CRGB expected[LED_COUNT] = {CRGB::Black, CRGB::Blue,CRGB::Blue, CRGB::Blue,
-                                CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue };
-    assert_leds_equal(expected,0);
-}
-
-void test_reversed_meter_tiny_value_still_isnt_lit(void){
-    reversedMeter.setValue(11);
-    assert_leds_equal(ALL_BLACK,0);
-}
-
-void test_double_meter_zero(void){
-    twoRangeMeter.setValue(0);
-    assert_leds_equal(ALL_BLACK,0);    
-}
-
-void test_double_meter_max_value(void){
-    twoRangeMeter.setValue(100);
-    assert_leds_equal(ALL_BLUE,0);
-}
-
-void test_double_meter_mid_value(void){
-    twoRangeMeter.setValue(50);
-    CRGB expected[LED_COUNT] = { CRGB::Blue,CRGB::Blue, CRGB::Black, CRGB::Black,
-                                 CRGB::Blue,CRGB::Blue, CRGB::Black, CRGB::Black };
-    assert_leds_equal(expected,0);
-}
-
-void test_double_meter_nearly_full_value_still_isnt_full(void){
-    twoRangeMeter.setValue(95);
-    CRGB expected[LED_COUNT] = {CRGB::Blue,CRGB::Blue, CRGB::Blue,CRGB::Black, 
-                                CRGB::Blue,CRGB::Blue, CRGB::Blue,CRGB::Black };
-    assert_leds_equal(expected,0);
-}
-
-void test_double_meter_tiny_value_still_isnt_lit(void){
-    twoRangeMeter.setValue(18);
-    assert_leds_equal(ALL_BLACK,0);
-}
-
-void test_mirrored_meter_zero(void){
-    mirroredRangeMeter.setValue(0);
-    assert_leds_equal(ALL_BLACK,0);    
-}
-
-void test_mirrored_meter_max_value(void){
-    mirroredRangeMeter.setValue(100);
-    assert_leds_equal(ALL_BLUE,0);
-}
-
-void test_mirrored_meter_mid_value(void){
-    mirroredRangeMeter.setValue(50);
-    CRGB expected[LED_COUNT] = { CRGB::Blue,CRGB::Blue, CRGB::Black, CRGB::Black,
-                                 CRGB::Black,CRGB::Black, CRGB::Blue, CRGB::Blue };
-    assert_leds_equal(expected,0);
-}
-
-void test_mirrored_meter_nearly_full_value_still_isnt_full(void){
-    mirroredRangeMeter.setValue(95);
-    CRGB expected[LED_COUNT] = {CRGB::Blue,CRGB::Blue, CRGB::Blue,CRGB::Black, 
-                                CRGB::Black,CRGB::Blue, CRGB::Blue,CRGB::Blue };
-    assert_leds_equal(expected,0);
-}
-
-void test_mirrored_meter_tiny_value_still_isnt_lit(void){
-    mirroredRangeMeter.setValue(18);
-    assert_leds_equal(ALL_BLACK,0);
+    TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
+    TEST_ASSERT_FALSE(cp.isCaptured());
+    TEST_ASSERT_FALSE(cp.isContested());
+    TEST_ASSERT_FALSE(cp.isOn(Team::RED));   
+    TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
+    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing());     
 }
 
 void setup() {
@@ -174,41 +117,11 @@ void setup() {
     delay(2000);
     Serial.begin(115200);
     UNITY_BEGIN();
-
-    //simple meter tests
-    resetLEDS();
-    RUN_TEST(test_meter_initially_all_black);
-    RUN_TEST(test_basic_meter_initial_state);
-    RUN_TEST(test_basic_meter_zero);
-    RUN_TEST(test_basic_meter_max_value);
-    RUN_TEST(test_basic_meter_mid_value);
-    RUN_TEST(test_basic_meter_nearly_full_value_still_isnt_full);
-    RUN_TEST(test_basic_meter_tiny_value_still_isnt_lit);
-
-    //reversed meter tests
-    resetLEDS();
-    RUN_TEST(test_reversed_meter_zero);
-    RUN_TEST(test_reversed_meter_max_value);
-    RUN_TEST(test_reversed_meter_mid_value);
-    RUN_TEST(test_reversed_meter_nearly_full_value_still_isnt_full);
-    RUN_TEST(test_reversed_meter_tiny_value_still_isnt_lit);
-
-    //tworange meter
-    resetLEDS();
-    RUN_TEST(test_double_meter_zero);
-    RUN_TEST(test_double_meter_max_value);
-    RUN_TEST(test_double_meter_mid_value);
-    RUN_TEST(test_double_meter_nearly_full_value_still_isnt_full);
-    RUN_TEST(test_double_meter_tiny_value_still_isnt_lit);
-
-    //two range, mirrored meter
-    resetLEDS();
-    RUN_TEST(test_mirrored_meter_zero);
-    RUN_TEST(test_mirrored_meter_max_value);
-    RUN_TEST(test_mirrored_meter_mid_value);
-    RUN_TEST(test_mirrored_meter_nearly_full_value_still_isnt_full);
-    RUN_TEST(test_mirrored_meter_tiny_value_still_isnt_lit);
-
+    RUN_TEST(test_control_point_initial_value);
+    RUN_TEST(test_basic_blu_capture);
+    RUN_TEST(test_contested);
+    RUN_TEST(test_count_back_down);
+    RUN_TEST(test_capture_disabled);
     UNITY_END();
 
 }

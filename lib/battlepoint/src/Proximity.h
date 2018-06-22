@@ -12,6 +12,47 @@ class Proximity {
 
 };
 
+//for testing
+class TestProximity: public Proximity {
+  public:
+
+    TestProximity() : Proximity() {
+      _redClose = false;
+      _bluClose = false;
+    };
+
+    void setRedClose( boolean redClose){
+      _redClose = redClose;
+    }
+    void setBluClose( boolean bluClose){
+      _bluClose = bluClose;
+    }
+
+    virtual boolean isRedClose(){
+      return _redClose;
+    };
+
+    virtual boolean isBluClose(){
+      return _bluClose;
+    };
+
+    virtual boolean isTeamClose(Team t){
+      if ( t == Team::RED){
+        return isRedClose();
+      }
+      else if ( t == Team::BLU){
+        return isBluClose();
+      }
+      else{
+        return false;
+      }
+    };    
+
+  private:
+    boolean _redClose;
+    boolean _bluClose;
+};
+
 class ButtonProximity: public Proximity {
   public:
 
