@@ -1,5 +1,5 @@
-#ifndef __INC_GAMEOPTIONS_H
-#define __INC_GAMEOPTIONS_H
+#ifndef __INC_GAME_H
+#define __INC_GAME_H
 #include <Arduino.h>
 
 typedef enum {
