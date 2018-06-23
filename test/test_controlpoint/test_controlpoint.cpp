@@ -6,10 +6,7 @@
 void test_control_point_initial_value(void){
     ControlPoint cp = ControlPoint();
     cp.init(5);
-    TEST_ASSERT_FALSE(cp.isCaptured());
     TEST_ASSERT_FALSE(cp.isContested());
-    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::RED));
-    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::BLU));
     TEST_ASSERT_FALSE(cp.isOn(Team::RED));
     TEST_ASSERT_FALSE(cp.isOn(Team::BLU));
     TEST_ASSERT_EQUAL(Team::NOBODY, cp.getOwner());
@@ -21,13 +18,13 @@ void test_basic_blu_capture(void ){
     ControlPoint cp = ControlPoint();
     TestProximity tp = TestProximity();
     tp.setBluClose(true);
+ 
     cp.init(1);
     cp.update(&tp);
     delay(200);
     cp.update(&tp);
     TEST_ASSERT_INT_WITHIN(1,20,cp.getPercentCaptured());
-    TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
-    TEST_ASSERT_FALSE(cp.isCaptured());
+    TEST_ASSERT_TRUE(cp.isOn(Team::BLU));    
     TEST_ASSERT_FALSE(cp.isContested());
     TEST_ASSERT_FALSE(cp.isOn(Team::RED));
     TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
@@ -38,12 +35,10 @@ void test_basic_blu_capture(void ){
     //counter intuitieve: percent captured is reset to zero after capture
     TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
     TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
-    TEST_ASSERT_TRUE(cp.isCaptured());
     TEST_ASSERT_FALSE(cp.isContested());
     TEST_ASSERT_FALSE(cp.isOn(Team::RED));
     TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
     TEST_ASSERT_EQUAL(Team::BLU, cp.getOwner());
-    TEST_ASSERT_TRUE(cp.isCapturedBy(Team::BLU));
     TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing());
 }
 
@@ -59,19 +54,17 @@ void test_contested(void){
     TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
     TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
     TEST_ASSERT_TRUE(cp.isOn(Team::RED));
-    TEST_ASSERT_FALSE(cp.isCaptured());
     TEST_ASSERT_TRUE(cp.isContested());
     TEST_ASSERT_EQUAL(Team::NOBODY, cp.getOwner());
-    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::BLU));
-    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::RED));
     TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing());
 }
 
 void test_count_back_down(void){
     ControlPoint cp = ControlPoint();
+    cp.init(1);    
     TestProximity tp = TestProximity();
     tp.setBluClose(true);
-    cp.init(1);
+
     cp.update(&tp);
     delay(200);
     cp.update(&tp);
@@ -85,31 +78,62 @@ void test_count_back_down(void){
     TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
     TEST_ASSERT_FALSE(cp.isOn(Team::BLU));
     TEST_ASSERT_FALSE(cp.isOn(Team::RED));
-    TEST_ASSERT_FALSE(cp.isCaptured());
     TEST_ASSERT_FALSE(cp.isContested());
     TEST_ASSERT_EQUAL(Team::NOBODY, cp.getOwner());
-    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::BLU));
-    TEST_ASSERT_FALSE(cp.isCapturedBy(Team::RED));
     TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing());
 }
 
 void test_capture_disabled(void){
     ControlPoint cp = ControlPoint();
-    cp.setBluCaptureEnabled(false);
-    cp.setRedCaptureEnabled(true);
-    TestProximity tp = TestProximity();
-    tp.setBluClose(true);
     cp.init(1);
+    cp.setBluCaptureEnabled(false);
+    cp.setRedCaptureEnabled(false);
+    TEST_ASSERT_FALSE(cp.getBluCaptureEnabled());
+    TEST_ASSERT_FALSE(cp.getRedCaptureEnabled());
+    TestProximity tp = TestProximity();
+    tp.setRedClose(true);
+
+    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing()); 
     cp.update(&tp);
     delay(200);
     cp.update(&tp);
 
-    TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
-    TEST_ASSERT_FALSE(cp.isCaptured());
+    TEST_ASSERT_TRUE(cp.isOn(Team::RED));
+    TEST_ASSERT_FALSE(cp.isOn(Team::BLU));
     TEST_ASSERT_FALSE(cp.isContested());
-    TEST_ASSERT_FALSE(cp.isOn(Team::RED));   
-    TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
-    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing());     
+    TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing()); 
+    TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());        
+}
+
+void test_reverse_capture(void){
+    ControlPoint cp = ControlPoint();
+    cp.init(1);
+    cp.setBluCaptureEnabled(true);
+    cp.setRedCaptureEnabled(true);
+    TestProximity tp = TestProximity();
+    tp.setRedClose(true);
+    cp.setOwner(Team::BLU);    
+    cp.update(&tp);
+    delay(200);
+    cp.update(&tp);
+    TEST_ASSERT_INT_WITHIN(1,20, cp.getPercentCaptured()); 
+    TEST_ASSERT_TRUE(cp.isOn(Team::RED));
+    TEST_ASSERT_EQUAL(Team::BLU, cp.getOwner());
+
+    TEST_ASSERT_FALSE(cp.isContested());
+    TEST_ASSERT_EQUAL(Team::RED, cp.getCapturing()); 
+    tp.setBluClose(true);
+    cp.update(&tp);
+    delay(100);
+    cp.update(&tp);
+    //no decrement or increment if contested
+    TEST_ASSERT_TRUE(cp.isContested());
+    TEST_ASSERT_INT_WITHIN(1,20, cp.getPercentCaptured());
+    tp.setRedClose(false);
+    cp.update(&tp);
+    delay(100);
+    cp.update(&tp);
+    TEST_ASSERT_INT_WITHIN(1,10, cp.getPercentCaptured());
 }
 
 void setup() {
@@ -122,6 +146,7 @@ void setup() {
     RUN_TEST(test_contested);
     RUN_TEST(test_count_back_down);
     RUN_TEST(test_capture_disabled);
+    RUN_TEST(test_reverse_capture);
     UNITY_END();
 
 }

@@ -8,9 +8,8 @@ class ControlPoint {
   public:
     ControlPoint();
     void update(Proximity* proximity );
-    boolean isCaptured();
-    boolean isCapturedBy(Team owner);
     Team getOwner();
+    boolean isOwnedBy(Team t);
     boolean isOn(Team t);
     boolean isContested();
     Team getCapturing();
@@ -20,6 +19,8 @@ class ControlPoint {
     void debug_state();
     void setRedCaptureEnabled(boolean redCapture);
     void setBluCaptureEnabled(boolean bluCapture);
+    boolean getRedCaptureEnabled();
+    boolean getBluCaptureEnabled();
   private:
     int _secondsToCapture;
     Team _owner;

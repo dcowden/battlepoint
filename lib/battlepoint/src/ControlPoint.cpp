@@ -20,6 +20,12 @@ void ControlPoint::setRedCaptureEnabled(boolean redCapture){
   _enableRedCapture = redCapture;
 }
 
+boolean ControlPoint::getRedCaptureEnabled(){
+  return _enableRedCapture;
+}
+boolean ControlPoint::getBluCaptureEnabled(){
+  return _enableRedCapture;
+}
 boolean ControlPoint::isContested(){
   return _contested;
 }
@@ -57,7 +63,7 @@ void ControlPoint::update(Proximity* proximity  ){
   //  (b) the other guy owns the point
   if ( _capturing == Team::NOBODY && is_one_team_on ){
     if ( _owner == Team::NOBODY || _on != _owner ){
-        if ( (_on == Team::RED && _enableRedCapture) || (_on == Team::BLU && _enableBluCapture == true)){
+        if ( ( (_on == Team::RED) && _enableRedCapture  ) || ((_on == Team::BLU) && _enableBluCapture )){
           _capturing = _on;
         }
     }
@@ -122,16 +128,12 @@ Team ControlPoint::getCapturing(){
 Team ControlPoint::getOwner(){
   return _owner;
 }
+boolean ControlPoint::isOwnedBy(Team t){
+  return _owner == t;
+}
 
 int ControlPoint::getPercentCaptured(){
   return (int)(_captureMillis/ (_secondsToCapture * 10) );
 }
 
-boolean ControlPoint::isCaptured(){
-  return _owner != Team::NOBODY && (_on == Team::NOBODY || _on == _owner ) && _captureMillis <= 0;
-}
-
-boolean ControlPoint::isCapturedBy(Team owner){
-  return isCaptured() && _owner == owner;
-}
 
