@@ -2,6 +2,18 @@
 #include "Teams.h"
 #include <FastLED.h>
 
+Team oppositeTeam(Team t){
+  if ( t == Team::RED){
+    return Team::BLU;
+  }
+  else if ( t == Team::BLU){
+    return Team::RED;
+  }
+  else{
+    return Team::NOBODY;
+  }
+}
+
 CRGB getTeamColor(Team t){
     if (t == Team::RED){
         return CRGB::Red;

@@ -22,7 +22,7 @@ typedef enum {
 } GameMode;
 
 typedef struct {
-    GameMode _mode;
+    GameMode mode;
     uint8_t captureSeconds;
     uint8_t captureButtonThresholdSeconds;
     uint8_t startDelaySeconds;
@@ -31,10 +31,12 @@ typedef struct {
 
 typedef struct {
     long timeRemainingSeconds;
-    GameMode mode;
+    GameOptions gameOptions;
     Team winner;
     boolean isover;
     boolean isrunning;
+    int redSecondsAccumulated;
+    int bluSecondsAccumulated;
 } GameStatistics;
 
 class Game {
@@ -51,24 +53,65 @@ class Game {
     void update();
     void end();
     GameStatistics getStatus();
-    
+    Team getWinner();
+    int getAccumulatedSeconds(Team t);
+    int getRemainingSecondsForTeam(Team t);
+    int getRemainingSeconds();
+    int getSecondsElapsed();
+    boolean isRunning();
+    GameOptions getOptions();
+    virtual Team checkVictory(){ return Team::NOBODY; } ;
+    virtual boolean checkOvertime() { return false; };
+    virtual int getRemainingSeconds(){ return 0;};
+    int getRemainingSeconds(Team t);
+    virtual void init();
+
+  protected:
+    GameOptions _options;
+    GameAudioManager* _audio;
+    ControlPoint* _controlPoint;
+    LedMeter* _ownerMeter;
+    LedMeter* _captureMeter;
+    LedMeter* _timer1Meter;
+    LedMeter* _timer2Meter;
+    Proximity* _proximity;    
+    long _redAccumulatedTimeMillis;
+    long _bluAccumulatedTimeMillis;
+
   private:
     Team _winner;
     long _startTime;
     long _lastUpdateTime;
-    long _redMillis;
-    long _bluMillis;
-    GameOptions _gameOptions;
-    GameAudioManager* _audioManager;
-    ControlPoint* _controlPoint;
-    LedMeter* _ownerMeter;
-    LedMeter* _captureMeter;
-    LedMeter* _timer1;
-    LedMeter* _timer2;
-    Proximity* _proximity;    
-    void endGame(Team winner);
+    void endGameWithWinner(Team winner);
+    void updateAccumulatedTime();
+    void updateAllMetersToColor(CRGB color);
 
 };
 
+class KothGame : public Game{
+    public:
+        virtual Team checkVictory();
+        virtual boolean checkOvertime();
+        virtual int getRemainingSeconds();
+        virtual void init();   
+
+    private:
+        boolean checkVictory(Team t);  
+};
+
+class ADGame : public Game{
+    public:
+        virtual Team checkVictory();
+        virtual boolean checkOvertime();
+        virtual int getRemainingSeconds();
+        virtual void init();  
+};
+class CPGame : public Game{
+    public:
+        virtual Team checkVictory();
+        virtual boolean checkOvertime();
+        virtual int getRemainingSeconds();
+        virtual void init();   
+};
 
 #endif

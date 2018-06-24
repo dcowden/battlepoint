@@ -1,4 +1,11 @@
 #include <Game.h>
+//TODO: have to abstract this to allow unit testing!
+#include <FastLED.h>
+#include <util.h>
+#include <Teams.h>
+
+#define END_GAME_FLASH_SECONDS 10
+#define END_GAME_FLASH_INTERVAL_MILLISECONDS 80
 
 Game::Game(  ControlPoint* controlPoint,
            GameOptions gameOptions,
@@ -8,216 +15,132 @@ Game::Game(  ControlPoint* controlPoint,
            LedMeter* captureMeter,
            LedMeter* timer1,
            LedMeter* timer2 ){
-    _gameOptions = gameOptions;
-    _audioManager = audioManager;
+    _options = gameOptions;
+    _audio = audioManager;
     _controlPoint = controlPoint;
     _proximity = proximity;
-    _timer1 = timer1;
-    _timer2 = timer2;
+    _timer1Meter = timer1;
+    _timer2Meter = timer2;
     _ownerMeter = ownerMeter;
     _captureMeter = captureMeter;
-
 };
 
 void Game::end(){
   _winner = Team::NOBODY;
-  _audioManager->cancelled();
-}
-void Game::start(){
-   
-   _startTime = millis();
-   if ( _gameOptions._mode == GameMode. ){
-      _timer1->setFgColor(CRGB::Red);
-      _timer1->setBgColor(CRGB::Black);
-      _timer2->setFgColor(CRGB::Blue);
-      _timer2->setBgColor(CRGB::Black);
-   }
-   else if ( _gameOptions->getMode() == GAME_MODE_AD ){
-     _controlPoint->setRedCapture(false);
-     _timer1->setFgColor(CRGB::Yellow);
-     _timer1->setBgColor(CRGB::Black);
-     _timer2->setFgColor(CRGB::Yellow);
-     _timer2->setBgColor(CRGB::Black);
-   }
-   else{ //game mode CP
-     _timer1->setFgColor(CRGB::Red);
-     _timer1->setBgColor(CRGB::Black);
-     _timer2->setFgColor(CRGB::Blue);
-     _timer2->setBgColor(CRGB::Black);
-   }
+  _audio->cancelled();
+};
 
-    _winner = NOBODY;
-    _redMillis=0 ;
-    _bluMillis=0 ;
-   _lastUpdateTime = millis();
-   _startTime = 0;
-   _timer1->setMaxValue(_gameOptions->getTimeLimitSeconds());
-   _timer2->setMaxValue(_gameOptions->getTimeLimitSeconds());
-   _eventManager->game_started();
-   _shouldAnnounceOvertime = true;
+void Game::start(){ 
+   
+    _startTime = millis();
+    init();
+    _winner = Team::NOBODY;
+    _redAccumulatedTimeMillis=0 ;
+    _bluAccumulatedTimeMillis=0 ;
+    _lastUpdateTime = millis();
+    _startTime = 0;
+    _timer1Meter->setMaxValue(_options.timeLimitSeconds);
+    _timer2Meter->setMaxValue(_options.timeLimitSeconds);
+    _audio->game_started();
 
 };
 
-void Game::endGame(uint8_t winner){
-    Serial.println(F("Ending Game"));
-    CRGB winnerColor = get_team_color(winner);
+void Game::updateAllMetersToColor(CRGB color){
+    _timer1Meter->setFgColor(color);
+    _timer2Meter->setFgColor(color);
+    _ownerMeter->setFgColor(color);
+    _captureMeter->setFgColor(color);    
+};
+
+void Game::endGameWithWinner(Team winner){    
+    CRGB winnerColor = getTeamColor(winner);
     _winner = winner;  
-    _timer1->setFgColor(winnerColor);
-    _timer2->setFgColor(winnerColor);
-    _timer1->setToMax();
-    _timer2->setToMax();
-    _eventManager->victory(winner);
-    _controlPoint->endGame(winner);
+    _audio->victory(winner);
+
+    updateAllMetersToColor(winnerColor);
+
+    _timer1Meter->setToMax();
+    _timer2Meter->setToMax();
+    _ownerMeter->setToMax();
+    _captureMeter->setToMax();
 
     long start_time = millis();
     long end_flash_time = start_time + (long)END_GAME_FLASH_SECONDS*1000;
     while( millis() < end_flash_time ){
-        _timer1->setFgColor(CRGB::Black);
-        _timer2->setFgColor(CRGB::Black);
-        _ownerMeter->setFgColor(CRGB::Black);
-        _captureMeter->setFgColor(CRGB::Black);
+        updateAllMetersToColor(CRGB::Black);
         FastLED.show();
-        FastLED.delay(END_GAME_FLASH_INTERVAL);
-        _timer1->setFgColor(winnerColor);
-        _timer2->setFgColor(winnerColor);
-        _ownerMeter->setFgColor(winnerColor);
-        _captureMeter->setFgColor(winnerColor);
+        FastLED.delay(END_GAME_FLASH_INTERVAL_MILLISECONDS);
+        updateAllMetersToColor(winnerColor);
         FastLED.show();
-        FastLED.delay(END_GAME_FLASH_INTERVAL);                
-    };
-    
-    
-}
+        FastLED.delay(END_GAME_FLASH_INTERVAL_MILLISECONDS);                
+    }; 
+};
 
-boolean Game::isOver(){
-  return _winner != NOBODY;
-}
-int Game::getRedTimeLeftSeconds(){
-  return (_gameOptions->getTimeLimitMilliSeconds() - _redMillis)/1000;
+GameOptions Game::getOptions(){
+    return _options;
 };
-int Game::getBluTimeLeftSeconds(){
-  return (_gameOptions->getTimeLimitMilliSeconds() - _bluMillis)/1000;
+
+boolean Game::isRunning(){
+  return _winner == Team::NOBODY;
 };
-uint8_t Game::winner(){
+
+int Game::getRemainingSeconds(Team t){
+  return _options.timeLimitSeconds - getAccumulatedSeconds(t);
+};
+
+int Game::getRemainingSecondsForTeam(Team t){
+  if ( t == Team::RED){
+      return millis_to_seconds(_redAccumulatedTimeMillis);
+  }
+  else if ( t == Team::BLU){
+      millis_to_seconds(_bluAccumulatedTimeMillis);
+  }
+  else{
+      return 0;
+  }
+};
+
+Team Game::getWinner(){
   return _winner;
 };
-boolean Game::isRunning(){
-  return ! isOver();
+
+int Game::getSecondsElapsed(){
+   return secondsSince(_startTime);
 };
-long Game::getRedMillis(){
-  return _redMillis;
-}
-long Game::getBluMillis(){
-  return _bluMillis;
-}
+
+void Game::updateAccumulatedTime(){
+    long millisSinceLastUpdate = millis() - _lastUpdateTime;
+    if ( _controlPoint->getOwner() == Team::RED ){
+       _redAccumulatedTimeMillis += millisSinceLastUpdate;
+    }
+    if ( _controlPoint->getOwner() == Team::BLU ){
+       _bluAccumulatedTimeMillis += millisSinceLastUpdate;
+    }
+
+};
+
 void Game::update(){
      
-  if ( isOver() ){
+  if ( ! isRunning() ){
     return;
   }
-  //Serial.println("X");  
-  //update capture status on the control point
   _controlPoint->update(_proximity );
+  updateAccumulatedTime();
 
-  long millisSinceLastUpdate = millis() - _lastUpdateTime;
-  int redSecondsLeft = getRedTimeLeftSeconds();
-  int bluSecondsLeft = getBluTimeLeftSeconds();
-
-  
-  if ( _gameOptions->getMode() == GAME_MODE_KOTH ){
- 
-      if ( _controlPoint->getOwner() == RED ){
-        _redMillis += millisSinceLastUpdate;
-      }
-      else if ( _controlPoint->getOwner() == BLU ){
-        _bluMillis += millisSinceLastUpdate;
-      }
-      
-      //check for game over and overtime
-      if ( redSecondsLeft <= 0 ){
-        if ( _controlPoint->capturedBy(RED)){
-          endGame(RED);  
-          return;     
-        }
-        else{
-          if ( _shouldAnnounceOvertime ){
-            _eventManager->overtime();
-            _shouldAnnounceOvertime = false;
-          }
-        }
-      }
-      if (bluSecondsLeft <= 0 ){
-        if ( _controlPoint->capturedBy(BLU)){
-          endGame(BLU);
-          return;
-        } 
-        else{
-          if ( _shouldAnnounceOvertime ){
-            _eventManager->overtime();
-            _shouldAnnounceOvertime = false;
-          }
-        }        
-      }
-      
-      if ( _controlPoint->getOwner() == BLU ){
-         _eventManager->ends_in_seconds(bluSecondsLeft);  
-      }
-      else if ( _controlPoint->getOwner() == RED ){
-        _eventManager->ends_in_seconds(redSecondsLeft);  
-      }      
-  }
-  else if ( _gameOptions->getMode() == GAME_MODE_AD ){
-
-    _eventManager->ends_in_seconds(redSecondsLeft);
-    
-    _redMillis += millisSinceLastUpdate;
-    _bluMillis += millisSinceLastUpdate;
-    if ( _controlPoint->capturedBy(BLU) ){
-      endGame(BLU);
+  Team winner = checkVictory();
+  if ( winner != Team::NOBODY){
+      endGameWithWinner(winner);
       return;
-    }
-
-    if ( redSecondsLeft <= 0 ){
-      if ( _controlPoint->getCapturing()  == BLU ){
-          if ( _shouldAnnounceOvertime ){
-            _eventManager->overtime();
-            _shouldAnnounceOvertime = false;
-          }              
-      }
-      else{
-          endGame(RED); 
-          return;       
-      }
-    }
-  }
-  else{  //GAME_MODE_CP
-    if ( _controlPoint->getOwner() == RED ){
-      _redMillis += millisSinceLastUpdate;
-    }
-    else if ( _controlPoint->getOwner() == BLU ){
-      _bluMillis += millisSinceLastUpdate;
-    }
-
-    //this kind of game ends when time is up. the winner
-    //is the one with the most time
-    long currentTime= millis();
-    
-    if ( (currentTime - _startTime)/1000 > _gameOptions->getTimeLimitSeconds() ){
-       if ( _redMillis > _bluMillis ){
-          endGame(RED);  
-          return;      
-       }
-       else{
-          endGame(BLU);
-          return;
-       }
-    }
   }
 
-  _timer1->setValue(redSecondsLeft);
-  _timer2->setValue(bluSecondsLeft);
+  if ( checkOvertime() ){
+      _audio->overtime();
+  }
+
+  _audio->ends_in_seconds( getRemainingSeconds() );
+  _timer1Meter->setValue(getRemainingSeconds(Team::RED));
+  _timer2Meter->setValue(getRemainingSeconds(Team::BLU));
   _lastUpdateTime = millis();  
-
 
 };
 
@@ -237,4 +160,4 @@ void print_game_mode_text(char* buffer, GameMode mode){
       strcpy(buffer,"??");
   }
   
-}
+};

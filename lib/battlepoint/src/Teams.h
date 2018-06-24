@@ -11,5 +11,6 @@ typedef enum{
 
 CRGB getTeamColor(Team t);
 char teamTextChar(Team team);
+Team oppositeTeam(Team t);
 void printTeamText(char* buffer, Team team);
 #endif
