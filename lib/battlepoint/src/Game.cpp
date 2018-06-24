@@ -1,6 +1,4 @@
 #include <Game.h>
-//TODO: have to abstract this to allow unit testing!
-#include <FastLED.h>
 #include <util.h>
 #include <Teams.h>
 
@@ -45,33 +43,31 @@ void Game::start(){
 
 };
 
-void Game::updateAllMetersToColor(CRGB color){
-    _timer1Meter->setFgColor(color);
-    _timer2Meter->setFgColor(color);
-    _ownerMeter->setFgColor(color);
-    _captureMeter->setFgColor(color);    
+void Game::updateAllMetersToColors(TeamColor fg, TeamColor bg){
+    _timer1Meter->setColors(fg,bg);
+    _timer2Meter->setColors(fg,bg);
+    _ownerMeter->setColors(fg,bg);
+    _captureMeter->setColors(fg,bg);  
 };
 
-void Game::endGameDisplay(){
+void Game::endGameDisplay( void (*delay_function)() ){
     long start_time = millis();
     long end_flash_time = start_time + (long)END_GAME_FLASH_SECONDS*1000;
-    CRGB winnerColor = getTeamColor(_winner);
+    TeamColor winnerColor = getTeamColor(_winner);
     while( millis() < end_flash_time ){
-        updateAllMetersToColor(CRGB::Black);
-        FastLED.show();
-        FastLED.delay(END_GAME_FLASH_INTERVAL_MILLISECONDS);
-        updateAllMetersToColor(winnerColor);
-        FastLED.show();
-        FastLED.delay(END_GAME_FLASH_INTERVAL_MILLISECONDS);                
+        updateAllMetersToColors(TeamColor::BLACK, TeamColor::BLACK);
+        delay_function();
+        updateAllMetersToColors(winnerColor, TeamColor::BLACK);
+        delay_function();
     }; 
 };
 
 void Game::endGameWithWinner(Team winner){    
-    CRGB winnerColor = getTeamColor(winner);
+    TeamColor winnerColor = getTeamColor(winner);
     _winner = winner;  
     _audio->victory(winner);
 
-    updateAllMetersToColor(winnerColor);
+    updateAllMetersToColors(winnerColor, TeamColor::BLACK);
 
     _timer1Meter->setToMax();
     _timer2Meter->setToMax();

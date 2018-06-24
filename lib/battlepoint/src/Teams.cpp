@@ -14,18 +14,18 @@ Team oppositeTeam(Team t){
   }
 }
 
-CRGB getTeamColor(Team t){
+TeamColor getTeamColor(Team t){
     if (t == Team::RED){
-        return CRGB::Red;
+        return TeamColor::RED;
     }
     else if (t == Team::BLU ){
-        return CRGB::Blue;
+        return TeamColor::BLUE;
     }
     else if ( t == Team::NOBODY){
-        return CRGB::Black;
+        return TeamColor::BLACK;
     }
     else{
-        return CRGB::Aqua;
+        return TeamColor::AQUA;
     }
 }
 

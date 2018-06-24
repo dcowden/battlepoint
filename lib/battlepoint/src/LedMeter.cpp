@@ -1,6 +1,25 @@
 #include "LedMeter.h"
+#include "Teams.h"
 #define DEFAULT_MAX 100
-LedMeter:: LedMeter(CRGB* new_leds, LedRange* new_ranges, 
+
+CRGB LedMeter::getFastLEDColor(TeamColor tc){
+  switch(tc){
+    case TeamColor::RED:
+        return CRGB::Red;
+    case TeamColor::BLUE:
+        return CRGB::Blue;
+    case TeamColor::BLACK:
+        return CRGB::Black;
+    case TeamColor::YELLOW:
+        return CRGB::Yellow;
+    case TeamColor::AQUA:
+        return CRGB::Aqua;
+    default:
+        return CRGB::Black;
+  }
+}
+
+LedMeter::LedMeter(CRGB* new_leds, LedRange* new_ranges, 
         uint8_t new_ranges_cnt, CRGB new_fgcolor, CRGB new_bgcolor ){
   leds = new_leds;
   ranges_cnt = new_ranges_cnt;
@@ -9,8 +28,13 @@ LedMeter:: LedMeter(CRGB* new_leds, LedRange* new_ranges,
   fgColor = new_fgcolor;
   bgColor = new_bgcolor;
   maxValue = DEFAULT_MAX;
-  init();
+  init();  
 };
+
+void LedMeter::setColors(TeamColor fg, TeamColor bg){
+  setFgColor(getFastLEDColor(fg));
+  setBgColor(getFastLEDColor(bg));
+}
 
 void LedMeter::setValue(int new_value){
   value = new_value;

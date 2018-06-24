@@ -54,7 +54,7 @@ class Game {
     void end();
     GameStatistics getStatus();
     Team getWinner();
-    void endGameDisplay();
+    void endGameDisplay( void (*delay_function)() );
     int getAccumulatedSeconds(Team t);
     int getRemainingSecondsForTeam(Team t);
     int getRemainingSeconds();
@@ -85,7 +85,7 @@ class Game {
     long _lastUpdateTime;
     void endGameWithWinner(Team winner);
     void updateAccumulatedTime();
-    void updateAllMetersToColor(CRGB color);
+    void updateAllMetersToColors(TeamColor fg, TeamColor bg);
 
 };
 
