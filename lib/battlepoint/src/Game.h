@@ -54,6 +54,7 @@ class Game {
     void end();
     GameStatistics getStatus();
     Team getWinner();
+    void endGameDisplay();
     int getAccumulatedSeconds(Team t);
     int getRemainingSecondsForTeam(Team t);
     int getRemainingSeconds();

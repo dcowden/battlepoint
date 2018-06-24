@@ -52,6 +52,20 @@ void Game::updateAllMetersToColor(CRGB color){
     _captureMeter->setFgColor(color);    
 };
 
+void Game::endGameDisplay(){
+    long start_time = millis();
+    long end_flash_time = start_time + (long)END_GAME_FLASH_SECONDS*1000;
+    CRGB winnerColor = getTeamColor(_winner);
+    while( millis() < end_flash_time ){
+        updateAllMetersToColor(CRGB::Black);
+        FastLED.show();
+        FastLED.delay(END_GAME_FLASH_INTERVAL_MILLISECONDS);
+        updateAllMetersToColor(winnerColor);
+        FastLED.show();
+        FastLED.delay(END_GAME_FLASH_INTERVAL_MILLISECONDS);                
+    }; 
+};
+
 void Game::endGameWithWinner(Team winner){    
     CRGB winnerColor = getTeamColor(winner);
     _winner = winner;  
@@ -64,16 +78,6 @@ void Game::endGameWithWinner(Team winner){
     _ownerMeter->setToMax();
     _captureMeter->setToMax();
 
-    long start_time = millis();
-    long end_flash_time = start_time + (long)END_GAME_FLASH_SECONDS*1000;
-    while( millis() < end_flash_time ){
-        updateAllMetersToColor(CRGB::Black);
-        FastLED.show();
-        FastLED.delay(END_GAME_FLASH_INTERVAL_MILLISECONDS);
-        updateAllMetersToColor(winnerColor);
-        FastLED.show();
-        FastLED.delay(END_GAME_FLASH_INTERVAL_MILLISECONDS);                
-    }; 
 };
 
 GameOptions Game::getOptions(){

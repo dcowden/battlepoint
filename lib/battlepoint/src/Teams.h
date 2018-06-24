@@ -9,6 +9,13 @@ typedef enum{
     ALL  
 } Team;
 
+typedef enum{
+    RED,
+    BLU,
+    YELLOW,
+    BLACK
+} TeamColors;
+
 CRGB getTeamColor(Team t);
 char teamTextChar(Team team);
 Team oppositeTeam(Team t);
