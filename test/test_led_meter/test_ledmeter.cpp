@@ -169,6 +169,24 @@ void test_mirrored_meter_tiny_value_still_isnt_lit(void){
     assert_leds_equal(ALL_BLACK,0);
 }
 
+void test_simple_meter_initial_state(void){
+    SimpleMeter sm = SimpleMeter();
+    TEST_ASSERT_EQUAL(100, sm.getMaxValue()); 
+    TEST_ASSERT_EQUAL(0, sm.getValue());    
+}
+
+void test_simple_meter_set_values(void){
+    SimpleMeter sm = SimpleMeter();
+    sm.setValue(50);
+
+    sm.setMaxValue(200);
+    TEST_ASSERT_EQUAL(200, sm.getMaxValue()); 
+    TEST_ASSERT_EQUAL(50, sm.getValue());      
+    sm.setToMin();
+    TEST_ASSERT_EQUAL(0, sm.getValue());
+    sm.setToMax();
+    TEST_ASSERT_EQUAL(200, sm.getValue());
+}
 void setup() {
     
     delay(2000);
@@ -209,6 +227,9 @@ void setup() {
     RUN_TEST(test_mirrored_meter_nearly_full_value_still_isnt_full);
     RUN_TEST(test_mirrored_meter_tiny_value_still_isnt_lit);
 
+    //tests a simple meter
+    RUN_TEST(test_simple_meter_initial_state);
+    RUN_TEST(test_simple_meter_set_values);
     UNITY_END();
 
 }

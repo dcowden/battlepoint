@@ -3,6 +3,32 @@
 
 #define DEFAULT_MAX 100
 
+Meter::Meter(){
+  value=0;
+  maxValue = DEFAULT_MAX;
+};
+
+void Meter::setValue(int new_value){
+  value = new_value;
+  update();
+};
+void Meter::setToMax(){
+  setValue(maxValue);
+};
+void Meter::setToMin(){
+  setValue(0);
+};
+void Meter::setMaxValue(int new_max_value){
+  maxValue = new_max_value;
+};
+
+int Meter::getValue(){
+  return value;
+};
+int Meter::getMaxValue(){
+  return maxValue;
+};
+
 CRGB LedMeter::getFastLEDColor(TeamColor tc){
   switch(tc){
     case TeamColor::COLOR_RED:
@@ -25,50 +51,30 @@ LedMeter::LedMeter(CRGB* new_leds, LedRange* new_ranges,
   leds = new_leds;
   ranges_cnt = new_ranges_cnt;
   ranges = new_ranges;
-  value = 0;
   fgColor = new_fgcolor;
   bgColor = new_bgcolor;
-  maxValue = DEFAULT_MAX;
   init();  
 };
 
 void LedMeter::setColors(TeamColor fg, TeamColor bg){
   setFgColor(getFastLEDColor(fg));
   setBgColor(getFastLEDColor(bg));
-}
+};
 
-void LedMeter::setValue(int new_value){
-  value = new_value;
-  update();
-};
-void LedMeter::setToMax(){
-  setValue(maxValue);
-};
-void LedMeter::setToMin(){
-  setValue(0);
-};
-void LedMeter::setMaxValue(int new_max_value){
-  maxValue = new_max_value;
-};
 void LedMeter::setFgColor(CRGB new_color){
   fgColor = new_color;
 };
 void LedMeter::setBgColor(CRGB new_color){
   bgColor = new_color;
 };
-int LedMeter::getValue(){
-  return value;
-};
-int LedMeter::getMaxValue(){
-  return maxValue;
-};
+
 
 void LedMeter::update(){
   struct LedRange* ptr = ranges;
   for ( int i=0;i<ranges_cnt;i++,ptr++){
     updateRange(ptr);
   }
-}
+};
 
 void LedMeter::updateRange(LedRange* range){
 
@@ -76,7 +82,7 @@ void LedMeter::updateRange(LedRange* range){
   int endIndex = range->endIndex;
   int pixels_on_index = 0;
   if ( endIndex > startIndex){
-    pixels_on_index  = map(value,0,maxValue,startIndex-1,endIndex);
+    pixels_on_index  = map(getValue(),0,getMaxValue(),startIndex-1,endIndex);
     for ( int i=startIndex;i<= endIndex;i++){
       if ( i <= pixels_on_index  ){
         leds[i] =fgColor;
@@ -87,7 +93,7 @@ void LedMeter::updateRange(LedRange* range){
     }    
   }
   else{
-    pixels_on_index  = map(value,0,maxValue,startIndex+1,endIndex);
+    pixels_on_index  = map(getValue(),0,getMaxValue(),startIndex+1,endIndex);
     for ( int i=endIndex;i<= startIndex;i++){
       if ( i >= pixels_on_index  ){
         leds[i] =fgColor;
@@ -98,4 +104,8 @@ void LedMeter::updateRange(LedRange* range){
     }    
   }
 
+}
+
+void SimpleMeter::update(){
+  //do nothing;
 }

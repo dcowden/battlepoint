@@ -13,19 +13,28 @@ struct LedRange {
 
 CRGB getFastLEDColor(TeamColor tc);
 
-class LedMeter {
-
-  //a meter which has two colors, and can represent a value between two boundaries
+class Meter {
   public:
-    LedMeter (CRGB* leds, LedRange* ranges, uint8_t new_ranges_cnt,CRGB new_fgcolor, CRGB new_bgcolor );
+    Meter ();
     void setValue(int value );
     void setMaxValue(int value);
     void setToMax();
     void setToMin();
-    void setColors(TeamColor fg, TeamColor bg);
     int getValue();
     int getMaxValue();
-    void update();
+    virtual void update() = 0;
+  private:
+    int value;
+    int maxValue;
+};
+
+class LedMeter : public Meter{
+
+  //a meter which has two colors, and can represent a value between two boundaries
+  public:
+    LedMeter (CRGB* leds, LedRange* ranges, uint8_t new_ranges_cnt,CRGB new_fgcolor, CRGB new_bgcolor );
+    void setColors(TeamColor fg, TeamColor bg);
+    virtual void update();
 
   private:
     CRGB getFastLEDColor(TeamColor tc);
@@ -34,10 +43,15 @@ class LedMeter {
     CRGB* leds;
     LedRange* ranges;
     uint8_t ranges_cnt;    
-    int value;
-    int maxValue;
     CRGB fgColor;
     CRGB bgColor;   
     void updateRange(LedRange* range);
 };
+
+class SimpleMeter: public Meter{
+  public:
+    virtual void update();
+};
+
+
 #endif
