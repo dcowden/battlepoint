@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <FastLED.h>
+#include <Teams.h>
+
 #ifndef __INC_LEDMETER_H
 #define __INC_LEDMETER_H
 

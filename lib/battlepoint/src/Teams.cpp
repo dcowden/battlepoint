@@ -16,16 +16,16 @@ Team oppositeTeam(Team t){
 
 TeamColor getTeamColor(Team t){
     if (t == Team::RED){
-        return TeamColor::RED;
+        return TeamColor::COLOR_RED;
     }
     else if (t == Team::BLU ){
-        return TeamColor::BLUE;
+        return TeamColor::COLOR_BLUE;
     }
     else if ( t == Team::NOBODY){
-        return TeamColor::BLACK;
+        return TeamColor::COLOR_BLACK;
     }
     else{
-        return TeamColor::AQUA;
+        return TeamColor::COLOR_AQUA;
     }
 }
 

@@ -7,14 +7,6 @@
 #include <Teams.h>
 #include <Proximity.h>
 
-typedef struct {
-     uint8_t bp_version;
-     uint8_t volume;
-     uint8_t brightness;
-     
-     GameOptions options;
-} EEPromSettingsData;
-
 typedef enum {
     AD,
     KOTH,
@@ -28,6 +20,14 @@ typedef struct {
     uint8_t startDelaySeconds;
     int timeLimitSeconds;
 } GameOptions;
+
+typedef struct {
+     uint8_t bp_version;
+     uint8_t volume;
+     uint8_t brightness;
+     
+     GameOptions options;
+} EEPromSettingsData;
 
 typedef struct {
     long timeRemainingSeconds;
@@ -57,14 +57,12 @@ class Game {
     void endGameDisplay( void (*delay_function)() );
     int getAccumulatedSeconds(Team t);
     int getRemainingSecondsForTeam(Team t);
-    int getRemainingSeconds();
     int getSecondsElapsed();
     boolean isRunning();
     GameOptions getOptions();
     virtual Team checkVictory(){ return Team::NOBODY; } ;
     virtual boolean checkOvertime() { return false; };
     virtual int getRemainingSeconds(){ return 0;};
-    int getRemainingSeconds(Team t);
     virtual void init();
 
   protected:

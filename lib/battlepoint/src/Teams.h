@@ -9,11 +9,11 @@ typedef enum{
 } Team;
 
 typedef enum{
-    RED,
-    BLUE,
-    YELLOW,
-    BLACK,
-    AQUA
+    COLOR_RED,
+    COLOR_BLUE,
+    COLOR_YELLOW,
+    COLOR_BLACK,
+    COLOR_AQUA
 } TeamColor;
 
 TeamColor getTeamColor(Team t);

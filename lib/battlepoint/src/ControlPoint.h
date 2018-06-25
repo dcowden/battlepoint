@@ -4,24 +4,20 @@
 #include "Proximity.h"
 #include "Teams.h"
 
-class ControlPoint {
+class BaseControlPoint {
   public:
-    ControlPoint();
-    void update(Proximity* proximity );
     Team getOwner();
     boolean isOwnedBy(Team t);
     boolean isOn(Team t);
     boolean isContested();
     Team getCapturing();
     void setOwner(Team owner);
-    int getPercentCaptured();
-    void init(int secondsToCapture);
-    void debug_state();
     void setRedCaptureEnabled(boolean redCapture);
     void setBluCaptureEnabled(boolean bluCapture);
     boolean getRedCaptureEnabled();
-    boolean getBluCaptureEnabled();
-  private:
+    boolean getBluCaptureEnabled();    
+
+  protected:
     int _secondsToCapture;
     Team _owner;
     Team _on;
@@ -31,8 +27,26 @@ class ControlPoint {
     long _lastUpdateTime;
     boolean _enableBluCapture;
     boolean _enableRedCapture;
+
+};
+
+class ControlPoint: public BaseControlPoint {
+  public:
+    ControlPoint();
+    void update(Proximity* proximity );
+    int getPercentCaptured();
+    void init(int secondsToCapture);
+
+  private:
     void _check_capture();
     void _dec_capture(long millis);
     void _inc_capture(long millis);
   };
+
+//for testing
+class TestControlPoint: public BaseControlPoint {
+  public:
+    void setCapturingTeam(Team t);
+    void setOn(Team t);
+};
 #endif

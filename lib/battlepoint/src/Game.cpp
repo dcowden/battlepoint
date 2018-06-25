@@ -55,9 +55,9 @@ void Game::endGameDisplay( void (*delay_function)() ){
     long end_flash_time = start_time + (long)END_GAME_FLASH_SECONDS*1000;
     TeamColor winnerColor = getTeamColor(_winner);
     while( millis() < end_flash_time ){
-        updateAllMetersToColors(TeamColor::BLACK, TeamColor::BLACK);
+        updateAllMetersToColors(TeamColor::COLOR_BLACK, TeamColor::COLOR_BLACK);
         delay_function();
-        updateAllMetersToColors(winnerColor, TeamColor::BLACK);
+        updateAllMetersToColors(winnerColor, TeamColor::COLOR_BLACK);
         delay_function();
     }; 
 };
@@ -67,7 +67,7 @@ void Game::endGameWithWinner(Team winner){
     _winner = winner;  
     _audio->victory(winner);
 
-    updateAllMetersToColors(winnerColor, TeamColor::BLACK);
+    updateAllMetersToColors(winnerColor, TeamColor::COLOR_BLACK);
 
     _timer1Meter->setToMax();
     _timer2Meter->setToMax();
@@ -84,20 +84,8 @@ boolean Game::isRunning(){
   return _winner == Team::NOBODY;
 };
 
-int Game::getRemainingSeconds(Team t){
-  return _options.timeLimitSeconds - getAccumulatedSeconds(t);
-};
-
 int Game::getRemainingSecondsForTeam(Team t){
-  if ( t == Team::RED){
-      return millis_to_seconds(_redAccumulatedTimeMillis);
-  }
-  else if ( t == Team::BLU){
-      millis_to_seconds(_bluAccumulatedTimeMillis);
-  }
-  else{
-      return 0;
-  }
+  return _options.timeLimitSeconds - getAccumulatedSeconds(t);
 };
 
 Team Game::getWinner(){
@@ -138,8 +126,8 @@ void Game::update(){
   }
 
   _audio->ends_in_seconds( getRemainingSeconds() );
-  _timer1Meter->setValue(getRemainingSeconds(Team::RED));
-  _timer2Meter->setValue(getRemainingSeconds(Team::BLU));
+  _timer1Meter->setValue(getRemainingSecondsForTeam(Team::RED));
+  _timer2Meter->setValue(getRemainingSecondsForTeam(Team::BLU));
   _lastUpdateTime = millis();  
 
 };

@@ -1,18 +1,19 @@
 #include "LedMeter.h"
-#include "Teams.h"
+#include <Teams.h>
+
 #define DEFAULT_MAX 100
 
 CRGB LedMeter::getFastLEDColor(TeamColor tc){
   switch(tc){
-    case TeamColor::RED:
+    case TeamColor::COLOR_RED:
         return CRGB::Red;
-    case TeamColor::BLUE:
+    case TeamColor::COLOR_BLUE:
         return CRGB::Blue;
-    case TeamColor::BLACK:
+    case TeamColor::COLOR_BLACK:
         return CRGB::Black;
-    case TeamColor::YELLOW:
+    case TeamColor::COLOR_YELLOW:
         return CRGB::Yellow;
-    case TeamColor::AQUA:
+    case TeamColor::COLOR_AQUA:
         return CRGB::Aqua;
     default:
         return CRGB::Black;

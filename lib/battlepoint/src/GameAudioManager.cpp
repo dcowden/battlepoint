@@ -61,7 +61,7 @@ void GameAudioManager::victory(Team team){
     #ifdef BP_DEBUG
     Serial.println("Victory Sound.");
     #endif
-    FastLED.delay(200);
+    delay(200);
     _player->play(SND_SOUNDS_0023_ANNOUNCER_VICTORY);
 }
 void GameAudioManager::overtime(){
@@ -108,12 +108,12 @@ void GameAudioManager::starts_in_seconds(int secs){
        }
        case 2:{
           _player->play(SND_SOUNDS_ANNOUNCER_BEGINS_2SEC);
-          FastLED.delay(100);
+          delay(100);
           break;
        }
        case 1:{
           _player->play(SND_SOUNDS_ANNOUNCER_BEGINS_1SEC);
-          FastLED.delay(100);
+          delay(100);
           break;
        }
     }

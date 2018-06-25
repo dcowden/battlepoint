@@ -3,10 +3,8 @@
 #include <util.h>
 
 void KothGame::init(){
-    _timer1Meter->setFgColor(CRGB::Red);
-    _timer1Meter->setBgColor(CRGB::Black);
-    _timer2Meter->setFgColor(CRGB::Blue);
-    _timer2Meter->setBgColor(CRGB::Black);
+     _timer1Meter->setColors(TeamColor::COLOR_RED, TeamColor::COLOR_BLACK);
+     _timer2Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
 };    
 
 Team KothGame::checkVictory(){    

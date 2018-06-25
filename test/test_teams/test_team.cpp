@@ -1,13 +1,12 @@
 #include <Arduino.h>
 #include <Teams.h>
-#include <FastLED.h>
 #include <unity.h>
 
 void test_team_color_mappings(void){
-    CRGB blue = CRGB::Blue;
-    CRGB red = CRGB::Red;
-    CRGB black = CRGB::Black;
-    CRGB aqua = CRGB::Aqua;
+    TeamColor blue = TeamColor::COLOR_BLUE;
+    TeamColor red = TeamColor::COLOR_RED;
+    TeamColor black = TeamColor::COLOR_BLACK;
+    TeamColor aqua = TeamColor::COLOR_AQUA;
     TEST_ASSERT_EQUAL(blue,getTeamColor(Team::BLU) );   
     TEST_ASSERT_EQUAL(red,getTeamColor(Team::RED) );
     TEST_ASSERT_EQUAL(black,getTeamColor(Team::NOBODY) );

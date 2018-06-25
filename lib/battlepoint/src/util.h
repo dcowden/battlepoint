@@ -11,21 +11,4 @@ int secondsSince(long startTimeMillis){
     return (int)(now - startTimeMillis) / 1000;
 }
 
-CRGB getFastLEDColor(TeamColor tc){
-    switch(tc){
-        case TeamColor::RED:
-            return CRGB::Red;
-        case TeamColor::BLUE:
-            return CRGB::Blue;
-        case TeamColor::BLACK:
-            return CRGB::Black;
-        case TeamColor::YELLOW:
-            return CRGB::Yellow;
-        case TeamColor::AQUA:
-            return CRGB::Aqua;
-        default:
-            return CRGB::Black;
-    }
-}
-
 #endif

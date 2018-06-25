@@ -31,8 +31,6 @@ int ADGame::getRemainingSeconds(){
 
 void ADGame::init(){
      _controlPoint->setRedCaptureEnabled(false);
-     _timer1Meter->setFgColor(CRGB::Yellow);
-     _timer1Meter->setBgColor(CRGB::Black);
-     _timer2Meter->setFgColor(CRGB::Yellow);
-     _timer2Meter->setBgColor(CRGB::Black);
+     _timer1Meter->setColors(TeamColor::COLOR_YELLOW, TeamColor::COLOR_BLACK);
+     _timer2Meter->setColors(TeamColor::COLOR_YELLOW, TeamColor::COLOR_BLACK);     
 };    

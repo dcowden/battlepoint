@@ -16,21 +16,40 @@ void ControlPoint::init(int secondsToCapture){
    _lastUpdateTime = millis();
 }
 
-void ControlPoint::setRedCaptureEnabled(boolean redCapture){
+void BaseControlPoint::setRedCaptureEnabled(boolean redCapture){
   _enableRedCapture = redCapture;
 }
 
-boolean ControlPoint::getRedCaptureEnabled(){
+boolean BaseControlPoint::getRedCaptureEnabled(){
   return _enableRedCapture;
 }
-boolean ControlPoint::getBluCaptureEnabled(){
+boolean BaseControlPoint::getBluCaptureEnabled(){
   return _enableRedCapture;
 }
-boolean ControlPoint::isContested(){
+boolean BaseControlPoint::isContested(){
   return _contested;
 }
 
-void ControlPoint::setBluCaptureEnabled(boolean bluCapture){
+void BaseControlPoint::setOwner(Team owner){
+  _owner = owner;
+}
+
+boolean BaseControlPoint::isOn(Team t){
+  return _on == t || _on == Team::ALL;
+};
+
+Team BaseControlPoint::getCapturing(){
+  return _capturing;
+};
+
+Team BaseControlPoint::getOwner(){
+  return _owner;
+}
+boolean BaseControlPoint::isOwnedBy(Team t){
+  return _owner == t;
+}
+
+void BaseControlPoint::setBluCaptureEnabled(boolean bluCapture){
   _enableBluCapture = bluCapture;
 }    
 
@@ -112,28 +131,13 @@ void ControlPoint::_inc_capture(long milliSeconds){
   }
 }
 
-void ControlPoint::setOwner(Team owner){
-  _owner = owner;
-}
-
-boolean ControlPoint::isOn(Team t){
-  return _on == t || _on == Team::ALL;
-};
-
-Team ControlPoint::getCapturing(){
-  return _capturing;
-};
-
-
-Team ControlPoint::getOwner(){
-  return _owner;
-}
-boolean ControlPoint::isOwnedBy(Team t){
-  return _owner == t;
-}
-
 int ControlPoint::getPercentCaptured(){
   return (int)(_captureMillis/ (_secondsToCapture * 10) );
 }
 
-
+void  TestControlPoint::setCapturingTeam(Team t){
+  _capturing = t;
+};
+void  TestControlPoint::setOn(Team t){
+  _on = t;
+};

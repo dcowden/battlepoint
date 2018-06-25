@@ -19,6 +19,7 @@ Team CPGame::checkVictory(){
            return Team::BLU;
        }
     }
+    return Team::NOBODY;
 };
 
 boolean CPGame::checkOvertime(){
@@ -33,8 +34,6 @@ int CPGame::getRemainingSeconds(){
 };
 
 void CPGame::init(){
-     _timer1Meter->setFgColor(CRGB::Red);
-     _timer1Meter->setBgColor(CRGB::Black);
-     _timer2Meter->setFgColor(CRGB::Blue);
-     _timer2Meter->setBgColor(CRGB::Black);
+     _timer1Meter->setColors(TeamColor::COLOR_RED, TeamColor::COLOR_BLACK);
+     _timer2Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
 };    
