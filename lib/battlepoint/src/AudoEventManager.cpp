@@ -1,4 +1,4 @@
-#include <GameAudioManager.h>
+#include <EventManagers.h>
 #include <Teams.h>
 #include <sound.h>
 
@@ -12,7 +12,7 @@
 //#define DEFAULT_BUTTON_SECONDS 5
 //#define DEFAULT_START_DELAY 5
 
-GameAudioManager::GameAudioManager(DFRobotDFPlayerMini* player,long cpAlertIntervalMilliSeconds){
+AudioEventManager::AudioEventManager(DFRobotDFPlayerMini* player,long cpAlertIntervalMilliSeconds){
       _player = player;
       _captureTimer= new CooldownTimer(cpAlertIntervalMilliSeconds);
       _contestTimer= new CooldownTimer(DEFAULT_CONTEST_ALERT_INTERVAL);
@@ -22,7 +22,7 @@ GameAudioManager::GameAudioManager(DFRobotDFPlayerMini* player,long cpAlertInter
 }
 
 
-void GameAudioManager::control_point_being_captured(Team team){
+void AudioEventManager::control_point_being_captured(Team team){
     if ( _captureTimer->canRun() ){
       #ifdef BP_DEBUG
       Serial.print(F("Control Point Being Captured."));
@@ -30,7 +30,7 @@ void GameAudioManager::control_point_being_captured(Team team){
       _player->play(SND_SOUNDS_0014_ANNOUNCER_LAST_FLAG);
     }
 }
-void GameAudioManager::control_point_contested(){
+void AudioEventManager::control_point_contested(){
     if (_contestTimer->canRun() ){
         #ifdef BP_DEBUG
         Serial.println(F("Control Point is being Contested!"));
@@ -38,33 +38,33 @@ void GameAudioManager::control_point_contested(){
         _player->play(SND_SOUNDS_0002_ANNOUNCER_ALERT_CENTER_CONTROL_BEING_CONTESTED);
     }
 }
-void GameAudioManager::control_point_captured(Team team){
+void AudioEventManager::control_point_captured(Team team){
     _player->play(SND_SOUNDS_0025_ANNOUNCER_WE_CAPTURED_CONTROL);
     #ifdef BP_DEBUG
     Serial.println(F("Control Point Captured."));
     #endif
 }
-void GameAudioManager::cancelled(){
+void AudioEventManager::cancelled(){
   _player->play(SND_SOUNDS_0028_ENGINEER_SPECIALCOMPLETED10);  
 }
-void GameAudioManager::starting_game(){
+void AudioEventManager::starting_game(){
   _player->play(SND_SOUNDS_0021_ANNOUNCER_TIME_ADDED);
   delay(500);
 }
-void GameAudioManager::game_started(){
+void AudioEventManager::game_started(){
     _player->play(SND_SOUNDS_0022_ANNOUNCER_TOURNAMENT_STARTED4);
     #ifdef BP_DEBUG
     Serial.print(F("Game Started"));
     #endif
 }
-void GameAudioManager::victory(Team team){
+void AudioEventManager::victory(Team team){
     #ifdef BP_DEBUG
     Serial.println("Victory Sound.");
     #endif
     delay(200);
     _player->play(SND_SOUNDS_0023_ANNOUNCER_VICTORY);
 }
-void GameAudioManager::overtime(){
+void AudioEventManager::overtime(){
   if (_overtimeTimer->canRun() ){
     _player->play(SND_SOUNDS_0017_ANNOUNCER_OVERTIME2);
     #ifdef BP_DEBUG
@@ -72,7 +72,7 @@ void GameAudioManager::overtime(){
     #endif
   }
 }
-void GameAudioManager::starts_in_seconds(int secs){
+void AudioEventManager::starts_in_seconds(int secs){
 
   if ( _startTimeTimer->canRun() ){
     #ifdef BP_DEBUG
@@ -122,7 +122,7 @@ void GameAudioManager::starts_in_seconds(int secs){
 }
 
 
-void GameAudioManager::ends_in_seconds(int secs){
+void AudioEventManager::ends_in_seconds(int secs){
     #ifdef BP_DEBUG
     Serial.print(F("Ends in "));
     Serial.print(secs);

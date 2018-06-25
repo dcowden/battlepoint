@@ -7,16 +7,14 @@
 
 Game::Game(  ControlPoint* controlPoint,
            GameOptions gameOptions,
-           GameAudioManager* audioManager,
-           Proximity* proximity,
+           EventManager* eventManager,
            LedMeter* ownerMeter,
            LedMeter* captureMeter,
            LedMeter* timer1,
            LedMeter* timer2 ){
     _options = gameOptions;
-    _audio = audioManager;
+    _events = eventManager;
     _controlPoint = controlPoint;
-    _proximity = proximity;
     _timer1Meter = timer1;
     _timer2Meter = timer2;
     _ownerMeter = ownerMeter;
@@ -25,7 +23,7 @@ Game::Game(  ControlPoint* controlPoint,
 
 void Game::end(){
   _winner = Team::NOBODY;
-  _audio->cancelled();
+  _events->cancelled();
 };
 
 void Game::start(){ 
@@ -39,7 +37,7 @@ void Game::start(){
     _startTime = 0;
     _timer1Meter->setMaxValue(_options.timeLimitSeconds);
     _timer2Meter->setMaxValue(_options.timeLimitSeconds);
-    _audio->game_started();
+    _events->game_started();
 
 };
 
@@ -65,7 +63,7 @@ void Game::endGameDisplay( void (*delay_function)() ){
 void Game::endGameWithWinner(Team winner){    
     TeamColor winnerColor = getTeamColor(winner);
     _winner = winner;  
-    _audio->victory(winner);
+    _events->victory(winner);
 
     updateAllMetersToColors(winnerColor, TeamColor::COLOR_BLACK);
 
@@ -112,7 +110,7 @@ void Game::update(){
   if ( ! isRunning() ){
     return;
   }
-  _controlPoint->update(_proximity );
+  _controlPoint->update( );
   updateAccumulatedTime();
 
   Team winner = checkVictory();
@@ -122,10 +120,10 @@ void Game::update(){
   }
 
   if ( checkOvertime() ){
-      _audio->overtime();
+      _events->overtime();
   }
 
-  _audio->ends_in_seconds( getRemainingSeconds() );
+  _events->ends_in_seconds( getRemainingSeconds() );
   _timer1Meter->setValue(getRemainingSecondsForTeam(Team::RED));
   _timer2Meter->setValue(getRemainingSecondsForTeam(Team::BLU));
   _lastUpdateTime = millis();  

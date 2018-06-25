@@ -32,12 +32,13 @@ class BaseControlPoint {
 
 class ControlPoint: public BaseControlPoint {
   public:
-    ControlPoint();
-    void update(Proximity* proximity );
+    ControlPoint(Proximity* proximity);
+    void update();
     int getPercentCaptured();
     void init(int secondsToCapture);
 
   private:
+    Proximity* _proximity;
     void _check_capture();
     void _dec_capture(long millis);
     void _inc_capture(long millis);

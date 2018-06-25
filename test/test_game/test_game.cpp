@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <Teams.h>
-#include <FastLED.h>
 #include <unity.h>
 #include <Game.h>
 

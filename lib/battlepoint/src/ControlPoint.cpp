@@ -2,7 +2,9 @@
 #include "Teams.h"
 #include "Proximity.h"
 
-ControlPoint::ControlPoint() {}
+ControlPoint::ControlPoint(Proximity* proximity) {
+  _proximity = proximity;
+}
 
 void ControlPoint::init(int secondsToCapture){
    _secondsToCapture = secondsToCapture;
@@ -53,9 +55,9 @@ void BaseControlPoint::setBluCaptureEnabled(boolean bluCapture){
   _enableBluCapture = bluCapture;
 }    
 
-void ControlPoint::update(Proximity* proximity  ){
-  boolean red_on = proximity->isRedClose();
-  boolean blu_on = proximity->isBluClose();
+void ControlPoint::update( ){
+  boolean red_on = _proximity->isRedClose();
+  boolean blu_on = _proximity->isBluClose();
 
   _contested = false;
   boolean is_one_team_on = false;

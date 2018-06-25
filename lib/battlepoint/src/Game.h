@@ -1,7 +1,7 @@
 #ifndef __INC_GAME_H
 #define __INC_GAME_H
 #include <Arduino.h>
-#include <GameAudioManager.h>
+#include <EventManagers.h>
 #include <ControlPoint.h>
 #include <LedMeter.h>
 #include <Teams.h>
@@ -43,8 +43,7 @@ class Game {
   public:
     Game(  ControlPoint* controlPoint,
            GameOptions gameOptions,
-           GameAudioManager* audioManager,
-           Proximity* proximity,
+           EventManager* eventManager,
            LedMeter* ownerMeter,
            LedMeter* captureMeter,
            LedMeter* timer1,
@@ -67,13 +66,12 @@ class Game {
 
   protected:
     GameOptions _options;
-    GameAudioManager* _audio;
+    EventManager* _events;
     ControlPoint* _controlPoint;
     LedMeter* _ownerMeter;
     LedMeter* _captureMeter;
     LedMeter* _timer1Meter;
-    LedMeter* _timer2Meter;
-    Proximity* _proximity;    
+    LedMeter* _timer2Meter; 
     long _redAccumulatedTimeMillis;
     long _bluAccumulatedTimeMillis;
 
