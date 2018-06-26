@@ -109,3 +109,7 @@ void LedMeter::updateRange(LedRange* range){
 void SimpleMeter::update(){
   //do nothing;
 }
+
+void SimpleMeter::setColors(TeamColor fg, TeamColor bg){
+
+}

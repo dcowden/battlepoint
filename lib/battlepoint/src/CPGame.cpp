@@ -33,7 +33,7 @@ int CPGame::getRemainingSeconds(){
     return _options.timeLimitSeconds - getSecondsElapsed();
 };
 
-void CPGame::init(){
+void CPGame::gameTypeInit(){
      _timer1Meter->setColors(TeamColor::COLOR_RED, TeamColor::COLOR_BLACK);
      _timer2Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
 };    

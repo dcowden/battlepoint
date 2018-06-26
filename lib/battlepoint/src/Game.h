@@ -29,29 +29,19 @@ typedef struct {
      GameOptions options;
 } EEPromSettingsData;
 
-typedef struct {
-    long timeRemainingSeconds;
-    GameOptions gameOptions;
-    Team winner;
-    boolean isover;
-    boolean isrunning;
-    int redSecondsAccumulated;
-    int bluSecondsAccumulated;
-} GameStatistics;
 
 class Game {
   public:
-    Game(  ControlPoint* controlPoint,
+    void init(  BaseControlPoint* controlPoint,
            GameOptions gameOptions,
            EventManager* eventManager,
-           LedMeter* ownerMeter,
-           LedMeter* captureMeter,
-           LedMeter* timer1,
-           LedMeter* timer2 );
+           Meter* ownerMeter,
+           Meter* captureMeter,
+           Meter* timer1,
+           Meter* timer2 );
     void start();
     void update();
     void end();
-    GameStatistics getStatus();
     Team getWinner();
     void endGameDisplay( void (*delay_function)() );
     int getAccumulatedSeconds(Team t);
@@ -59,19 +49,21 @@ class Game {
     int getSecondsElapsed();
     boolean isRunning();
     GameOptions getOptions();
-    virtual Team checkVictory(){ return Team::NOBODY; } ;
-    virtual boolean checkOvertime() { return false; };
-    virtual int getRemainingSeconds(){ return 0;};
-    virtual void init();
 
+    virtual int getRemainingSeconds(){ return 0;};
+    virtual void gameTypeInit();
+ 
   protected:
+    void resetGame();
+    virtual Team checkVictory(){ return Team::NOBODY; } ;
+    virtual boolean checkOvertime() { return false; };  
     GameOptions _options;
     EventManager* _events;
-    ControlPoint* _controlPoint;
-    LedMeter* _ownerMeter;
-    LedMeter* _captureMeter;
-    LedMeter* _timer1Meter;
-    LedMeter* _timer2Meter; 
+    BaseControlPoint* _controlPoint;
+    Meter* _ownerMeter;
+    Meter* _captureMeter;
+    Meter* _timer1Meter;
+    Meter* _timer2Meter; 
     long _redAccumulatedTimeMillis;
     long _bluAccumulatedTimeMillis;
 
@@ -86,11 +78,11 @@ class Game {
 };
 
 class KothGame : public Game{
-    public:
+    public: 
         virtual Team checkVictory();
         virtual boolean checkOvertime();
         virtual int getRemainingSeconds();
-        virtual void init();   
+        virtual void gameTypeInit();   
 
     private:
         boolean checkVictory(Team t);  
@@ -101,14 +93,14 @@ class ADGame : public Game{
         virtual Team checkVictory();
         virtual boolean checkOvertime();
         virtual int getRemainingSeconds();
-        virtual void init();  
+        virtual void gameTypeInit();  
 };
 class CPGame : public Game{
     public:
         virtual Team checkVictory();
         virtual boolean checkOvertime();
         virtual int getRemainingSeconds();
-        virtual void init();   
+        virtual void gameTypeInit();   
 };
 
 #endif

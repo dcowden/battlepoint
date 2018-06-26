@@ -143,3 +143,7 @@ void  TestControlPoint::setCapturingTeam(Team t){
 void  TestControlPoint::setOn(Team t){
   _on = t;
 };
+
+void  TestControlPoint::update(){
+  
+};

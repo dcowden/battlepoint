@@ -23,6 +23,7 @@ class Meter {
     int getValue();
     int getMaxValue();
     virtual void update() = 0;
+    virtual void setColors(TeamColor fg, TeamColor bg)= 0;
   private:
     int value;
     int maxValue;
@@ -32,10 +33,9 @@ class LedMeter : public Meter{
 
   //a meter which has two colors, and can represent a value between two boundaries
   public:
-    LedMeter (CRGB* leds, LedRange* ranges, uint8_t new_ranges_cnt,CRGB new_fgcolor, CRGB new_bgcolor );
-    void setColors(TeamColor fg, TeamColor bg);
+    LedMeter (CRGB* leds, LedRange* ranges, uint8_t new_ranges_cnt,CRGB new_fgcolor, CRGB new_bgcolor );    
     virtual void update();
-
+    virtual void setColors(TeamColor fg, TeamColor bg);
   private:
     CRGB getFastLEDColor(TeamColor tc);
     void setFgColor(CRGB color);    
@@ -51,6 +51,7 @@ class LedMeter : public Meter{
 class SimpleMeter: public Meter{
   public:
     virtual void update();
+    virtual void setColors(TeamColor fg, TeamColor bg);
 };
 
 

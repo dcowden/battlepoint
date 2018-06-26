@@ -29,7 +29,7 @@ int ADGame::getRemainingSeconds(){
     return _options.timeLimitSeconds - getSecondsElapsed();
 };
 
-void ADGame::init(){
+void ADGame::gameTypeInit(){
      _controlPoint->setRedCaptureEnabled(false);
      _timer1Meter->setColors(TeamColor::COLOR_YELLOW, TeamColor::COLOR_BLACK);
      _timer2Meter->setColors(TeamColor::COLOR_YELLOW, TeamColor::COLOR_BLACK);     

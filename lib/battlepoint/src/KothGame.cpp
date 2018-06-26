@@ -1,8 +1,8 @@
 #include <Game.h>
 #include <Teams.h>
-#include <util.h>
 
-void KothGame::init(){
+
+void KothGame::gameTypeInit(){
      _timer1Meter->setColors(TeamColor::COLOR_RED, TeamColor::COLOR_BLACK);
      _timer2Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
 };    

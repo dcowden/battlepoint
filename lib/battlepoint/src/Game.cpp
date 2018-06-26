@@ -4,14 +4,14 @@
 
 #define END_GAME_FLASH_SECONDS 10
 #define END_GAME_FLASH_INTERVAL_MILLISECONDS 80
-
-Game::Game(  ControlPoint* controlPoint,
+#define NOT_STARTED  -1
+void Game::init(  BaseControlPoint* controlPoint,
            GameOptions gameOptions,
            EventManager* eventManager,
-           LedMeter* ownerMeter,
-           LedMeter* captureMeter,
-           LedMeter* timer1,
-           LedMeter* timer2 ){
+           Meter* ownerMeter,
+           Meter* captureMeter,
+           Meter* timer1,
+           Meter* timer2 ){
     _options = gameOptions;
     _events = eventManager;
     _controlPoint = controlPoint;
@@ -19,6 +19,7 @@ Game::Game(  ControlPoint* controlPoint,
     _timer2Meter = timer2;
     _ownerMeter = ownerMeter;
     _captureMeter = captureMeter;
+    resetGame();
 };
 
 void Game::end(){
@@ -26,19 +27,22 @@ void Game::end(){
   _events->cancelled();
 };
 
-void Game::start(){ 
-   
-    _startTime = millis();
-    init();
+void Game::resetGame(){
+    
+    gameTypeInit();
     _winner = Team::NOBODY;
     _redAccumulatedTimeMillis=0 ;
     _bluAccumulatedTimeMillis=0 ;
     _lastUpdateTime = millis();
-    _startTime = 0;
+    _startTime = NOT_STARTED;
     _timer1Meter->setMaxValue(_options.timeLimitSeconds);
     _timer2Meter->setMaxValue(_options.timeLimitSeconds);
-    _events->game_started();
+};
 
+void Game::start(){
+    _startTime = millis(); 
+    resetGame();
+    _events->game_started();
 };
 
 void Game::updateAllMetersToColors(TeamColor fg, TeamColor bg){
@@ -71,7 +75,7 @@ void Game::endGameWithWinner(Team winner){
     _timer2Meter->setToMax();
     _ownerMeter->setToMax();
     _captureMeter->setToMax();
-
+    _startTime = NOT_STARTED;
 };
 
 GameOptions Game::getOptions(){
@@ -79,7 +83,7 @@ GameOptions Game::getOptions(){
 };
 
 boolean Game::isRunning(){
-  return _winner == Team::NOBODY;
+  return _startTime != NOT_STARTED;
 };
 
 int Game::getRemainingSecondsForTeam(Team t){
@@ -91,7 +95,24 @@ Team Game::getWinner(){
 };
 
 int Game::getSecondsElapsed(){
-   return secondsSince(_startTime);
+   if ( _startTime == NOT_STARTED){
+       return 0;
+   }
+   else{
+       return secondsSince(_startTime);
+   }   
+};
+
+int Game::getAccumulatedSeconds(Team t){
+    if ( t == Team::RED){
+        return millis_to_seconds(_redAccumulatedTimeMillis);
+    }
+    else if ( t == Team::BLU){
+        return millis_to_seconds(_bluAccumulatedTimeMillis);
+    }
+    else{
+        return 0;
+    }
 };
 
 void Game::updateAccumulatedTime(){

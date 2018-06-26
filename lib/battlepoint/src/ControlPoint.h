@@ -16,6 +16,7 @@ class BaseControlPoint {
     void setBluCaptureEnabled(boolean bluCapture);
     boolean getRedCaptureEnabled();
     boolean getBluCaptureEnabled();    
+    virtual void update() = 0;
 
   protected:
     int _secondsToCapture;
@@ -49,5 +50,6 @@ class TestControlPoint: public BaseControlPoint {
   public:
     void setCapturingTeam(Team t);
     void setOn(Team t);
+    void update();
 };
 #endif

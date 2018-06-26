@@ -1,7 +1,7 @@
 #ifndef __INC_UTIL_H
 #define __INC_UTIL_H
 #include <Arduino.h>
-#include <FastLED.h>
+
 int millis_to_seconds(long timeInMillis){
     return (int)timeInMillis / 1000;
 }
