@@ -40,8 +40,8 @@ void Game::resetGame(){
 };
 
 void Game::start(){
-    _startTime = millis(); 
     resetGame();
+    _startTime = millis();
     _events->game_started();
 };
 
@@ -55,6 +55,12 @@ void Game::updateAllMetersToColors(TeamColor fg, TeamColor bg){
 void Game::endGameDisplay( void (*delay_function)() ){
     long start_time = millis();
     long end_flash_time = start_time + (long)END_GAME_FLASH_SECONDS*1000;
+
+    _timer1Meter->setToMax();
+    _timer2Meter->setToMax();
+    _ownerMeter->setToMax();
+    _captureMeter->setToMax();
+
     TeamColor winnerColor = getTeamColor(_winner);
     while( millis() < end_flash_time ){
         updateAllMetersToColors(TeamColor::COLOR_BLACK, TeamColor::COLOR_BLACK);
@@ -68,13 +74,6 @@ void Game::endGameWithWinner(Team winner){
     TeamColor winnerColor = getTeamColor(winner);
     _winner = winner;  
     _events->victory(winner);
-
-    updateAllMetersToColors(winnerColor, TeamColor::COLOR_BLACK);
-
-    _timer1Meter->setToMax();
-    _timer2Meter->setToMax();
-    _ownerMeter->setToMax();
-    _captureMeter->setToMax();
     _startTime = NOT_STARTED;
 };
 
@@ -120,10 +119,10 @@ void Game::updateAccumulatedTime(){
     if ( _controlPoint->getOwner() == Team::RED ){
        _redAccumulatedTimeMillis += millisSinceLastUpdate;
     }
-    if ( _controlPoint->getOwner() == Team::BLU ){
+    else if ( _controlPoint->getOwner() == Team::BLU ){
        _bluAccumulatedTimeMillis += millisSinceLastUpdate;
     }
-
+    _lastUpdateTime = millis(); 
 };
 
 void Game::update(){
@@ -133,6 +132,7 @@ void Game::update(){
   }
   _controlPoint->update( );
   updateAccumulatedTime();
+  
 
   Team winner = checkVictory();
   if ( winner != Team::NOBODY){
@@ -144,10 +144,10 @@ void Game::update(){
       _events->overtime();
   }
 
+  
   _events->ends_in_seconds( getRemainingSeconds() );
-  _timer1Meter->setValue(getRemainingSecondsForTeam(Team::RED));
-  _timer2Meter->setValue(getRemainingSecondsForTeam(Team::BLU));
-  _lastUpdateTime = millis();  
+
+  updateDisplay();   
 
 };
 

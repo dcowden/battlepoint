@@ -1,6 +1,11 @@
 #include <Game.h>
 #include <Teams.h>
 #include <util.h>
+
+void ADGame::updateDisplay(){
+
+};
+
 Team ADGame::checkVictory(){
 
     if ( _controlPoint->getOwner() == Team::BLU ){

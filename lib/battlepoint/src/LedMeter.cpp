@@ -52,8 +52,7 @@ LedMeter::LedMeter(CRGB* new_leds, LedRange* new_ranges,
   ranges_cnt = new_ranges_cnt;
   ranges = new_ranges;
   fgColor = new_fgcolor;
-  bgColor = new_bgcolor;
-  init();  
+  bgColor = new_bgcolor; 
 };
 
 void LedMeter::setColors(TeamColor fg, TeamColor bg){

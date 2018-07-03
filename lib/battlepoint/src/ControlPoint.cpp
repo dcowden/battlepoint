@@ -147,3 +147,11 @@ void  TestControlPoint::setOn(Team t){
 void  TestControlPoint::update(){
   
 };
+
+int TestControlPoint::getPercentCaptured(){
+  return _percentCaptured;
+};
+
+void TestControlPoint::setPercentCaptured(int percentCaptured){
+  _percentCaptured = percentCaptured;
+};

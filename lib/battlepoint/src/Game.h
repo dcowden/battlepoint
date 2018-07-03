@@ -49,7 +49,7 @@ class Game {
     int getSecondsElapsed();
     boolean isRunning();
     GameOptions getOptions();
-
+    virtual void updateDisplay(){};
     virtual int getRemainingSeconds(){ return 0;};
     virtual void gameTypeInit();
  
@@ -57,6 +57,7 @@ class Game {
     void resetGame();
     virtual Team checkVictory(){ return Team::NOBODY; } ;
     virtual boolean checkOvertime() { return false; };  
+    
     GameOptions _options;
     EventManager* _events;
     BaseControlPoint* _controlPoint;
@@ -74,7 +75,7 @@ class Game {
     void endGameWithWinner(Team winner);
     void updateAccumulatedTime();
     void updateAllMetersToColors(TeamColor fg, TeamColor bg);
-
+    
 };
 
 class KothGame : public Game{
@@ -82,7 +83,8 @@ class KothGame : public Game{
         virtual Team checkVictory();
         virtual boolean checkOvertime();
         virtual int getRemainingSeconds();
-        virtual void gameTypeInit();   
+        virtual void gameTypeInit();
+        virtual void updateDisplay();   
 
     private:
         boolean checkVictory(Team t);  
@@ -93,14 +95,16 @@ class ADGame : public Game{
         virtual Team checkVictory();
         virtual boolean checkOvertime();
         virtual int getRemainingSeconds();
-        virtual void gameTypeInit();  
+        virtual void gameTypeInit();
+        virtual void updateDisplay();  
 };
 class CPGame : public Game{
     public:
         virtual Team checkVictory();
         virtual boolean checkOvertime();
         virtual int getRemainingSeconds();
-        virtual void gameTypeInit();   
+        virtual void gameTypeInit();
+        virtual void updateDisplay();   
 };
 
 #endif

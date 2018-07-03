@@ -11,12 +11,14 @@ class BaseControlPoint {
     boolean isOn(Team t);
     boolean isContested();
     Team getCapturing();
+    
     void setOwner(Team owner);
     void setRedCaptureEnabled(boolean redCapture);
     void setBluCaptureEnabled(boolean bluCapture);
     boolean getRedCaptureEnabled();
     boolean getBluCaptureEnabled();    
     virtual void update() = 0;
+    virtual int getPercentCaptured() = 0;
 
   protected:
     int _secondsToCapture;
@@ -35,7 +37,7 @@ class ControlPoint: public BaseControlPoint {
   public:
     ControlPoint(Proximity* proximity);
     void update();
-    int getPercentCaptured();
+    virtual int getPercentCaptured();
     void init(int secondsToCapture);
 
   private:
@@ -51,5 +53,9 @@ class TestControlPoint: public BaseControlPoint {
     void setCapturingTeam(Team t);
     void setOn(Team t);
     void update();
+    virtual int getPercentCaptured();
+    void setPercentCaptured(int percentCaptured);
+  private:
+    int _percentCaptured;
 };
 #endif

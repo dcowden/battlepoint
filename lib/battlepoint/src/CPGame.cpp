@@ -2,6 +2,11 @@
 #include <Teams.h>
 #include <util.h>
 
+void CPGame::updateDisplay(){
+
+};
+
+
 Team CPGame::checkVictory(){
     //this kind of game ends when time is up. the winner
     //is the one with the most time

@@ -7,6 +7,15 @@ void KothGame::gameTypeInit(){
      _timer2Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
 };    
 
+void KothGame::updateDisplay(){
+    _timer1Meter->setValue(getRemainingSecondsForTeam(Team::BLU));
+    _timer2Meter->setValue(getRemainingSecondsForTeam(Team::RED));
+    _captureMeter->setValue(_controlPoint->getPercentCaptured());    
+    Team owner = _controlPoint->getOwner();
+    _ownerMeter->setColors(getTeamColor(owner), TeamColor::COLOR_BLACK);
+
+};
+
 Team KothGame::checkVictory(){    
     if ( checkVictory(Team::BLU) ) return Team::BLU;
     if ( checkVictory(Team::RED) ) return Team::RED;
