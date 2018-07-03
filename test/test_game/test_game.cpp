@@ -80,11 +80,16 @@ void test_koth_game_ends_after_capture(){
 
     TEST_ASSERT_EQUAL(100, owner.getValue());
     TEST_ASSERT_TRUE(testControlPoint.isOwnedBy(Team::BLU));
-    TEST_ASSERT_EQUAL(timer1.getMaxValue(), timer1.getValue());
-    TEST_ASSERT_EQUAL(0, timer2.getValue());
     TEST_ASSERT_EQUAL(Team::BLU, koth.getWinner());
+
+    TEST_ASSERT_EQUAL(go.timeLimitSeconds, koth.getRemainingSecondsForTeam(Team::RED));
+    TEST_ASSERT_EQUAL(0, koth.getRemainingSecondsForTeam(Team::BLU));
     
-    
+    TEST_ASSERT_EQUAL(0, koth.getAccumulatedSeconds(Team::RED));
+    TEST_ASSERT_EQUAL(2, koth.getAccumulatedSeconds(Team::BLU));
+
+    TEST_ASSERT_EQUAL(go.timeLimitSeconds, timer2.getValue());
+    TEST_ASSERT_EQUAL(0, timer1.getValue());
 
 }
 

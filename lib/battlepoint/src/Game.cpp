@@ -137,17 +137,15 @@ void Game::update(){
   Team winner = checkVictory();
   if ( winner != Team::NOBODY){
       endGameWithWinner(winner);
+      updateDisplay(); 
       return;
   }
 
   if ( checkOvertime() ){
       _events->overtime();
   }
-
   
   _events->ends_in_seconds( getRemainingSeconds() );
-
-  updateDisplay();   
 
 };
 
