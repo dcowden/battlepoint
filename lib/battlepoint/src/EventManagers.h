@@ -21,7 +21,7 @@ class EventManager {
 
 class AudioEventManager : public EventManager{
   public:
-    AudioEventManager(DFRobotDFPlayerMini* _player, long cpAlertIntervalMilliSeconds);
+    AudioEventManager(DFRobotDFPlayerMini* _player, long cpAlertIntervalMilliSeconds, Clock* clock);
     void control_point_being_captured(Team team);
     void control_point_captured(Team team);
     void control_point_contested();

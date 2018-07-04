@@ -2,10 +2,12 @@
 #include "ControlPoint.h"
 #include <unity.h>
 #include <Teams.h>
+#include <Clock.h>
 
 void test_control_point_initial_value(void){
     TestProximity tp = TestProximity();
-    ControlPoint cp = ControlPoint(&tp);
+    TestClock tc = TestClock();
+    ControlPoint cp = ControlPoint(&tp, &tc);
     cp.init(5);
     TEST_ASSERT_FALSE(cp.isContested());
     TEST_ASSERT_FALSE(cp.isOn(Team::RED));
@@ -17,12 +19,13 @@ void test_control_point_initial_value(void){
 
 void test_basic_blu_capture(void ){
     TestProximity tp = TestProximity();
-    ControlPoint cp = ControlPoint(&tp);
+    TestClock tc = TestClock();
+    ControlPoint cp = ControlPoint(&tp, &tc);
     tp.setBluClose(true);
  
     cp.init(1);
     cp.update();
-    delay(200);
+    tc.addTime(200);
     cp.update();
     TEST_ASSERT_INT_WITHIN(1,20,cp.getPercentCaptured());
     TEST_ASSERT_TRUE(cp.isOn(Team::BLU));    
@@ -31,7 +34,7 @@ void test_basic_blu_capture(void ){
     TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
     TEST_ASSERT_EQUAL(Team::NOBODY, cp.getOwner());
     TEST_ASSERT_EQUAL(Team::BLU, cp.getCapturing());
-    delay(900);
+    tc.addTime(900);
     cp.update();
     //counter intuitieve: percent captured is reset to zero after capture
     TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
@@ -45,12 +48,13 @@ void test_basic_blu_capture(void ){
 
 void test_contested(void){
     TestProximity tp = TestProximity();
-    ControlPoint cp = ControlPoint(&tp);
+    TestClock tc = TestClock();
+    ControlPoint cp = ControlPoint(&tp, &tc);
     tp.setBluClose(true);
     tp.setRedClose(true);
     cp.init(1);
     cp.update();
-    delay(200);
+    tc.addTime(200);
     cp.update();
     TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
     TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
@@ -62,19 +66,20 @@ void test_contested(void){
 
 void test_count_back_down(void){
     TestProximity tp = TestProximity();
-    ControlPoint cp = ControlPoint(&tp);
+    TestClock tc = TestClock();
+    ControlPoint cp = ControlPoint(&tp, &tc);
     cp.init(1);    
     tp.setBluClose(true);
 
     cp.update();
-    delay(200);
+    tc.addTime(200);
     cp.update();
     TEST_ASSERT_INT_WITHIN(1,20, cp.getPercentCaptured());
     tp.setBluClose(false);
-    delay(100);
+    tc.addTime(100);
     cp.update();
     TEST_ASSERT_EQUAL(10, cp.getPercentCaptured());
-    delay(400);
+    tc.addTime(400);
     cp.update();
     TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
     TEST_ASSERT_FALSE(cp.isOn(Team::BLU));
@@ -88,7 +93,8 @@ void test_capture_disabled(void){
     TestProximity tp = TestProximity();
     tp.setRedClose(true);
 
-    ControlPoint cp = ControlPoint(&tp);
+    TestClock tc = TestClock();
+    ControlPoint cp = ControlPoint(&tp, &tc);
     cp.init(1);
     cp.setBluCaptureEnabled(false);
     cp.setRedCaptureEnabled(false);
@@ -96,7 +102,7 @@ void test_capture_disabled(void){
     TEST_ASSERT_FALSE(cp.getRedCaptureEnabled());
     TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing()); 
     cp.update();
-    delay(200);
+    tc.addTime(200);
     cp.update();
 
     TEST_ASSERT_TRUE(cp.isOn(Team::RED));
@@ -108,7 +114,8 @@ void test_capture_disabled(void){
 
 void test_reverse_capture(void){
     TestProximity tp = TestProximity();
-    ControlPoint cp = ControlPoint(&tp);
+    TestClock tc = TestClock();
+    ControlPoint cp = ControlPoint(&tp, &tc);
     cp.init(1);
     cp.setBluCaptureEnabled(true);
     cp.setRedCaptureEnabled(true);
@@ -116,7 +123,7 @@ void test_reverse_capture(void){
     tp.setRedClose(true);
     cp.setOwner(Team::BLU);    
     cp.update();
-    delay(200);
+    tc.addTime(200);
     cp.update();
     TEST_ASSERT_INT_WITHIN(1,20, cp.getPercentCaptured()); 
     TEST_ASSERT_TRUE(cp.isOn(Team::RED));
@@ -126,21 +133,21 @@ void test_reverse_capture(void){
     TEST_ASSERT_EQUAL(Team::RED, cp.getCapturing()); 
     tp.setBluClose(true);
     cp.update();
-    delay(100);
+    tc.addTime(100);
     cp.update();
     //no decrement or increment if contested
     TEST_ASSERT_TRUE(cp.isContested());
     TEST_ASSERT_INT_WITHIN(1,20, cp.getPercentCaptured());
     tp.setRedClose(false);
     cp.update();
-    delay(100);
+    tc.addTime(100);
     cp.update();
     TEST_ASSERT_INT_WITHIN(1,10, cp.getPercentCaptured());
 }
 
 void setup() {
     
-    delay(2000);
+    delay(1000);
     Serial.begin(115200);
     UNITY_BEGIN();
     RUN_TEST(test_control_point_initial_value);

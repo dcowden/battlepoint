@@ -189,7 +189,7 @@ void test_simple_meter_set_values(void){
 }
 void setup() {
     
-    delay(2000);
+    delay(1000);
     Serial.begin(115200);
     UNITY_BEGIN();
 

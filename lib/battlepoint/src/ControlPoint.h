@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include "Proximity.h"
 #include "Teams.h"
+#include "Clock.h"
 
 class BaseControlPoint {
   public:
@@ -30,12 +31,12 @@ class BaseControlPoint {
     long _lastUpdateTime;
     boolean _enableBluCapture;
     boolean _enableRedCapture;
-
+    Clock* _clock;
 };
 
 class ControlPoint: public BaseControlPoint {
   public:
-    ControlPoint(Proximity* proximity);
+    ControlPoint(Proximity* proximity, Clock* clock);
     void update();
     virtual int getPercentCaptured();
     void init(int secondsToCapture);

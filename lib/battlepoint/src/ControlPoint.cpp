@@ -2,8 +2,9 @@
 #include "Teams.h"
 #include "Proximity.h"
 
-ControlPoint::ControlPoint(Proximity* proximity) {
+ControlPoint::ControlPoint(Proximity* proximity, Clock* clock) {
   _proximity = proximity;
+  _clock = clock;
 }
 
 void ControlPoint::init(int secondsToCapture){
@@ -15,7 +16,7 @@ void ControlPoint::init(int secondsToCapture){
    _owner=Team::NOBODY;
    _captureMillis = 0;
    _contested=false;
-   _lastUpdateTime = millis();
+   _lastUpdateTime = _clock->milliseconds();
 }
 
 void BaseControlPoint::setRedCaptureEnabled(boolean redCapture){
@@ -89,7 +90,9 @@ void ControlPoint::update( ){
         }
     }
   }
-  long millisSinceLastUpdate = (millis() - _lastUpdateTime);
+  
+  long millisSinceLastUpdate = (_clock->milliseconds() - _lastUpdateTime);
+
   //check for point capture
   if ( is_one_team_on ){    
     if ( _capturing == _on ){
@@ -105,7 +108,7 @@ void ControlPoint::update( ){
   }
 
   _check_capture();  
-  _lastUpdateTime = millis();
+  _lastUpdateTime = _clock->milliseconds();
 
 }
 

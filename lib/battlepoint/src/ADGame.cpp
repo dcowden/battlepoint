@@ -1,8 +1,17 @@
 #include <Game.h>
 #include <Teams.h>
-#include <util.h>
+
+
+void ADGame::gameTypeInit(){
+     _controlPoint->setRedCaptureEnabled(false);
+     _timer1Meter->setColors(TeamColor::COLOR_YELLOW, TeamColor::COLOR_BLACK);
+     _timer2Meter->setColors(TeamColor::COLOR_YELLOW, TeamColor::COLOR_BLACK);     
+}; 
 
 void ADGame::updateDisplay(){
+    _timer1Meter->setValue(getRemainingSeconds());
+    _timer2Meter->setValue(getRemainingSeconds());
+    _captureMeter->setValue(_controlPoint->getPercentCaptured());    
 
 };
 
@@ -34,8 +43,4 @@ int ADGame::getRemainingSeconds(){
     return _options.timeLimitSeconds - getSecondsElapsed();
 };
 
-void ADGame::gameTypeInit(){
-     _controlPoint->setRedCaptureEnabled(false);
-     _timer1Meter->setColors(TeamColor::COLOR_YELLOW, TeamColor::COLOR_BLACK);
-     _timer2Meter->setColors(TeamColor::COLOR_YELLOW, TeamColor::COLOR_BLACK);     
-};    
+   

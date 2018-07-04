@@ -1,9 +1,26 @@
 #include <Game.h>
 #include <Teams.h>
-#include <util.h>
+#include <Clock.h>
+
+void CPGame::gameTypeInit(){
+     _timer1Meter->setColors(TeamColor::COLOR_RED, TeamColor::COLOR_BLACK);
+     _timer2Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
+}; 
 
 void CPGame::updateDisplay(){
+    _timer1Meter->setValue(getAccumulatedSeconds(Team::BLU));
+    _timer2Meter->setValue(getAccumulatedSeconds(Team::RED));
+    _captureMeter->setValue(_controlPoint->getPercentCaptured());    
 
+    //TODO: factor out: same as KothGame
+    Team owner = _controlPoint->getOwner();
+    _ownerMeter->setColors(getTeamColor(owner), TeamColor::COLOR_BLACK);
+    if ( owner == Team::NOBODY){
+        _ownerMeter->setToMin();
+    }
+    else{
+        _ownerMeter->setToMax();
+    }
 };
 
 
@@ -38,7 +55,4 @@ int CPGame::getRemainingSeconds(){
     return _options.timeLimitSeconds - getSecondsElapsed();
 };
 
-void CPGame::gameTypeInit(){
-     _timer1Meter->setColors(TeamColor::COLOR_RED, TeamColor::COLOR_BLACK);
-     _timer2Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
-};    
+   

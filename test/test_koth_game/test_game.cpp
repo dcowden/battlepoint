@@ -11,7 +11,7 @@ SimpleMeter timer1 = SimpleMeter();
 SimpleMeter timer2 = SimpleMeter();
 TestEventManager em = TestEventManager();
 
-GameOptions standard_game_options(void){
+GameOptions koth_game_options(void){
     GameOptions go;
     go.timeLimitSeconds=2;
     go.startDelaySeconds=0;
@@ -22,34 +22,30 @@ GameOptions standard_game_options(void){
 }
 
 void test_koth_game_initial_state(void){
-    GameOptions go = standard_game_options();    
+    GameOptions go = koth_game_options();    
     KothGame koth = KothGame();
-    RealClock rc = RealClock();
-    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2, &rc);
+    TestClock tc = TestClock();
+    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2, &tc);
     TEST_ASSERT_FALSE(koth.isRunning() );
     TEST_ASSERT_EQUAL( Team::NOBODY, koth.getWinner() );
     TEST_ASSERT_EQUAL(0,koth.getSecondsElapsed());
     TEST_ASSERT_EQUAL(go.timeLimitSeconds,koth.getRemainingSeconds() );
-
     TEST_ASSERT_EQUAL(0, owner.getValue());
     TEST_ASSERT_EQUAL(0, capture.getValue());
 
 }
 
 void test_koth_game_keeps_time(){
-    GameOptions go = standard_game_options();    
+    GameOptions go = koth_game_options();    
     KothGame koth = KothGame();
-    RealClock rc = RealClock();
-    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2, &rc);
+    TestClock tc = TestClock();
+    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2, &tc);
     testControlPoint.setOwner(Team::NOBODY);
-    koth.start();
-    //TEST_ASSERT_EQUAL(timer1.getMaxValue(), timer1.getValue());
-    //TEST_ASSERT_EQUAL(timer2.getMaxValue(), timer2.getValue());    
+    koth.start();  
     TEST_ASSERT_EQUAL( Team::NOBODY, koth.getWinner() );
     TEST_ASSERT_TRUE(koth.isRunning() );
     TEST_ASSERT_EQUAL(go.timeLimitSeconds, koth.getRemainingSeconds());
-
-    delay(1000);
+    tc.addTime(1000);
     koth.update();
     TEST_ASSERT_INT_WITHIN(1,1,koth.getSecondsElapsed());
 
@@ -60,24 +56,24 @@ void test_koth_game_keeps_time(){
 
     //blue capture
     testControlPoint.setCapturingTeam(Team::BLU);
-    delay(1000);
+    tc.addTime(2000);
     koth.update();
 }
 
 void test_koth_game_ends_after_capture(){
-    GameOptions go = standard_game_options();    
+    GameOptions go = koth_game_options();    
     KothGame koth = KothGame();
-    RealClock rc = RealClock();
-    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2, &rc);
+    TestClock tc = TestClock();
+    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2, &tc);
     koth.start();
     testControlPoint.setOwner(Team::BLU);
-    koth.update();
-    delay(1100);
+    koth.update();    
+    tc.addTime(1100);
     koth.update();
     TEST_ASSERT_EQUAL(0, koth.getAccumulatedSeconds(Team::RED));
     TEST_ASSERT_EQUAL(1, koth.getAccumulatedSeconds(Team::BLU));
 
-    delay(1000);
+    tc.addTime(1000);
     koth.update();
     TEST_ASSERT_EQUAL(Team::BLU, koth.getWinner());
     TEST_ASSERT_EQUAL(0, koth.getRemainingSeconds());

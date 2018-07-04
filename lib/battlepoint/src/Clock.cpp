@@ -12,3 +12,6 @@ long TestClock::milliseconds() {
 void TestClock::setTime(long currentTime){
     _currentTime = currentTime;
 };
+void TestClock::addTime(long milliSeconds){
+    _currentTime += milliSeconds;
+}

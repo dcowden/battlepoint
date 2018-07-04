@@ -1,6 +1,7 @@
 #include <EventManagers.h>
 #include <Teams.h>
 #include <sound.h>
+#include <Clock.h>
 
 #define DEFAULT_CONTEST_ALERT_INTERVAL 20000
 #define START_END_WINDOW_INTERVAL 900
@@ -12,13 +13,13 @@
 //#define DEFAULT_BUTTON_SECONDS 5
 //#define DEFAULT_START_DELAY 5
 
-AudioEventManager::AudioEventManager(DFRobotDFPlayerMini* player,long cpAlertIntervalMilliSeconds){
+AudioEventManager::AudioEventManager(DFRobotDFPlayerMini* player,long cpAlertIntervalMilliSeconds, Clock* clock){
       _player = player;
-      _captureTimer= new CooldownTimer(cpAlertIntervalMilliSeconds);
-      _contestTimer= new CooldownTimer(DEFAULT_CONTEST_ALERT_INTERVAL);
-      _overtimeTimer=new CooldownTimer(cpAlertIntervalMilliSeconds);
-      _startTimeTimer=new CooldownTimer(START_END_WINDOW_INTERVAL);
-      _endTimeTimer=new CooldownTimer(START_END_WINDOW_INTERVAL);    
+      _captureTimer= new CooldownTimer(cpAlertIntervalMilliSeconds,clock);
+      _contestTimer= new CooldownTimer(DEFAULT_CONTEST_ALERT_INTERVAL,clock);
+      _overtimeTimer=new CooldownTimer(cpAlertIntervalMilliSeconds,clock);
+      _startTimeTimer=new CooldownTimer(START_END_WINDOW_INTERVAL,clock);
+      _endTimeTimer=new CooldownTimer(START_END_WINDOW_INTERVAL,clock);    
 }
 
 

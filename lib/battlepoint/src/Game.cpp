@@ -1,5 +1,5 @@
 #include <Game.h>
-#include <util.h>
+#include <Clock.h>
 #include <Teams.h>
 
 #define END_GAME_FLASH_SECONDS 10
@@ -43,7 +43,7 @@ void Game::resetGame(){
 
 void Game::start(){
     resetGame();
-    _startTime = millis();
+    _startTime = _gameClock->milliseconds();
     _events->game_started();
 };
 
@@ -64,7 +64,7 @@ void Game::endGameDisplay( void (*delay_function)() ){
     _captureMeter->setToMax();
 
     TeamColor winnerColor = getTeamColor(_winner);
-    while( millis() < end_flash_time ){
+    while( _gameClock->milliseconds() < end_flash_time ){
         updateAllMetersToColors(TeamColor::COLOR_BLACK, TeamColor::COLOR_BLACK);
         delay_function();
         updateAllMetersToColors(winnerColor, TeamColor::COLOR_BLACK);
@@ -100,16 +100,16 @@ int Game::getSecondsElapsed(){
        return 0;
    }
    else{
-       return secondsSince(_startTime);
+       return Clock::secondsSince(_startTime);
    }   
 };
 
 int Game::getAccumulatedSeconds(Team t){
     if ( t == Team::RED){
-        return millis_to_seconds(_redAccumulatedTimeMillis);
+        return Clock::millis_to_seconds(_redAccumulatedTimeMillis);
     }
     else if ( t == Team::BLU){
-        return millis_to_seconds(_bluAccumulatedTimeMillis);
+        return Clock::millis_to_seconds(_bluAccumulatedTimeMillis);
     }
     else{
         return 0;
@@ -124,7 +124,7 @@ void Game::updateAccumulatedTime(){
     else if ( _controlPoint->getOwner() == Team::BLU ){
        _bluAccumulatedTimeMillis += millisSinceLastUpdate;
     }
-    _lastUpdateTime = millis(); 
+    _lastUpdateTime =_gameClock->milliseconds(); 
 };
 
 void Game::update(){
