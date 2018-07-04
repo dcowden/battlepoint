@@ -6,7 +6,7 @@
 #include <LedMeter.h>
 #include <Teams.h>
 #include <Proximity.h>
-
+#include <Clock.h>
 typedef enum {
     AD,
     KOTH,
@@ -65,6 +65,7 @@ class Game {
     Meter* _captureMeter;
     Meter* _timer1Meter;
     Meter* _timer2Meter; 
+    Clock* _gameClock;
     long _redAccumulatedTimeMillis;
     long _bluAccumulatedTimeMillis;
 
