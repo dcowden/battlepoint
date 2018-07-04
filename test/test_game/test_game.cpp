@@ -2,6 +2,7 @@
 #include <Teams.h>
 #include <unity.h>
 #include <Game.h>
+#include <Clock.h>
 
 TestControlPoint testControlPoint = TestControlPoint();
 SimpleMeter owner = SimpleMeter();
@@ -23,7 +24,8 @@ GameOptions standard_game_options(void){
 void test_koth_game_initial_state(void){
     GameOptions go = standard_game_options();    
     KothGame koth = KothGame();
-    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2);
+    RealClock rc = RealClock();
+    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2, &rc);
     TEST_ASSERT_FALSE(koth.isRunning() );
     TEST_ASSERT_EQUAL( Team::NOBODY, koth.getWinner() );
     TEST_ASSERT_EQUAL(0,koth.getSecondsElapsed());
@@ -37,7 +39,8 @@ void test_koth_game_initial_state(void){
 void test_koth_game_keeps_time(){
     GameOptions go = standard_game_options();    
     KothGame koth = KothGame();
-    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2);
+    RealClock rc = RealClock();
+    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2, &rc);
     testControlPoint.setOwner(Team::NOBODY);
     koth.start();
     //TEST_ASSERT_EQUAL(timer1.getMaxValue(), timer1.getValue());
@@ -64,7 +67,8 @@ void test_koth_game_keeps_time(){
 void test_koth_game_ends_after_capture(){
     GameOptions go = standard_game_options();    
     KothGame koth = KothGame();
-    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2);
+    RealClock rc = RealClock();
+    koth.init(&testControlPoint, go, &em, &owner, &capture, &timer1, &timer2, &rc);
     koth.start();
     testControlPoint.setOwner(Team::BLU);
     koth.update();

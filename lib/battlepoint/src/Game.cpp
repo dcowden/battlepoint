@@ -11,7 +11,8 @@ void Game::init(  BaseControlPoint* controlPoint,
            Meter* ownerMeter,
            Meter* captureMeter,
            Meter* timer1,
-           Meter* timer2 ){
+           Meter* timer2,
+           Clock* clock ){
     _options = gameOptions;
     _events = eventManager;
     _controlPoint = controlPoint;
@@ -19,6 +20,7 @@ void Game::init(  BaseControlPoint* controlPoint,
     _timer2Meter = timer2;
     _ownerMeter = ownerMeter;
     _captureMeter = captureMeter;
+    _gameClock = clock;
     resetGame();
 };
 
@@ -33,7 +35,7 @@ void Game::resetGame(){
     _winner = Team::NOBODY;
     _redAccumulatedTimeMillis=0 ;
     _bluAccumulatedTimeMillis=0 ;
-    _lastUpdateTime = millis();
+    _lastUpdateTime = _gameClock->milliseconds();
     _startTime = NOT_STARTED;
     _timer1Meter->setMaxValue(_options.timeLimitSeconds);
     _timer2Meter->setMaxValue(_options.timeLimitSeconds);
@@ -53,7 +55,7 @@ void Game::updateAllMetersToColors(TeamColor fg, TeamColor bg){
 };
 
 void Game::endGameDisplay( void (*delay_function)() ){
-    long start_time = millis();
+    long start_time = _gameClock->milliseconds();
     long end_flash_time = start_time + (long)END_GAME_FLASH_SECONDS*1000;
 
     _timer1Meter->setToMax();
@@ -115,7 +117,7 @@ int Game::getAccumulatedSeconds(Team t){
 };
 
 void Game::updateAccumulatedTime(){
-    long millisSinceLastUpdate = millis() - _lastUpdateTime;
+    long millisSinceLastUpdate = _gameClock->milliseconds() - _lastUpdateTime;
     if ( _controlPoint->getOwner() == Team::RED ){
        _redAccumulatedTimeMillis += millisSinceLastUpdate;
     }

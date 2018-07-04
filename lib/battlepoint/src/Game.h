@@ -38,7 +38,8 @@ class Game {
            Meter* ownerMeter,
            Meter* captureMeter,
            Meter* timer1,
-           Meter* timer2 );
+           Meter* timer2,
+           Clock* clock );
     void start();
     void update();
     void end();
