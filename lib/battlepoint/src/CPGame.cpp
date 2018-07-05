@@ -2,9 +2,19 @@
 #include <Teams.h>
 #include <Clock.h>
 
+/**
+  cp game: both teams capture the point as much as possible.
+  After a set time limit, the team with the most accumulated ownership time wins
+  If the time limit elapses with no capture, nobody wins
+
+  both meters start with zero, and have max value of the time limit.
+**/
+
 void CPGame::gameTypeInit(){
-     _timer1Meter->setColors(TeamColor::COLOR_RED, TeamColor::COLOR_BLACK);
-     _timer2Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
+  
+    _timer1Meter->setColors(TeamColor::COLOR_RED, TeamColor::COLOR_BLACK);
+    _timer2Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
+     
 }; 
 
 void CPGame::updateDisplay(){
@@ -49,9 +59,7 @@ boolean CPGame::checkOvertime(){
     return  _controlPoint->getCapturing() != Team::NOBODY;
 };
 
-int CPGame::getRemainingSeconds(){
-    //in this mode, the game always ends after a fixed time
-    //the team with the most accumulated time wins
+int CPGame::getGameTypeRemainingSeconds(){    
     return _options.timeLimitSeconds - getSecondsElapsed();
 };
 

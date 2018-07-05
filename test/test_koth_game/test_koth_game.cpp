@@ -45,7 +45,7 @@ void test_koth_game_keeps_time(){
     TEST_ASSERT_EQUAL( Team::NOBODY, koth.getWinner() );
     TEST_ASSERT_TRUE(koth.isRunning() );
     TEST_ASSERT_EQUAL(go.timeLimitSeconds, koth.getRemainingSeconds());
-    tc.addTime(1000);
+    tc.addMillis(1000);
     koth.update();
     TEST_ASSERT_INT_WITHIN(1,1,koth.getSecondsElapsed());
 
@@ -56,7 +56,7 @@ void test_koth_game_keeps_time(){
 
     //blue capture
     testControlPoint.setCapturingTeam(Team::BLU);
-    tc.addTime(2000);
+    tc.addMillis(2000);
     koth.update();
 }
 
@@ -68,12 +68,12 @@ void test_koth_game_ends_after_capture(){
     koth.start();
     testControlPoint.setOwner(Team::BLU);
     koth.update();    
-    tc.addTime(1100);
+    tc.addMillis(1100);
     koth.update();
     TEST_ASSERT_EQUAL(0, koth.getAccumulatedSeconds(Team::RED));
     TEST_ASSERT_EQUAL(1, koth.getAccumulatedSeconds(Team::BLU));
 
-    tc.addTime(1000);
+    tc.addMillis(1000);
     koth.update();
     TEST_ASSERT_EQUAL(Team::BLU, koth.getWinner());
     TEST_ASSERT_EQUAL(0, koth.getRemainingSeconds());

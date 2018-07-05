@@ -4,7 +4,7 @@
 
 #define END_GAME_FLASH_SECONDS 10
 #define END_GAME_FLASH_INTERVAL_MILLISECONDS 80
-#define NOT_STARTED  -1
+#define NOT_STARTED -100
 void Game::init(  BaseControlPoint* controlPoint,
            GameOptions gameOptions,
            EventManager* eventManager,
@@ -22,6 +22,16 @@ void Game::init(  BaseControlPoint* controlPoint,
     _captureMeter = captureMeter;
     _gameClock = clock;
     resetGame();
+};
+
+int Game:: getRemainingSeconds(){
+    if ( _winner != Team::NOBODY){
+        return 0;
+    }
+    else{
+        return getGameTypeRemainingSeconds();
+    }
+
 };
 
 void Game::end(){
@@ -100,7 +110,7 @@ int Game::getSecondsElapsed(){
        return 0;
    }
    else{
-       return Clock::secondsSince(_startTime);
+       return _gameClock->secondsSince(_startTime);
    }   
 };
 
@@ -142,13 +152,13 @@ void Game::update(){
       updateDisplay(); 
       return;
   }
-
+  
   if ( checkOvertime() ){
       _events->overtime();
   }
   
   _events->ends_in_seconds( getRemainingSeconds() );
-
+  updateDisplay(); 
 };
 
 

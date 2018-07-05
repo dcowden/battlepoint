@@ -2,6 +2,14 @@
 #include <Teams.h>
 
 
+/**
+  AD game: RED team starts with ownership.
+
+  If the BLU team captures within the timelimit, blue wins, else red wins
+
+  both time meters have max value of the time limit, and count to zero with time
+**/
+
 void ADGame::gameTypeInit(){
      _controlPoint->setRedCaptureEnabled(false);
      _timer1Meter->setColors(TeamColor::COLOR_YELLOW, TeamColor::COLOR_BLACK);
@@ -37,7 +45,7 @@ boolean ADGame::checkOvertime(){
     return false;
 };
 
-int ADGame::getRemainingSeconds(){
+int ADGame::getGameTypeRemainingSeconds(){
     //in this mode, the game always ends after a fixed time.
     //blue wins if the CP is captured. otherwise, red wins
     return _options.timeLimitSeconds - getSecondsElapsed();

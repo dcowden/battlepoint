@@ -1,10 +1,21 @@
 #include <Game.h>
 #include <Teams.h>
 
+/**
+  koth game: both teams capture the point as much as possible.
+  The first team to hold the point for the timelimt duration wins.
+
+  The game lasts forever if nobody ever captures once.
+
+  The time meters have max value- the time limit, and min value zero
+**/
+
 
 void KothGame::gameTypeInit(){
-     _timer1Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
-     _timer2Meter->setColors(TeamColor::COLOR_RED, TeamColor::COLOR_BLACK);
+    _timer1Meter->setMaxValue(_options.timeLimitSeconds);
+    _timer2Meter->setMaxValue(_options.timeLimitSeconds);  
+    _timer1Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
+    _timer2Meter->setColors(TeamColor::COLOR_RED, TeamColor::COLOR_BLACK);
 };    
 
 void KothGame::updateDisplay(){
@@ -38,7 +49,7 @@ boolean KothGame::checkOvertime(){
     return false;
 };
 
-int KothGame::getRemainingSeconds(){
+int KothGame::getGameTypeRemainingSeconds(){
     //in this game mode, time remianing is the time left for the team who owns the point's timer
     if (_controlPoint->isOwnedBy(Team::RED)){
         return getRemainingSecondsForTeam(Team::RED);

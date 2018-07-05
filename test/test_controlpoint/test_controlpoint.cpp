@@ -25,7 +25,7 @@ void test_basic_blu_capture(void ){
  
     cp.init(1);
     cp.update();
-    tc.addTime(200);
+    tc.addMillis(200);
     cp.update();
     TEST_ASSERT_INT_WITHIN(1,20,cp.getPercentCaptured());
     TEST_ASSERT_TRUE(cp.isOn(Team::BLU));    
@@ -34,7 +34,7 @@ void test_basic_blu_capture(void ){
     TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
     TEST_ASSERT_EQUAL(Team::NOBODY, cp.getOwner());
     TEST_ASSERT_EQUAL(Team::BLU, cp.getCapturing());
-    tc.addTime(900);
+    tc.addMillis(900);
     cp.update();
     //counter intuitieve: percent captured is reset to zero after capture
     TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
@@ -54,7 +54,7 @@ void test_contested(void){
     tp.setRedClose(true);
     cp.init(1);
     cp.update();
-    tc.addTime(200);
+    tc.addMillis(200);
     cp.update();
     TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
     TEST_ASSERT_TRUE(cp.isOn(Team::BLU));
@@ -72,14 +72,14 @@ void test_count_back_down(void){
     tp.setBluClose(true);
 
     cp.update();
-    tc.addTime(200);
+    tc.addMillis(200);
     cp.update();
     TEST_ASSERT_INT_WITHIN(1,20, cp.getPercentCaptured());
     tp.setBluClose(false);
-    tc.addTime(100);
+    tc.addMillis(100);
     cp.update();
     TEST_ASSERT_EQUAL(10, cp.getPercentCaptured());
-    tc.addTime(400);
+    tc.addMillis(400);
     cp.update();
     TEST_ASSERT_EQUAL(0, cp.getPercentCaptured());
     TEST_ASSERT_FALSE(cp.isOn(Team::BLU));
@@ -102,7 +102,7 @@ void test_capture_disabled(void){
     TEST_ASSERT_FALSE(cp.getRedCaptureEnabled());
     TEST_ASSERT_EQUAL(Team::NOBODY, cp.getCapturing()); 
     cp.update();
-    tc.addTime(200);
+    tc.addMillis(200);
     cp.update();
 
     TEST_ASSERT_TRUE(cp.isOn(Team::RED));
@@ -123,7 +123,7 @@ void test_reverse_capture(void){
     tp.setRedClose(true);
     cp.setOwner(Team::BLU);    
     cp.update();
-    tc.addTime(200);
+    tc.addMillis(200);
     cp.update();
     TEST_ASSERT_INT_WITHIN(1,20, cp.getPercentCaptured()); 
     TEST_ASSERT_TRUE(cp.isOn(Team::RED));
@@ -133,14 +133,14 @@ void test_reverse_capture(void){
     TEST_ASSERT_EQUAL(Team::RED, cp.getCapturing()); 
     tp.setBluClose(true);
     cp.update();
-    tc.addTime(100);
+    tc.addMillis(100);
     cp.update();
     //no decrement or increment if contested
     TEST_ASSERT_TRUE(cp.isContested());
     TEST_ASSERT_INT_WITHIN(1,20, cp.getPercentCaptured());
     tp.setRedClose(false);
     cp.update();
-    tc.addTime(100);
+    tc.addMillis(100);
     cp.update();
     TEST_ASSERT_INT_WITHIN(1,10, cp.getPercentCaptured());
 }

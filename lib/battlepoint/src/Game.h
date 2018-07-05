@@ -51,7 +51,8 @@ class Game {
     boolean isRunning();
     GameOptions getOptions();
     virtual void updateDisplay(){};
-    virtual int getRemainingSeconds(){ return 0;};
+    int getRemainingSeconds();
+    virtual int getGameTypeRemainingSeconds(){ return 0;};
     virtual void gameTypeInit();
  
   protected:
@@ -83,10 +84,10 @@ class Game {
 class KothGame : public Game{
     public: 
         virtual Team checkVictory();
-        virtual boolean checkOvertime();
-        virtual int getRemainingSeconds();
+        virtual boolean checkOvertime();        
         virtual void gameTypeInit();
         virtual void updateDisplay();   
+        virtual int getGameTypeRemainingSeconds();
 
     private:
         boolean checkVictory(Team t);  
@@ -95,18 +96,18 @@ class KothGame : public Game{
 class ADGame : public Game{
     public:
         virtual Team checkVictory();
-        virtual boolean checkOvertime();
-        virtual int getRemainingSeconds();
+        virtual boolean checkOvertime();        
         virtual void gameTypeInit();
-        virtual void updateDisplay();  
+        virtual void updateDisplay();
+        virtual int getGameTypeRemainingSeconds();
 };
 class CPGame : public Game{
     public:
         virtual Team checkVictory();
         virtual boolean checkOvertime();
-        virtual int getRemainingSeconds();
         virtual void gameTypeInit();
         virtual void updateDisplay();   
+        virtual int getGameTypeRemainingSeconds();
 };
 
 #endif

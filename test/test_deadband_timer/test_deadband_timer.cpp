@@ -10,11 +10,11 @@ void test_basic_timer(void){
     CooldownTimer ct = CooldownTimer(500, &clock);
     TEST_ASSERT_TRUE ( ct.canRun() ) ;
     TEST_ASSERT_FALSE ( ct.canRun() );
-    clock.addTime(100);
+    clock.addMillis(100);
     TEST_ASSERT_FALSE ( ct.canRun() );
-    clock.addTime(600);
+    clock.addMillis(600);
     TEST_ASSERT_TRUE ( ct.canRun()) ;
-    clock.addTime(600);
+    clock.addMillis(600);
     TEST_ASSERT_TRUE ( ct.canRun()) ;    
 }
 

@@ -30,12 +30,18 @@ void test_fake_clock(void){
 void test_fake_clock_add(void){
     TestClock tc = TestClock();
     TEST_ASSERT_EQUAL(0, tc.milliseconds());
-    tc.addTime(200);
+    tc.addMillis(200);
     TEST_ASSERT_EQUAL(200,tc.milliseconds());
-    tc.addTime(400);
+    tc.addMillis(400);
     TEST_ASSERT_EQUAL(600,tc.milliseconds());        
 }
 
+void test_clock_seconds_since(void){
+    TestClock tc = TestClock();
+    TEST_ASSERT_EQUAL(0, tc.milliseconds());
+    tc.addMillis(4000);
+    TEST_ASSERT_EQUAL(3,tc.secondsSince(1000));
+}
 void setup() {
     delay(1000);
     Serial.begin(115200);
