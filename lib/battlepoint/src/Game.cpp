@@ -41,7 +41,6 @@ void Game::end(){
 
 void Game::resetGame(){
     
-    gameTypeInit();
     _winner = Team::NOBODY;
     _redAccumulatedTimeMillis=0 ;
     _bluAccumulatedTimeMillis=0 ;
@@ -49,6 +48,8 @@ void Game::resetGame(){
     _startTime = NOT_STARTED;
     _timer1Meter->setMaxValue(_options.timeLimitSeconds);
     _timer2Meter->setMaxValue(_options.timeLimitSeconds);
+    gameTypeInit();
+    updateDisplay();
 };
 
 void Game::start(){
@@ -62,6 +63,19 @@ void Game::updateAllMetersToColors(TeamColor fg, TeamColor bg){
     _timer2Meter->setColors(fg,bg);
     _ownerMeter->setColors(fg,bg);
     _captureMeter->setColors(fg,bg);  
+};
+void Game::updateOwnerMeter(){
+    Team owner = _controlPoint->getOwner();
+    _ownerMeter->setColors(getTeamColor(owner), TeamColor::COLOR_BLACK);
+    if ( owner == Team::NOBODY){
+        _ownerMeter->setToMin();
+    }
+    else{
+        _ownerMeter->setToMax();
+    }
+};
+void Game::updateCaptureMeter(){
+    _captureMeter->setValue(_controlPoint->getPercentCaptured());
 };
 
 void Game::endGameDisplay( void (*delay_function)() ){

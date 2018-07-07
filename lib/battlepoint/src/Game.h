@@ -57,6 +57,8 @@ class Game {
  
   protected:
     void resetGame();
+    void updateOwnerMeter();
+    void updateCaptureMeter();
     virtual Team checkVictory(){ return Team::NOBODY; } ;
     virtual boolean checkOvertime() { return false; };  
     

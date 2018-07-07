@@ -12,8 +12,7 @@
 
 
 void KothGame::gameTypeInit(){
-    _timer1Meter->setMaxValue(_options.timeLimitSeconds);
-    _timer2Meter->setMaxValue(_options.timeLimitSeconds);  
+    _controlPoint->setOwner(Team::NOBODY);
     _timer1Meter->setColors(TeamColor::COLOR_BLUE, TeamColor::COLOR_BLACK);
     _timer2Meter->setColors(TeamColor::COLOR_RED, TeamColor::COLOR_BLACK);
 };    
@@ -21,15 +20,8 @@ void KothGame::gameTypeInit(){
 void KothGame::updateDisplay(){
     _timer1Meter->setValue(getRemainingSecondsForTeam(Team::BLU));
     _timer2Meter->setValue(getRemainingSecondsForTeam(Team::RED));
-    _captureMeter->setValue(_controlPoint->getPercentCaptured());    
-    Team owner = _controlPoint->getOwner();
-    _ownerMeter->setColors(getTeamColor(owner), TeamColor::COLOR_BLACK);
-    if ( owner == Team::NOBODY){
-        _ownerMeter->setToMin();
-    }
-    else{
-        _ownerMeter->setToMax();
-    }
+    updateCaptureMeter();    
+    updateOwnerMeter(); 
 };
 
 Team KothGame::checkVictory(){    

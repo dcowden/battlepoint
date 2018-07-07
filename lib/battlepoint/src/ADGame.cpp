@@ -12,6 +12,7 @@
 
 void ADGame::gameTypeInit(){
      _controlPoint->setRedCaptureEnabled(false);
+     _controlPoint->setOwner(Team::RED);
      _timer1Meter->setColors(TeamColor::COLOR_YELLOW, TeamColor::COLOR_BLACK);
      _timer2Meter->setColors(TeamColor::COLOR_YELLOW, TeamColor::COLOR_BLACK);     
 }; 
@@ -19,8 +20,8 @@ void ADGame::gameTypeInit(){
 void ADGame::updateDisplay(){
     _timer1Meter->setValue(getRemainingSeconds());
     _timer2Meter->setValue(getRemainingSeconds());
-    _captureMeter->setValue(_controlPoint->getPercentCaptured());    
-
+    updateCaptureMeter();
+    updateOwnerMeter(); 
 };
 
 Team ADGame::checkVictory(){
