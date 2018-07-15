@@ -27,8 +27,7 @@ typedef struct {
      uint8_t brightness;
      
      GameOptions options;
-} EEPromSettingsData;
-
+} SettingsData;
 
 class Game {
   public:

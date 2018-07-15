@@ -5,6 +5,8 @@
 #define END_GAME_FLASH_SECONDS 10
 #define END_GAME_FLASH_INTERVAL_MILLISECONDS 80
 #define NOT_STARTED -100
+
+
 void Game::init(  BaseControlPoint* controlPoint,
            GameOptions gameOptions,
            EventManager* eventManager,
