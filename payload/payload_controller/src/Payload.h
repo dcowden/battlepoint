@@ -17,7 +17,7 @@
 #define P_GAIN 1.0
 #define D_GAIN 0.02
 
-#define DEBUG true
+#define DEBUG 0
 
 struct gameOptions
 {

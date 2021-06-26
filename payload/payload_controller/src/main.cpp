@@ -12,7 +12,8 @@
 #include "EncoderMenuDriver.h"
 #include "Ticker.h"
 #include "pinmap.h"
-#include "BLEScanner.h"
+//#include "BLEScanner.h"
+#include <Ultrasonic.h>
 
 //Menu Includes
 #include <menuIO/keyIn.h>
@@ -35,7 +36,8 @@
 #define DISPLAY_UPDATE_INTERVAL_MS 200
 #define SERIAL_UPDATE_INTERVAL_MS 1000
 #define MOTOR_UPDATE_INTERVAL_MS 50
-#define DEBUG 1
+#define GAME_OVER_DIST_CM 6
+#define DEBUG 0
 #define EEPROMStartAddress 0 // Where to start reading and writing EEPROM
 
 struct gameOptions tmpGameOptions; // Temorary struct for reading EEPROM into
@@ -69,15 +71,16 @@ void encButton_DoubleClick();
 CRGB leds[NUM_LEDS];
 SSD1306AsciiWire oled;
 ESP32Encoder encoder;
+Ultrasonic ultrasonic(ULTRA_ECHO, ULTRA_TRIG);	// An ultrasonic sensor HC-04
 LedRange payloadRange [2] = {  { 1, 29 } , { 58,30 }} ; //
 LedMeter payloadMeter = LedMeter(leds,payloadRange,2,CRGB::Blue, CRGB::Black);
 Payload payload;
 Game game(&payload);
-
+int ultraDist = 0;
 OneButton encButton(ROTARY_ENCODER_BUTTON_PIN, true);
-BLEProximityScanner scanner;
+//BLEProximityScanner scanner;
 
-TaskHandle_t BLETask;
+//TaskHandle_t BLETask;
 
 void sendMotorCommand(){
     Wire.beginTransmission (MOTOR_CONTROLLER_ADDRESS );
@@ -111,7 +114,7 @@ void setupOLED(){
   oled.setFont(menuFont);
   oled.displayRemap(true);
   oled.clear();
-  oled.println("BattlePoint v1.0"); 
+  oled.println("BattlePoint v1.1"); 
   oled.println("Starting..."); 
 }
 
@@ -126,7 +129,7 @@ void startGame() {
     payloadMeter.setColors(CRGB::Blue,CRGB::Black);
     oled.clear();    
     payload.enable();
-    scanner.rssiThreshold = gameOptions.rssiThreshold;
+    //scanner.rssiThreshold = gameOptions.rssiThreshold;
     game.start();
     appMode = APP_GAME_RUNNING;
 }
@@ -153,11 +156,12 @@ void setupEEProm(){
   readGameSettings();
 }
 
+/**
 void bleScanLoop(void * pvParameters){
   Serial.println("BLE Scanner Running");
-  scanner.init();
+  //scanner.init();
   while (true){
-     scanner.update();
+     //scanner.update();
      if ( DEBUG ){
         if ( scanner.foundDevice() ){
           Serial.println("FOUND IT. I FOUND IT!");
@@ -167,17 +171,19 @@ void bleScanLoop(void * pvParameters){
         }
      }
   }
-}
-void setupBLETask(){
-  xTaskCreatePinnedToCore(
-              bleScanLoop,  /* Task function. */
-              "BLESCAN",    /* name of task. */
-              5000,      /* Stack size of task */
-              NULL,       /* parameter of the task */
-              1,          /* priority of the task */
-              &BLETask,     /* Task handle to keep track of created task */
-              1);    
-}
+}**/
+
+// void setupBLETask(){
+//  xTaskCreatePinnedToCore(
+//              bleScanLoop,  /* Task function. */
+//              "BLESCAN",    /* name of task. */
+//              5000,      /* Stack size of task */
+//              NULL,       /* parameter of the task */
+//             1,          /* priority of the task */
+//              &BLETask,     /* Task handle to keep track of created task */
+//              1);    
+//} 
+
 
 void startTimers(){
   displayTimer.start();
@@ -201,7 +207,7 @@ void setup() {
   setupEEProm();
   startTimers();
   payload.disable();
-  setupBLETask();
+  //setupBLETask();
 }
 
 void updateLEDs(){
@@ -253,7 +259,9 @@ void updateDisplay(){
   oled.print("SEN: ");
   oled.print(payload.left_sensor);
   oled.print(" ");   
-  oled.println(payload.right_sensor);
+  oled.print(payload.right_sensor);
+  oled.print(" ");
+  oled.println(ultraDist);
   oled.clearToEOL();
   oled.print("MTR: ");  
   oled.print((int)payload.lastCommand.leftVelocity);
@@ -292,8 +300,8 @@ void updateSerial(){
    Serial.print(payload.manualDrive);
    Serial.print(" enabled:");
    Serial.print(payload.enabled);
-   Serial.print(" BLE:");
-   Serial.println(scanner.foundDevice());
+   //Serial.print(" BLE:");
+   //Serial.println(scanner.foundDevice());
    
 }
 
@@ -339,7 +347,7 @@ TOGGLE(driveMode,driveModeMenu,"Motors: ",doNothing,noEvent,wrapStyle
   ,VALUE("AUTO",1,doEndManualControl,noEvent)
 );
 
-MENU(mainMenu, "BP Payload v0.1", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
+MENU(mainMenu, "BP Payload v1.1", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
   ,OP("Start Game!",doStartGame,Menu::enterEvent)
   ,SUBMENU(driveModeMenu)
   ,SUBMENU(settingsSubMenu)
@@ -372,18 +380,27 @@ void encButton_SingleClick(){
 void encButton_DoubleClick(){
   encoderDriver.button_dbl_clicked();
 } 
+
+void updateUltrasonic(){
+    ultraDist = ultrasonic.read(CM);
+    //Serial.print("ULtra dist:");
+    //Serial.print(ultraDist);
+}
+
 void loop() {
   
   payload.update();
   motorCommandTimer.update();  
   serialTimer.update();
+  updateUltrasonic();
   updateLEDs();
 
   if ( appMode == APP_GAME_RUNNING){
     //check button, so we can cancel
     encButton.tick();    
     displayTimer.update();
-    if ( encButton.isLongPressed() || game.isOver() || scanner.foundDevice() ){
+
+    if ( encButton.isLongPressed() || game.isOver() || ultraDist <  GAME_OVER_DIST_CM ){
       appMode = APP_MENU_MODE;
       payload.disable();
       int gameResult = 0;

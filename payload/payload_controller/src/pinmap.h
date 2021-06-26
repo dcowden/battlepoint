@@ -14,4 +14,6 @@
 #define BTN_FWD_3 17
 #define BTN_BWD 5 
 
+#define ULTRA_ECHO 2
+#define ULTRA_TRIG 15
 #endif
