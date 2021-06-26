@@ -1,0 +1,43 @@
+High Priority
+* why does the other side read 500 when saturated?
+* weird runaway situation? happens when you just barely catch the corner?
+* better connector on wire loop
+* motor slow start
+* caps at adc
+
+Next Features
+* use interediate checkpoint
+* proximity detection for checkpoint-- add time
+
+Low priority
+* add logging library
+* move eeprom code into separate file
+* set times in ft/sec not rpm
+  --@6000,  20.5 revs/30s = 41 rpm . 6 in wheel -> 64fpm at 6000
+  -->  6000    64 fpm 1 fps
+  -->  3000    32 fpm 0.5 fps
+  -->  1500    16 fpm 0.25 fps
+* fix missing small curves
+   --- possible algo. if no sensor readings and you had a 4000 in the last xx,
+     then you missed the wire, turn towards the sensor
+* move game over result code into game
+
+DONE
+* Higher max speed
+* open up speed options
+* refactor icky eeprom write code
+* add speed settings into eeprom
+* move all pin definitions into one file
+* red button should stop progress
+* Misses small curves
+* advancing non-stop should be overtime
+* odd delay after game over ?????
+* proximity detection for end
+
+
+BOARD VERSION 2 notes
+* 0.1uf caps for adc pins
+* move i2c ports for usb conflict
+* make footprint right ( or, use different esp model)
+* usb footprings were not right
+* ultrsonic sensor port/pins

@@ -1,0 +1,191 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include <PID_v1.h>
+
+#define ENCODER_PIN 2
+#define LEFT_MOTOR_ENABLE 11
+#define LEFT_MOTOR_A 10
+#define LEFT_MOTOR_B 9
+#define RIGHT_MOTOR_A 8
+#define RIGHT_MOTOR_B 7
+#define RIGHT_MOTOR_ENABLE 6
+
+
+#define DEBUG_INTERVAL_MS 1000
+#define STARTUP_SPEED_RPM=300.0
+
+//unsigned long setPoint; 
+
+long error;
+int basePWM; 
+long errorPWM; 
+int PWMval = 0;
+
+//volatile unsigned long isrRevMicros = 0;
+//volatile unsigned long isrRevCount = 0;
+//volatile bool newRevMicros = true;
+//bool pseudoRevMicros = false;
+//bool stallDetected = false;
+//byte afterStallCount = 0;
+
+//unsigned long revCount;
+
+//unsigned long revMicros;
+//unsigned long prevIsrMicros;
+//unsigned long latestIsrMicros;
+
+//unsigned long targetMicros = 20000;
+
+double KP=40;
+double KI=16;
+double KD=0;
+
+double targetSpeed = 2000;
+double motorOutput = 0.0;
+
+PID leftMotorPID(&targetSpeed, &motorOutput, &Setpoint, KP, KI, KD, DIRECT);
+
+//void revDetectorISR() {
+//    isrRevMicros = micros();
+//    isrRevCount ++;
+//    newRevMicros = true;
+//}
+void setupMotorPins(){
+  pinMode(LEFT_MOTOR_ENABLE, OUTPUT);
+  pinMode(LEFT_MOTOR_A, OUTPUT);
+  pinMode(LEFT_MOTOR_B, OUTPUT);
+  pinMode(RIGHT_MOTOR_A, OUTPUT);
+  pinMode(RIGHT_MOTOR_B, OUTPUT);
+  pinMode(RIGHT_MOTOR_ENABLE, OUTPUT);
+  
+}
+void setupEncoderPins(){
+    pinMode(ENCODER_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(ENCODER_PIN), revDetectorISR, RISING);  
+}
+
+void setup() 
+{
+    Serial.begin(57600);
+    setupEncoderPins();
+    setupMotorPins();
+    leftMotorPID.SetMode(AUTOMATIC);
+}
+
+void loop()
+{     
+    //checkForStall();
+    updatePWM();
+    setLeftMotorSpeed(PWMval);
+    showDebugData();
+}
+
+//================
+
+//void checkForStall() {
+//
+//    if (micros() - latestIsrMicros >= STALL_MICROS) {
+//        pseudoRevMicros = true;
+//        stallDetected = true;       // new SoftStart
+//        afterStallCount = 0;
+//    }
+//    else if (stallDetected == true) {       // new SoftStart
+//        afterStallCount ++;
+//        if (afterStallCount > STALL_COUNT_REV) {  // stay at low speed for a few revs
+//            stallDetected = false;
+//        }
+//    }
+//}
+
+
+//============
+
+void updatePWM() {
+    if(newRevMicros == true or pseudoRevMicros == true) {
+
+        setPoint = targetMicros;
+        if (stallDetected == true) {        // new SoftStart
+            setPoint = SLOW_REV_MICROS;
+        }
+
+        prevIsrMicros = latestIsrMicros;
+        if (newRevMicros == true) {
+            noInterrupts();
+                latestIsrMicros = isrRevMicros;
+                revCount = isrRevCount;
+                newRevMicros = false;
+            interrupts();
+        }
+        else { // it was pseudoRevMicros
+            latestIsrMicros = micros();
+            pseudoRevMicros = false;
+        }
+        revMicros = latestIsrMicros - prevIsrMicros;
+        if (revMicros < (setPoint >> 2)) {
+            latestIsrMicros = prevIsrMicros; // restore the value
+            return; // ignore very short values of revMicros as aberrations
+        }
+
+
+        error = revMicros - setPoint;
+        errorPWM = calcPWM(error, KP);
+        basePWM += calcPWM(error, KI);
+        PWMval = basePWM + errorPWM;
+    }
+}
+
+//====================
+
+long calcPWM(long microsVal, byte kFactor) {
+        // note that division of a negative number does funny things
+    long pwmCalc = microsVal * kFactor;
+    if (pwmCalc < 0) {
+        pwmCalc = -(abs(pwmCalc) / setPoint);
+    }
+    else {
+        pwmCalc = pwmCalc / setPoint;
+    }
+    return pwmCalc;
+}
+
+
+//=============
+
+void showDebugData() {
+
+    static unsigned long prevShowMillis;
+    if ( millis() - prevShowMillis  >= DEBUG_INTERVAL_MS ) {
+        prevShowMillis = millis();
+
+        Serial.print("\tSetpt "); Serial.print(setPoint);
+        Serial.print("\trevMic "); Serial.print(revMicros);
+        Serial.print("\terr "); Serial.print(error);
+        Serial.print("\ttotPWM "); Serial.print(PWMval);
+        Serial.print("\tbsPWM "); Serial.print(basePWM);
+        Serial.print("\terPWM "); Serial.print(errorPWM);
+        Serial.println();
+
+    }
+}
+
+
+void setRightMotorSpeed( int velocity){
+  setMotorSpeed( RIGHT_MOTOR_A, RIGHT_MOTOR_B, RIGHT_MOTOR_ENABLE, velocity );
+}
+
+void setLeftMotorSpeed( int velocity){
+  setMotorSpeed( LEFT_MOTOR_A, LEFT_MOTOR_B, LEFT_MOTOR_ENABLE, velocity );
+}
+
+void setMotorSpeed ( int pinA, int pinB, int pinEnable, int velocity ){
+  int speed = abs(velocity);
+  analogWrite(pinEnable, speed );
+  if ( velocity > 0 ){
+    digitalWrite(pinA, HIGH);
+    digitalWrite(pinB, LOW);     
+  }
+  else{
+    digitalWrite(pinA, LOW);
+    digitalWrite(pinB, HIGH);    
+  }
+}

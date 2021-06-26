@@ -1,0 +1,9 @@
+led meter:          manage the lights of a meter using a single value
+control point:      the notion of ownership, and time capture
+proximity:          when someone on one team is close
+game options:       various settings a game can have
+game:               the rules of the game and how they apply to one or more control points
+menu:               abstracts reading and displaying a menu to the user
+eventmanager?:      allows game events to be broadcast via various methods
+settings            data stored in EEPROM between starts, including game options, volume, brightness
+

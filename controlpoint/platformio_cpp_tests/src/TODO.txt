@@ -1,0 +1,11 @@
+save memory
+ * meter that controls a bunch of lights on or off
+ * eliminate bg color-- we always use black
+ * smaller deadband timer that uses int not long. or, how do deal with only one long?
+ * smaller numbers of leds
+ * controlpont: 
+      int value not long?
+    unint8_t capture seconds?
+ * game: get rid of4 longs
+ 
+ without debug: 26544/1538
