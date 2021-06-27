@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "PlatformIO",
+			"task": "Remote Test (desktop)",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"label": "PlatformIO: Remote Test (desktop)"
+		}
+	]
+}

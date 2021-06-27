@@ -1,4 +1,5 @@
-#include <koth.h>
+#include <game.h>
+#include <Teams.h>
 
 char char_for_team(Team t){
     if ( t == Team::BLU){
@@ -10,7 +11,7 @@ char char_for_team(Team t){
     else if ( t == Team::NOBODY){
         return 'X';
     }
-    else if ( t == Team::EVERYBODY){
+    else if ( t == Team::ALL){
         return 'B';
     }
     else{

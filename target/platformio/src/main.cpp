@@ -2,8 +2,8 @@
 #include "Ticker.h"
 #include <U8g2lib.h>
 #include <FastLED.h>
-#include "LedMeter.h"
-#include <koth.h>
+#include <LedMeter.h>
+#include <game.h>
 //Menu Includes
 #include <menuIO/keyIn.h>
 #include <menu.h>
@@ -90,9 +90,9 @@ void setupOLED(){
 }
 
 void startGame() {
-    targetMeter.setMaxValue(HITS_TO_WIN);
-    targetMeter.setToMin();
-    targetMeter.setColors(CRGB::Red,CRGB::Black);
+    //targetMeter.setMaxValue(HITS_TO_WIN);
+    //targetMeter.setToMin();
+    //targetMeter.setColors(CRGB::Red,CRGB::Black);
     oled.clear();    
     appMode = APP_GAME_RUNNING;
 }

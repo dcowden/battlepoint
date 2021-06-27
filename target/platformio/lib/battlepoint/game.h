@@ -1,9 +1,5 @@
-typedef enum {
-    BLU,
-    RED,
-    NOBODY,
-    EVERYBODY
-} Team;
+
+#include "Teams.h"
 
 typedef enum {
     GAME_STATUS_OVERTIME,
