@@ -16,7 +16,7 @@ int TRIGGER_THRESHOLD= 50;
 /*
 These values can be changed in order to evaluate the functions
 */
-const uint16_t samples = 128; //This value MUST ALWAYS be a power of 2
+const uint16_t samples = 512; //This value MUST ALWAYS be a power of 2
 const double samplingFrequency = 800;
 
 
