@@ -12,9 +12,14 @@ unsigned int sampling_period_us;
 unsigned long microseconds;
 
 int data[SAMPLE_COUNT];
+sampling_period_us = round(1000000*(1.0/samplingFrequency));
+
+void poll_for_hit(){
+
+}
 
 void setup() {
-  sampling_period_us = round(1000000*(1.0/samplingFrequency));
+  
   pinMode(HIT_PIN,OUTPUT);
   digitalWrite(HIT_PIN,1);
   Serial.begin(57600); 

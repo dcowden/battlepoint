@@ -4,6 +4,9 @@
 #include <FastLED.h>
 #include <LedMeter.h>
 #include <game.h>
+#include <display.h>
+#include <util.h>
+#include <hit_detect.h>
 //Menu Includes
 #include <menuIO/keyIn.h>
 #include <menu.h>
@@ -11,7 +14,7 @@
 #include <menuIO/serialOut.h>
 #include <menuIO/chainStream.h>
 #include <menuIO/serialIn.h>
-
+#define BP_DEBUG 1
 
 //pins
 #define I2C_ADDRESS 0x3C
@@ -24,8 +27,8 @@
 #define PIN_CENTER 39
 
 
-#define HIT_PIN 25
-#define NUM_LEDS 60
+#define ANALOG_PIN 25
+#define NUM_LEDS 16
 #define LED_PIN 12
 
 //app constants
@@ -36,21 +39,20 @@
 #define U8_WIDTH 128
 #define U8_HEIGHT 64
 #define DISPLAY_UPDATE_INTERVAL_MS 500
-#define HITS_TO_WIN 14
+#define HITS_TO_WIN 16
 
 CRGB leds[NUM_LEDS];
-LedRange targetMeterRange [1] = {  { 1, 12 } } ; //
-LedMeter targetMeter = LedMeter(leds,targetMeterRange,1,CRGB::Blue, CRGB::Black);
+LedMeter targetMeter = { 0, NUM_LEDS-1, HITS_TO_WIN, CRGB::Blue, CRGB::Black };
+
 short fontW = 6;
 short fontH = 13;
 
 //prototypes
-//void updateDryer();
+
 void updateDisplay();
 void menuIdleEvent();
 
 Ticker updateDisplayTimer(updateDisplay,DISPLAY_UPDATE_INTERVAL_MS);
-
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0,  I2C_SDA,I2C_SCL);
 
 enum AppModeValues{
@@ -61,40 +63,16 @@ enum AppModeValues{
 int appMode = APP_MENU_MODE;
 int num_hits = 0;
 
-
-void displayWelcomeBanner(){
-  oled.clearBuffer();
-  oled.firstPage();
-  oled.setFontPosBaseline();
-  oled.setFont(u8g2_font_logisoso16_tf);
-  fontW = 10;
-  fontH = 16;
-  oled.setCursor(0,40);
-  oled.print("BP Target v0.1");   
-  oled.sendBuffer();
-  delay(SPLASH_WAIT_MS);
-}
-
 void setupLEDs(){
   pinMode(LED_PIN,OUTPUT);
   FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, NUM_LEDS);
 }
 
-void setupOLED(){
-  oled.begin();
-  displayWelcomeBanner();
-  oled.clear();
-  oled.setFont(u8g2_font_6x13_tf);
-  fontW = 6;
-  fontH = 13;
-}
 
 void startGame() {
-    //targetMeter.setMaxValue(HITS_TO_WIN);
-    //targetMeter.setToMin();
-    //targetMeter.setColors(CRGB::Red,CRGB::Black);
-    oled.clear();    
-    appMode = APP_GAME_RUNNING;
+  num_hits = 0;
+  oled.clear();    
+  appMode = APP_GAME_RUNNING;
 }
 
 void stopGame(){
@@ -102,14 +80,6 @@ void stopGame(){
   appMode = APP_MENU_MODE;
 }
 
-char charForBoolean(boolean v){
-  if (v){
-    return 'Y';
-  }
-  else{
-    return 'N';
-  }
-}
 
 int getLineLocation(int linenum){
   return (int)(linenum * fontH) + 1;
@@ -120,7 +90,7 @@ void updateDisplay(){
   oled.setCursor(0,getLineLocation(1));
   oled.print("Hits: ");
   oled.print(num_hits);
-    oled.setCursor(0,getLineLocation(2));
+  oled.setCursor(0,getLineLocation(2));
   oled.print("Rqd: ");
   oled.print(HITS_TO_WIN);
   oled.sendBuffer();
@@ -128,12 +98,14 @@ void updateDisplay(){
 
 Menu::result doStartGame() {
   oled.clear();
+  num_hits = 0;
   startGame();
   appMode = APP_GAME_RUNNING;
   return Menu::quit;
 }
 
 Menu::result doStop() {
+  appMode = APP_MENU_MODE;
   return Menu::quit;
 }
 
@@ -173,7 +145,7 @@ CHOOSE(profileSelectionIndex,presetMenu,"Filament:",Menu::doNothing,noEvent,noSt
 );
 **/
 
-MENU(mainMenu, "BP Target v0.1", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
+MENU(mainMenu, "BP Target v0.2", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
   //,SUBMENU(presetMenu)
   //,SUBMENU(settingsSubMenu)
   ,OP("START",doStartGame,Menu::enterEvent)
@@ -240,9 +212,26 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
   }
   return proceed;
 }
+void updateLEDs(){
+  updateLedMeter(leds,targetMeter,num_hits);
+  FastLED.show();
+}
+void displayWelcomeBanner( ){
+  oled.clearBuffer();
+  oled.firstPage();
+  oled.setFontPosBaseline();
+  oled.setFont(u8g2_font_logisoso16_tf);
+  oled.setCursor(0,40);
+  oled.print("BP Target v0.2");   
+  oled.sendBuffer();
+  delay(SPLASH_WAIT_MS);    
+}
 
-void handle_hit() {
-  num_hits++;
+void initDisplay(){
+  oled.begin();
+  displayWelcomeBanner();
+  oled.clear();
+  oled.setFont(u8g2_font_6x13_tf);
 }
 
 void setup() {
@@ -250,24 +239,18 @@ void setup() {
   Serial.begin(115200);
   Serial.setTimeout(500);
   Serial.println("Starting...");
-  setupOLED();
+  initDisplay();
   Serial.println("OLED [OK]");
   setupLEDs();    
   Serial.println("LEDS [OK]");  
-  pinMode(HIT_PIN,INPUT);
-  attachInterrupt(digitalPinToInterrupt(HIT_PIN),handle_hit,RISING);
+  pinMode(ANALOG_PIN,INPUT);
+  //attachInterrupt(digitalPinToInterrupt(HIT_PIN),handle_hit,RISING);
   thingy_buttons.begin();
   // hardwareOutputTimer.start();
   updateDisplayTimer.start();
   nav.idleTask = menuIdleEvent;
 
 }
-
-void updateLEDs(){
-  targetMeter.setValue ( num_hits );
-  FastLED.show();
-}
-
 
 void stopTimers(){
   updateDisplayTimer.stop();
@@ -276,7 +259,6 @@ void stopTimers(){
 void loop() {
   updateLEDs();  
   nav.doInput();
-  
 
   //user is in a menu
   if ( appMode == APP_MENU_MODE ){
@@ -289,6 +271,9 @@ void loop() {
 
   //menu is suspended, app is running
   else if ( appMode == APP_GAME_RUNNING){
+    if ( poll_for_hit() == 1 ){
+      num_hits++;
+    }
     updateDisplayTimer.update();
   }
   else{
