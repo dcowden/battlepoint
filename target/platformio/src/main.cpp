@@ -259,7 +259,7 @@ void stopTimers(){
 void loop() {
   updateLEDs();  
   nav.doInput();
-
+  
   //user is in a menu
   if ( appMode == APP_MENU_MODE ){
     
@@ -272,6 +272,7 @@ void loop() {
   //menu is suspended, app is running
   else if ( appMode == APP_GAME_RUNNING){
     if ( poll_for_hit() == 1 ){
+      Serial.println("Adding a Hit!");
       num_hits++;
     }
     updateDisplayTimer.update();
