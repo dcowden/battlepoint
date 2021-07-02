@@ -4,10 +4,6 @@
 #include <unity.h>
 
 
-void test_test(){
-
-};
-
 void test_real_clock(void){    
     RealClock c = RealClock();
     long m = c.milliseconds();
@@ -47,9 +43,11 @@ void setup() {
     Serial.begin(115200);
 
     UNITY_BEGIN();
-    RUN_TEST(test_test);
+
     RUN_TEST(test_real_clock);
     RUN_TEST(test_fake_clock);
+    RUN_TEST(test_fake_clock_add);
+    RUN_TEST(test_clock_seconds_since);
     UNITY_END();
 }
 
