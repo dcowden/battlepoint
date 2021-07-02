@@ -1,4 +1,5 @@
-
+#ifndef __INC_GAME_H
+#define __INC_GAME_H
 #include "Teams.h"
 
 typedef enum {
@@ -91,3 +92,4 @@ char char_for_team(Team t);
 bool should_game_end(TimedGame timedGame, long millis_since_game_start);
 GameTime compute_game_time(GameTime current, long millis_since_game_start);
 Ownership compute_ownership_time( Ownership current, GameTime current_time, long millis_since_game_start);
+#endif

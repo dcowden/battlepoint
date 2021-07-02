@@ -1,5 +1,8 @@
-#include <Arduino.h>
+#ifndef __INC_TARGET_H
+#define __INC_TARGET_H
 
+#include <Arduino.h>
+#include <Clock.h>
 #define TARGET_ENERGY_RATIO 0.11
 #define TARGET_TRIGGER_THRESHOLD 2000
 #define TARGET_HIT_ENERGY_THRESHOLD 20000.0
@@ -11,7 +14,7 @@
 #define BP_DEBUG 1
 
 typedef struct {
-    int pin;
+    //int pin;
     int total_hits;
     long last_hit_millis;
     double trigger_threshold;
@@ -31,5 +34,5 @@ typedef struct {
     double vImag[TARGET_FFT_SAMPLES];
 } FFTData;
 
-int analog_read(int pin);
-TargetHitScanResult check_target(int pinReader(int), FFTData fft_data, Target target);
+TargetHitScanResult check_target(int pinReader(void), FFTData fft_data, Target target, Clock* clock);
+#endif

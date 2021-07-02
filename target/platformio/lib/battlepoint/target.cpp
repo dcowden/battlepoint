@@ -13,8 +13,6 @@
 
 arduinoFFT FFT = arduinoFFT();
 
-
-
 void PrintVector(double *vData, uint16_t bufferSize, uint8_t scaleType)
 {
   for (uint16_t i = 0; i < bufferSize; i++)
@@ -42,27 +40,21 @@ void PrintVector(double *vData, uint16_t bufferSize, uint8_t scaleType)
   Serial.println();
 }
 
-//seam for testing
-int analog_read(int pin){
-    return analogRead(pin);
-}
-
-
 //more sophisticated code could check the two targets
 //in parallel, but I dont think that'll be necessary.
 //and if it is, we maybe want to use a separate ADC
-TargetHitScanResult check_target(int pinReader(int), FFTData fft_data, Target target){
+TargetHitScanResult check_target(int pinReader(void), FFTData fft_data, Target target,Clock* clock){
 
     TargetHitScanResult result;
-    int targetValue = pinReader(target.pin);
+    int targetValue = pinReader();
 
     if (targetValue >  target.trigger_threshold ){
         for(int i=0;i<FFT_SAMPLES;i++){
-            fft_data.vReal[i] = pinReader(target.pin);
+            fft_data.vReal[i] = pinReader();
             fft_data.vImag[i] = 0;
         }
-        Serial.println("Data:");
-        PrintVector(fft_data.vReal, FFT_SAMPLES, SCL_TIME);  
+        //Serial.println("Data:");
+        //PrintVector(fft_data.vReal, FFT_SAMPLES, SCL_TIME);  
 
         FFT.Windowing(fft_data.vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
         FFT.Compute(fft_data.vReal, fft_data.vImag, FFT_SAMPLES, FFT_FORWARD);
@@ -78,7 +70,7 @@ TargetHitScanResult check_target(int pinReader(int), FFTData fft_data, Target ta
         if ( last_hit_energy > target.hit_energy_threshold){
             result.was_sampled = 1;
             result.was_hit = 1;
-            result.hit_millis = millis();
+            result.hit_millis = clock->milliseconds();
             result.last_hit_energy = last_hit_energy;
             result.peak_frequency = peak;
         }        

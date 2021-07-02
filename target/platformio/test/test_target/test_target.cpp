@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <target.h>
+#include <Clock.h>
 #include <unity.h>
 #define BP_DEBUG 1
 
@@ -19,24 +20,26 @@ int mockData[MOCK_DATA_LENGTH] = {
 };
 int sample_number = 0;
 
-int mock_adc_reader(int pin){
+int mock_adc_reader(){
     int v = mockData[sample_number++]; 
     return v;
 }
 
 void test_simple_target(void){
     Serial.println("Testing Target Code");
+    TestClock tc = TestClock();
+    tc.setTime(123456);
     Target t;
-    t.pin=0;
+    //t.pin=0;
     t.total_hits=0;
     t.last_hit_millis=0;
     t.trigger_threshold=2000;
     t.hit_energy_threshold=10000.0;
 
-    TargetHitScanResult r = check_target(mock_adc_reader, data, t);
+    TargetHitScanResult r = check_target(mock_adc_reader, data, t, &tc);
     TEST_ASSERT_FLOAT_WITHIN(14249.97, r.last_hit_energy , 0.01 );
     TEST_ASSERT_FLOAT_WITHIN(249.083582, r.peak_frequency , 0.01 );
-    TEST_ASSERT_TRUE_MESSAGE(r.hit_millis > 0, "Last hit milli  > 0 expected");
+    TEST_ASSERT_TRUE_MESSAGE(r.hit_millis == tc.milliseconds(), "Last hit milli  expected now");
     TEST_ASSERT_TRUE_MESSAGE(r.was_sampled == 1, "should have been sampled");
     TEST_ASSERT_TRUE_MESSAGE(r.was_hit == 1, "Expected a hit");
 
