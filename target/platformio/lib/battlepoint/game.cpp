@@ -3,8 +3,14 @@
 #include <Clock.h>
 #include <math.h>
 
-GameFirstToHits update(GameFirstToHits current, Clock* clock){
-    GameFirstToHits updated = current;
+GameTime _updateGameTime(GameTime current, Clock* clock){
+    GameTime updated = current;
+    updated.last_update_millis = clock->milliseconds();
+    return updated;
+}
+
+FirstToHitsGame update(FirstToHitsGame current, Clock* clock){
+    FirstToHitsGame updated = current;
     updated.time = _updateGameTime(updated.time, clock);
 
     if ( current.hits.blu_hits >= current.settings.hitsToWin ){
@@ -25,11 +31,7 @@ GameFirstToHits update(GameFirstToHits current, Clock* clock){
 }
 
 
-GameTime _updateGameTime(GameTime current, Clock* clock){
-    GameTime updated = current;
-    updated.last_update_millis = clock->milliseconds();
-    return updated;
-}
+
 
 Ownership compute_ownership_time( Ownership current, GameTime current_time, long millis_since_game_start){
     Ownership new_ownership = current;

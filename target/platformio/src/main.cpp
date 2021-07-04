@@ -2,6 +2,8 @@
 #include "Ticker.h"
 #include <U8g2lib.h>
 #include <FastLED.h>
+#include <target.h>
+#include <Clock.h>
 #include <LedMeter.h>
 #include <game.h>
 #include <display.h>
@@ -18,13 +20,25 @@
 #include <menuIO/serialIn.h>
 
 #define BP_DEBUG 1
+#define VERTICAL_LED_SIZE 16
+#define HORIONTAL_LED_SIZE 10
 
 
-CRGB leds[NUM_LEDS];
-LedMeter targetMeter = { 0, NUM_LEDS-1, HITS_TO_WIN, CRGB::Blue, CRGB::Black };
+RealClock gameClock = RealClock();
 
-short fontW = 6;
-short fontH = 13;
+//the different types of games we can play
+GameType currentGameType;
+FirstToOwnTimeGame ozGame;
+AttackDefendGame adGame;
+MostOwnInTimeGame mostTimeGame;
+MostHitsInTimeGame mostHitsGame;
+FirstToHitsGame firstHitsGame;
+
+CRGB leftLeds[VERTICAL_LED_SIZE];
+CRGB centerLeds[VERTICAL_LED_SIZE];
+CRGB rightLeds[VERTICAL_LED_SIZE];
+CRGB topLeds[2* HORIONTAL_LED_SIZE];
+CRGB bottomLeds[2* HORIONTAL_LED_SIZE];
 
 //prototypes
 
@@ -43,10 +57,23 @@ int appMode = APP_MENU_MODE;
 //int num_hits = 0;
 
 void setupLEDs(){
-  pinMode(LED_PIN,OUTPUT);
-  FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, NUM_LEDS);
-}
 
+  pinMode(Pins::LED_TOP,OUTPUT);
+  pinMode(Pins::LED_BOTTOM,OUTPUT);
+  pinMode(Pins::LED_LEFT_EDGE,OUTPUT);
+  pinMode(Pins::LED_CENTER_VERTICAL,OUTPUT);
+  pinMode(Pins::LED_RIGHT_EDGE,OUTPUT);
+
+  FastLED.addLeds<NEOPIXEL, Pins::LED_TOP>(topLeds, 2* HORIONTAL_LED_SIZE);
+  FastLED.addLeds<NEOPIXEL, Pins::LED_BOTTOM>(bottomLeds, 2* HORIONTAL_LED_SIZE);
+  FastLED.addLeds<NEOPIXEL, Pins::LED_LEFT_EDGE>(leftLeds, VERTICAL_LED_SIZE);
+  FastLED.addLeds<NEOPIXEL, Pins::LED_CENTER_VERTICAL>(centerLeds, VERTICAL_LED_SIZE);
+  FastLED.addLeds<NEOPIXEL, Pins::LED_RIGHT_EDGE>(rightLeds, VERTICAL_LED_SIZE);
+}
+void setupTargets(){
+  pinMode(Pins::TARGET_LEFT,INPUT);
+  pinMode(Pins::TARGET_RIGHT,INPUT);
+}
 
 void startGame() {
   //num_hits = 0;
@@ -145,11 +172,11 @@ Menu::panelsList pList(panels, nodes, 1); //a list of panels and nodes
 Menu::idx_t tops[MENU_MAX_DEPTH] = {0,0}; //store cursor positions for each level
 
 Menu::keyMap btn_map[] = {
-  { -PIN_UP, Menu::options->getCmdChar(upCmd )} ,
-  { -PIN_DOWN, Menu::options->getCmdChar(downCmd )} ,
-  { -PIN_LEFT, Menu::options->getCmdChar(escCmd )}  ,
-  { -PIN_RIGHT, Menu::options->getCmdChar(enterCmd )}  ,
-  { -PIN_CENTER, Menu::options->getCmdChar(enterCmd )}  ,
+  { -Pins::MOUSE_UP, Menu::options->getCmdChar(upCmd )} ,
+  { -Pins::MOUSE_DOWN, Menu::options->getCmdChar(downCmd )} ,
+  //{ -PIN_LEFT, Menu::options->getCmdChar(escCmd )}  ,
+  //{ -PIN_RIGHT, Menu::options->getCmdChar(enterCmd )}  ,
+  { -Pins::MOUSE_CENTER, Menu::options->getCmdChar(enterCmd )}  ,
 };
 
 Menu::keyIn<5> thingy_buttons(btn_map);
@@ -189,6 +216,7 @@ void updateLEDs(){
 
   FastLED.show();
 }
+
 void displayWelcomeBanner( ){
   oled.clearBuffer();
   oled.firstPage();
@@ -216,8 +244,8 @@ void setup() {
   Serial.println("OLED [OK]");
   setupLEDs();    
   Serial.println("LEDS [OK]");  
-  pinMode(ANALOG_PIN,INPUT);
-  //attachInterrupt(digitalPinToInterrupt(HIT_PIN),handle_hit,RISING);
+  setupTargets();
+
   thingy_buttons.begin();
   // hardwareOutputTimer.start();
   updateDisplayTimer.start();
@@ -229,7 +257,47 @@ void stopTimers(){
   updateDisplayTimer.stop();
 }
 
+int readLeftTarget(){
+   return analogRead(Pins::TARGET_LEFT);
+}
+
+int readRightTarget(){
+  return analogRead(Pins::TARGET_RIGHT);
+}
+
+void updateTeamHits( TeamHits* hitsToUpdate, TargetSettings targetSettings){
+    TargetHitScanResult right_result = check_target(readRightTarget,firstHitsGame.settings.targetSettings,(Clock*)(&gameClock));
+    TargetHitScanResult left_result = check_target(readLeftTarget,firstHitsGame.settings.targetSettings,(Clock*)(&gameClock));  
+
+    if ( right_result.was_hit ){
+       firstHitsGame.hits.red_hits++;
+    }
+    
+    if ( left_result.was_hit ){
+      firstHitsGame.hits.blu_hits++;
+    }
+}
+
+void updateGame(){
+
+  if ( currentGameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
+    updateTeamHits(&firstHitsGame.hits, firstHitsGame.settings.targetSettings);
+    firstHitsGame = update(firstHitsGame,(Clock*)(&gameClock));
+  }
+
+}
+
+/**
+TeamHits updateTargets(){
+  TargetSettings temporarySettings;
+  TargetHitScanResult right_result = check_target(readRightTarget,temporarySettings,(Clock*)(&gameClock));
+  TargetHitScanResult left_result = check_target(readLeftTarget,temporarySettings,(Clock*)(&gameClock));
+  right_result.
+}**/
+
 void loop() {
+  //updateTargets();
+
   updateLEDs();  
   nav.doInput();
   

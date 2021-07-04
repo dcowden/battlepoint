@@ -12,6 +12,7 @@
 #define SCL_PLOT 0x03
 
 arduinoFFT FFT = arduinoFFT();
+FFTData fft_data;
 
 void PrintVector(double *vData, uint16_t bufferSize, uint8_t scaleType)
 {
@@ -43,7 +44,7 @@ void PrintVector(double *vData, uint16_t bufferSize, uint8_t scaleType)
 //more sophisticated code could check the two targets
 //in parallel, but I dont think that'll be necessary.
 //and if it is, we maybe want to use a separate ADC
-TargetHitScanResult check_target(int pinReader(void), FFTData fft_data, TargetSettings target,Clock* clock){
+TargetHitScanResult check_target(int pinReader(void), TargetSettings target,Clock* clock){
 
     TargetHitScanResult result;
     int targetValue = pinReader();

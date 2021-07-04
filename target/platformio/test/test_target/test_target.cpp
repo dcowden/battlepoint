@@ -5,7 +5,7 @@
 #define BP_DEBUG 1
 
 #define MOCK_DATA_LENGTH 129
-FFTData data;
+
 
 int mockData[MOCK_DATA_LENGTH] = {
     3000,
@@ -36,7 +36,7 @@ void test_simple_target(void){
     t.trigger_threshold=2000;
     t.hit_energy_threshold=10000.0;
 
-    TargetHitScanResult r = check_target(mock_adc_reader, data, t, &tc);
+    TargetHitScanResult r = check_target(mock_adc_reader, t, &tc);
     TEST_ASSERT_FLOAT_WITHIN(14249.97, r.last_hit_energy , 0.01 );
     TEST_ASSERT_FLOAT_WITHIN(249.083582, r.peak_frequency , 0.01 );
     TEST_ASSERT_TRUE_MESSAGE(r.hit_millis == tc.milliseconds(), "Last hit milli  expected now");

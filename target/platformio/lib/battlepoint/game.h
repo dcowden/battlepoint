@@ -112,7 +112,7 @@ typedef struct{
     GameResult result;
     TeamHits hits;
     FirstToHitsGameSettings settings;
-} GameFirstToHits;
+} FirstToHitsGame;
 
 typedef struct{
     GameStatus status;    
@@ -120,7 +120,7 @@ typedef struct{
     GameResult result;
     TeamHits hits;
     MostHitsInTimeGameSettings settings;
-} GameMostHitsInTime;
+} MostHitsInTimeGame;
 
 typedef struct{
     GameStatus status;    
@@ -129,7 +129,7 @@ typedef struct{
     Ownership ownership;
     TeamHits hits;
     FirstToOwnTimeGameSettings settings;
-} GameFirstToOwnTime;
+} FirstToOwnTimeGame;
 
 typedef struct{
     GameStatus status;    
@@ -137,7 +137,7 @@ typedef struct{
     GameResult result;
     Ownership ownership;
     MostOwnInTimeGameSettings settings;
-} GameMostOwnInTime;
+} MostOwnInTimeGame;
 
 typedef struct{
     GameStatus status;    
@@ -145,7 +145,7 @@ typedef struct{
     GameResult result;
     TeamHits hits;
     AttackDefendGameSettings settings;
-} GameAttackDefend;
+} AttackDefendGame;
 
 
 //game updates
@@ -153,7 +153,7 @@ typedef struct{
 //GameMostOwnInTime update()
 //GameFirstToOwnTime
 //GameMostHitsInTime
-GameFirstToHits update(GameFirstToHits current, Clock* clock);
+FirstToHitsGame update(FirstToHitsGame current, Clock* clock);
 
 //GameFirstToHits update(GameFirstToHits current_game, long millis_since_last_update);
 //GameMostHitsInTime update(GameMostHitsInTime current_game, long millis_since_last_update);

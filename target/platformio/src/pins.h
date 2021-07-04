@@ -1,14 +1,17 @@
 
 #define I2C_ADDRESS 0x3C
-#define I2C_SDA 21
-#define I2C_SCL 22
-#define PIN_UP 36
-#define PIN_DOWN 34
-#define PIN_LEFT 33
-#define PIN_RIGHT 32
-#define PIN_CENTER 39
 
-
-#define ANALOG_PIN 25
-#define NUM_LEDS 16
-#define LED_PIN 12
+typedef enum {
+    TARGET_LEFT = 33,
+    TARGET_RIGHT = 34,
+    LED_LEFT_EDGE = 12,
+    LED_RIGHT_EDGE = 14,
+    LED_CENTER_VERTICAL = 15,
+    LED_TOP = 16,
+    LED_BOTTOM = 17,
+    MOUSE_UP= 36,
+    MOUSE_DOWN = 34,
+    MOUSE_CENTER=35,
+    I2C_SDA = 21,
+    I2C_SCL = 22
+} Pins;

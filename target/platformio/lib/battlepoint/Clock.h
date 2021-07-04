@@ -17,7 +17,7 @@ class Clock{
 
 class RealClock : public Clock {
     public:
-        virtual long milliseconds();        
+        long milliseconds();        
 };
 
 class TestClock : public Clock {

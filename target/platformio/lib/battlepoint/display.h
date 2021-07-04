@@ -6,4 +6,5 @@ typedef struct{
     int fontW;
 } DisplaySettings;
 
-
+short fontW = 6;
+short fontH = 13;
