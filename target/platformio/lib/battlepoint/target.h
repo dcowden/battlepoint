@@ -14,12 +14,11 @@
 #define BP_DEBUG 1
 
 typedef struct {
-    //int pin;
     int total_hits;
     long last_hit_millis;
     double trigger_threshold;
     double hit_energy_threshold;
-} Target;
+} TargetSettings;
 
 typedef struct {
     int was_sampled;
@@ -34,5 +33,5 @@ typedef struct {
     double vImag[TARGET_FFT_SAMPLES];
 } FFTData;
 
-TargetHitScanResult check_target(int pinReader(void), FFTData fft_data, Target target, Clock* clock);
+TargetHitScanResult check_target(int pinReader(void), FFTData fft_data, TargetSettings target, Clock* clock);
 #endif

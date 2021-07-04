@@ -6,7 +6,9 @@
 #include <game.h>
 #include <display.h>
 #include <util.h>
-#include <hit_detect.h>
+#include <pins.h>
+#include <constants.h>
+
 //Menu Includes
 #include <menuIO/keyIn.h>
 #include <menu.h>
@@ -14,32 +16,9 @@
 #include <menuIO/serialOut.h>
 #include <menuIO/chainStream.h>
 #include <menuIO/serialIn.h>
+
 #define BP_DEBUG 1
 
-//pins
-#define I2C_ADDRESS 0x3C
-#define I2C_SDA 21
-#define I2C_SCL 22
-#define PIN_UP 36
-#define PIN_DOWN 34
-#define PIN_LEFT 33
-#define PIN_RIGHT 32
-#define PIN_CENTER 39
-
-
-#define ANALOG_PIN 25
-#define NUM_LEDS 16
-#define LED_PIN 12
-
-//app constants
-#define SPLASH_WAIT_MS 1000
-#define MENU_MAX_DEPTH 2
-#define OFFSET_X 0
-#define OFFSET_Y 0
-#define U8_WIDTH 128
-#define U8_HEIGHT 64
-#define DISPLAY_UPDATE_INTERVAL_MS 500
-#define HITS_TO_WIN 16
 
 CRGB leds[NUM_LEDS];
 LedMeter targetMeter = { 0, NUM_LEDS-1, HITS_TO_WIN, CRGB::Blue, CRGB::Black };
@@ -61,7 +40,7 @@ enum AppModeValues{
 };
 
 int appMode = APP_MENU_MODE;
-int num_hits = 0;
+//int num_hits = 0;
 
 void setupLEDs(){
   pinMode(LED_PIN,OUTPUT);
@@ -70,7 +49,7 @@ void setupLEDs(){
 
 
 void startGame() {
-  num_hits = 0;
+  //num_hits = 0;
   oled.clear();    
   appMode = APP_GAME_RUNNING;
 }
@@ -87,18 +66,12 @@ int getLineLocation(int linenum){
 
 void updateDisplay(){  
   oled.clearBuffer();
-  oled.setCursor(0,getLineLocation(1));
-  oled.print("Hits: ");
-  oled.print(num_hits);
-  oled.setCursor(0,getLineLocation(2));
-  oled.print("Rqd: ");
-  oled.print(HITS_TO_WIN);
   oled.sendBuffer();
 }
 
 Menu::result doStartGame() {
   oled.clear();
-  num_hits = 0;
+
   startGame();
   appMode = APP_GAME_RUNNING;
   return Menu::quit;
@@ -213,7 +186,7 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
   return proceed;
 }
 void updateLEDs(){
-  updateLedMeter(leds,targetMeter,num_hits);
+
   FastLED.show();
 }
 void displayWelcomeBanner( ){
@@ -271,9 +244,7 @@ void loop() {
 
   //menu is suspended, app is running
   else if ( appMode == APP_GAME_RUNNING){
-    if ( poll_for_hit() == 1 ){
-      num_hits++;
-    }
+
     updateDisplayTimer.update();
   }
   else{

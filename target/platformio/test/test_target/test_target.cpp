@@ -29,9 +29,9 @@ void test_simple_target(void){
     Serial.println("Testing Target Code");
     TestClock tc = TestClock();
     tc.setTime(123456);
-    Target t;
+    TargetSettings t;
     //t.pin=0;
-    t.total_hits=0;
+    //t.total_hits=0;
     t.last_hit_millis=0;
     t.trigger_threshold=2000;
     t.hit_energy_threshold=10000.0;

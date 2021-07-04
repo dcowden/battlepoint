@@ -1,38 +1,34 @@
 #include <game.h>
 #include <Teams.h>
+#include <Clock.h>
+#include <math.h>
 
-char char_for_team(Team t){
-    if ( t == Team::BLU){
-        return 'B';
+GameFirstToHits update(GameFirstToHits current, Clock* clock){
+    GameFirstToHits updated = current;
+    updated.time = _updateGameTime(updated.time, clock);
+
+    if ( current.hits.blu_hits >= current.settings.hitsToWin ){
+        updated.result.winner = Team::BLU;
+        updated.status = GameStatus::GAME_STATUS_ENDED;
     }
-    else if ( t == Team::RED){
-        return 'R';
+    else if ( current.hits.red_hits >= current.settings.hitsToWin){
+        updated.result.winner = Team::RED;
+        updated.status = GameStatus::GAME_STATUS_ENDED;
     }
-    else if ( t == Team::NOBODY){
-        return 'X';
-    }
-    else if ( t == Team::ALL){
-        return 'B';
+    else if ( abs(current.hits.red_hits - current.hits.blu_hits) < current.settings.mustWinBy ){
+        updated.status == GameStatus::GAME_STATUS_OVERTIME;
     }
     else{
-        return '?';
+        updated.status = GameStatus::GAME_STATUS_RUNNING;
     }
+    return updated;
 }
 
-long seconds_to_millis(int seconds ){
-    return 1000*seconds;
-}
 
-bool should_game_end(TimedGame timedGame, long millis_since_game_start){
-    return  millis_since_game_start >= seconds_to_millis(timedGame.game_duration_seconds);
-}
-
-GameMostOwnInTime update(GameMostOwnInTime current_game, long millis_since_last_update);
-
-GameTime compute_game_time(GameTime current, long millis_since_game_start){
-    GameTime new_game = current;
-    new_game.last_update_millis = millis_since_game_start;
-    return new_game;
+GameTime _updateGameTime(GameTime current, Clock* clock){
+    GameTime updated = current;
+    updated.last_update_millis = clock->milliseconds();
+    return updated;
 }
 
 Ownership compute_ownership_time( Ownership current, GameTime current_time, long millis_since_game_start){
@@ -46,22 +42,6 @@ Ownership compute_ownership_time( Ownership current, GameTime current_time, long
         new_ownership.red_millis += elapsed_millis;
     }
     return new_ownership;
-}
-
-GameFirstToHits update(GameFirstToHits current_game, long millis_since_last_update){
-    GameFirstToHits new_game = current_game;
-    new_game.time = compute_game_time(current_game.time,millis_since_last_update);
-    if ( current_game.hits.blu_hits > current_game.hits_to_win ){
-        new_game.result = { Team::BLU };
-    }
-
-    else if ( current_game.hits.red_hits > current_game.hits_to_win ) {
-        new_game.result = { Team::RED };
-    }
-    else {
-        new_game.result = { Team::NOBODY };
-    }
-    return new_game;
 }
 
 /**

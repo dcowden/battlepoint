@@ -1,0 +1,8 @@
+#define SPLASH_WAIT_MS 1000
+#define MENU_MAX_DEPTH 2
+#define OFFSET_X 0
+#define OFFSET_Y 0
+#define U8_WIDTH 128
+#define U8_HEIGHT 64
+#define DISPLAY_UPDATE_INTERVAL_MS 500
+#define HITS_TO_WIN 16
