@@ -8,6 +8,15 @@
 //important: keep settings separate from 
 //status, so that settings can be saved in eeprom
 
+
+
+//////////////////////////////////////
+//Settings Things
+//////////////////////////////////////
+typedef struct {
+    int game_duration_seconds;
+} TimedGame;
+
 typedef struct{
     LedMeter leftTop;
     LedMeter leftBottom;
@@ -16,14 +25,7 @@ typedef struct{
     LedMeter center;
     LedMeter left;
     LedMeter right;
-} Meters;
-
-//////////////////////////////////////
-//Settings Things
-//////////////////////////////////////
-typedef struct {
-    int game_duration_seconds;
-} TimedGame;
+} MeterSettings;
 
 typedef enum {
     GAME_TYPE_KOTH_FIRST_TO_HITS,
@@ -34,9 +36,10 @@ typedef enum {
 } GameType;
 
 typedef struct {
-    GameType gameType;
-    TargetSettings targetSettings;
-} BaseGameSettings;
+    int to_capture;
+    int to_win;
+    int victory_margin;
+} HitCounts;
 
 typedef struct{
     int hits_to_capture;
@@ -45,39 +48,14 @@ typedef struct{
     int capture_offense_to_defense_ratio;
 } CaptureSettings;
 
-typedef struct{
+typedef struct {    
     GameType gameType;
-    TargetSettings targetSettings;
-    int hitsToWin= 0;
-    int mustWinBy = 0;
-} FirstToHitsGameSettings;
+    TargetSettings target;
+    TimedGame timed;
+    CaptureSettings capture;
+    HitCounts hits;
+} GameSettings;
 
-typedef struct{
-    GameType gameType;
-    TimedGame gameTimeSettings;    
-    TargetSettings targetSettings;
-} MostHitsInTimeGameSettings;
-
-typedef struct{
-    GameType gameType;
-    TimedGame gameTimeSettings;
-    TargetSettings targetSettings;
-    CaptureSettings captureSettings;
-} MostOwnInTimeGameSettings;
-
-typedef struct{
-    GameType gameType;
-    TimedGame gameTimeSettings;
-    TargetSettings targetSettings;
-    CaptureSettings captureSettings;    
-} AttackDefendGameSettings;
-
-typedef struct{
-    GameType gameType;
-    TimedGame gameTimeSettings;
-    TargetSettings targetSettings;
-    CaptureSettings captureSettings;    
-} FirstToOwnTimeGameSettings;
 
 //////////////////////////////////////
 ///  Status Things
@@ -103,13 +81,6 @@ typedef struct {
 } TeamHits;
 
 typedef struct {
-    GameStatus status;
-    GameTime time;
-    GameResult result;
-    TeamHits hits;
-} BaseGameState;
-
-typedef struct {
     long blu_millis;
     long red_millis;
     Team capturing;
@@ -117,45 +88,17 @@ typedef struct {
     Team owner;
 } Ownership;
 
-typedef struct{
-    BaseGameState state;
-    FirstToHitsGameSettings settings;
-} FirstToHitsGame;
-
-typedef struct{
-    BaseGameState state;
-    MostHitsInTimeGameSettings settings;
-} MostHitsInTimeGame;
-
-typedef struct{
-    BaseGameState state;
+typedef struct {
+    GameStatus status;
+    GameResult result;
+    GameTime time;
+    TeamHits hits;
     Ownership ownership;
-    FirstToOwnTimeGameSettings settings;
-} FirstToOwnTimeGame;
+    MeterSettings meters;
+} GameState;
 
-typedef struct{
-    BaseGameState state;
-    Ownership ownership;
-    MostOwnInTimeGameSettings settings;
-} MostOwnInTimeGame;
-
-typedef struct{
-    BaseGameState state;
-    AttackDefendGameSettings settings;
-} AttackDefendGame;
-
-//common start methods
-void initGame(BaseGameState* state, Clock* clock);
-void initOwnership(Ownership* ownership, Clock* clock);
-
-//common update methods
-void updateTeamHits( TeamHits* hitsToUpdate, TargetHitScanResult leftScan, TargetHitScanResult rightScan ,Clock* clock);
-void updateOwnership(Ownership* ownership, GameTime current_time, Clock* clock);
-
-
-//game specific methods
-void startGame(FirstToHitsGame* game, Clock* clock);
-void update(FirstToHitsGame* game, TargetHitScanResult leftScan, TargetHitScanResult rightScan, Clock* clock);
+GameState startGame(GameSettings settings, Clock* clock);
+GameState updateGame(GameState current, SensorState sensors, GameSettings settings, Clock* clock);
 
 
 #endif
