@@ -4,134 +4,68 @@
 #include <math.h>
 #include <target.h>
 
-//common start methods
-void initGame(BaseGameState* state, Clock* clock){
-    state->time.start_time_millis = clock->milliseconds();
-    state->hits.red_hits = 0;
-    state->hits.blu_hits = 0;
-    state->result.winner = Team::NOBODY;
-    state->status = GameStatus::GAME_STATUS_RUNNING;
+GameState startGame(GameSettings settings, Clock* clock){
+    GameState gs;
+    MeterSettings s = gs.meters;
+
+    gs.time.start_time_millis = clock->milliseconds();
+    gs.hits.blu_hits = 0;
+    gs.hits.red_hits = 0;
+    gs.status = GameStatus::GAME_STATUS_RUNNING;
+    gs.result.winner = Team::NOBODY;
+    gs.ownership.blu_millis = 0;
+    gs.ownership.red_millis = 0;
+    gs.ownership.owner = Team::NOBODY;
+    gs.ownership.capturing = Team::NOBODY;
+    gs.ownership.capture_hits = 0;
+
+    if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
+
+        //configure meters
+        s.center = { .startIndex = 0, .endIndex = 15, .max_val = 100, .val = 0, .fgColor = CRGB::Black, .bgColor = CRGB::Black };
+        s.left = { .startIndex = 0, .endIndex = 15, .max_val = settings.hits.to_win, .val = 0, .fgColor = CRGB::Blue, .bgColor = CRGB::Black };   
+        s.right = { .startIndex = 0, .endIndex = 15, .max_val = settings.hits.to_win, .val = 0, .fgColor = CRGB::Red, .bgColor = CRGB::Black }; 
+        s.leftTop = {.startIndex = 0,.endIndex = 9,.max_val = 10,.val = 10,.fgColor = CRGB::Blue,.bgColor = CRGB::Black };
+        s.leftBottom = {.startIndex = 0,.endIndex = 9,.max_val = 10,.val = 10,.fgColor = CRGB::Blue,.bgColor = CRGB::Black };  
+        s.rightTop = {.startIndex = 10,.endIndex = 19,.max_val = 10,.val = 10,.fgColor = CRGB::Red,.bgColor = CRGB::Black };
+        s.rightBottom = {.startIndex = 10,.endIndex = 19,.max_val = 10,.val = 10,.fgColor = CRGB::Red,.bgColor = CRGB::Black };                                       
+
+    }
+
 }
 
-void initOwnership(Ownership* ownership, Clock* clock){
-    ownership->blu_millis = 0;
-    ownership->red_millis = 0;
-    ownership->capturing = Team::NOBODY;
-    ownership->owner = Team::NOBODY;
-}
+GameState updateGame(GameState current, SensorState sensors, GameSettings settings, Clock* clock){
+    GameState r = current;
+    r.time.last_update_millis = clock->milliseconds();
 
-void updateTeamHits( TeamHits* hitsToUpdate, TargetHitScanResult leftScan, TargetHitScanResult rightScan ,Clock* clock){
-    if ( rightScan.was_hit ){
-       hitsToUpdate->red_hits++;
-    }
+    if ( sensors.rightScan.was_hit ) r.hits.red_hits++;
+    if ( sensors.leftScan.was_hit ) r.hits.blu_hits++;
 
-    if ( leftScan.was_hit ){
-      hitsToUpdate->.blu_hits++;
-}
+    if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
 
-void updateOwnership(Ownership* ownership, GameTime current_time, Clock* clock){
-    long elapsed_millis = clock->milliseconds() - current_time.last_update_millis;
-
-    if ( ownership->owner == Team::BLU ){
-        ownership->blu_millis += elapsed_millis;
-    }
-    else if ( ownership->owner == Team::RED ){
-         ownership->red_millis += elapsed_millis;
-    }
-}
-
-//game specific methods
-void startGame(FirstToHitsGame* game, Clock* clock){
-    initGame(game.state, clock);
-}
-
-void update(FirstToHitsGame* game, TargetHitScanResult leftScan, TargetHitScanResult rightScan, Clock* clock){
-    //updateTeamHits(game->status)
-
-    /**
-    if ( current.hits.blu_hits >= current.settings.hitsToWin ){
-        updated.result.winner = Team::BLU;
-        updated.status = GameStatus::GAME_STATUS_ENDED;
-    }
-    else if ( current.hits.red_hits >= current.settings.hitsToWin){
-        updated.result.winner = Team::RED;
-        updated.status = GameStatus::GAME_STATUS_ENDED;
-    }
-    else if ( abs(current.hits.red_hits - current.hits.blu_hits) < current.settings.mustWinBy ){
-        updated.status == GameStatus::GAME_STATUS_OVERTIME;
-    }
-    else{
-        updated.status = GameStatus::GAME_STATUS_RUNNING;
-    }
-    return updated;
-    **/
-}
-
-////////////////////////////////////////////////////////////
-
-/**
-Game update_game(Game current_game, long millis_since_game_start){
-
-    Game new_game = current_game;
-    GameStatus new_status = new_game.status;
-    GameStatus current_status = current_game.status;
-    new_status.last_update_millis = millis_since_game_start;
-
-    //first to hits
-
-
-    //most hits in time
-    if ( current_game.type == GAME_TYPE_KOTH_MOST_HITS_IN_TIME ){
-
-        if ( should_game_end( current_game.settings.game_duration_seconds, millis_since_game_start) ){
-            if ( current_status.blu_total_hits > current_status.red_total_hits){
-                end_game_with_winner(&new_status,TEAM_BLU,millis_since_game_start);
-            }
-            else if ( current_status.red_total_hits > current_status.blu_total_hits){
-                end_game_with_winner(&new_status,TEAM_RED,millis_since_game_start);
+        if ( current.hits.blu_hits >= settings.hits.to_win ){
+            if ( current.hits.blu_hits > current.hits.red_hits + settings.hits.victory_margin ){
+                r.result.winner = Team::BLU;
+                r.status = GameStatus::GAME_STATUS_ENDED;
             }
             else{
-                new_status.overtime=true;
+                r.status = GameStatus::GAME_STATUS_OVERTIME;
             }
         }
-
-    }
-
-    //first_to_own_time
-    if ( current_game.type == GAME_TYPE_KOTH_MOST_HITS_IN_TIME ){
-        long elapsed_millis = millis_since_game_start - current_status.last_update_millis;
-        increment_ownership_time(&current_status,millis_since_game_start);
-
-        if ( new_status.blu_own_millis > seconds_to_millis(current_game.settings.win_time_seconds) ){
-            end_game_with_winner(&new_status,TEAM_BLU,millis_since_game_start);
-        }
-        else if ( new_status.red_own_millis > seconds_to_millis(current_game.settings.win_time_seconds) ){
-            end_game_with_winner(&new_status,TEAM_RED,millis_since_game_start);
-        }
-
-    }
-
-    //most own in time
-    if ( current_game.type == GAME_TYPE_KOTH_MOST_OWN_IN_TIME ){
-         if ( should_game_end( current_game.settings.game_duration_seconds, millis_since_game_start) ){
-            increment_ownership_time(&new_status,millis_since_game_start);
-
-            if ( new_status.blu_own_millis > new_status.red_own_millis){
-                end_game_with_winner(&new_status,TEAM_BLU,millis_since_game_start);
-            }
-            else if (new_status.red_own_millis > new_status.blu_own_millis){
-                end_game_with_winner(&new_status,TEAM_RED,millis_since_game_start);
+        else if ( current.hits.red_hits >= settings.hits.to_win ){
+            if ( current.hits.red_hits > current.hits.blu_hits + settings.hits.victory_margin ){
+                r.result.winner = Team::RED;
+                r.status = GameStatus::GAME_STATUS_ENDED;
             }
             else{
-                new_status.overtime=true;
+                r.status = GameStatus::GAME_STATUS_OVERTIME;
             }
-         }
+        }
+        else{
+            r.status = GameStatus::GAME_STATUS_RUNNING;
+        }
     }
+    return r;
+}
 
-    Game new_game;
-    new_game.settings = current_game.settings;
-    new_game.type = current_game.type;
-    
-    new_game.status = new_status;
-    return new_game;
-} **/
+

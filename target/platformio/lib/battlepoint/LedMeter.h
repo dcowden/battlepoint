@@ -9,11 +9,12 @@ typedef struct  {
     uint8_t startIndex;
     uint8_t endIndex;
     int max_val;
+    int val;
     CRGB fgColor;
     CRGB bgColor;
 } LedMeter;
 
 CRGB getFastLEDColor(TeamColor tc);
 int proportionalValue(int in_val, int in_max, int out_max );
-void updateLedMeter(CRGB* leds, LedMeter meter, int val );
+void updateLedMeter(CRGB* leds, LedMeter meter );
 #endif

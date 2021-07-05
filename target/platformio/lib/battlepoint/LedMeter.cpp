@@ -6,7 +6,7 @@ int proportionalValue(int in_val, int in_max, int out_max ){
   return in_val * out_max / in_max;
 }
 
-void updateLedMeter(CRGB* leds, LedMeter meter, int val ){
+void updateLedMeter(CRGB* leds, LedMeter meter ){
 
 
   int indexIncrement =0;
@@ -21,7 +21,7 @@ void updateLedMeter(CRGB* leds, LedMeter meter, int val ){
     indexIncrement = -1;
   }
 
-  int num_lights_on = proportionalValue( val, meter.max_val, total_lights); 
+  int num_lights_on = proportionalValue( meter.val, meter.max_val, total_lights); 
   int currentIndex = meter.startIndex;
  
   #ifdef BP_DEBUG

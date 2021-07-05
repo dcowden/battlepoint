@@ -18,9 +18,9 @@ void resetLEDS(){
     }
 }
 
-LedMeter simpleMeter { 0, 7, 100, CRGB::Blue, CRGB::Black };  //8 lights
-LedMeter reversedMeter { 7, 0, 100, CRGB::Blue, CRGB::Black }; //8 lights
-LedMeter subsetMeter { 0, 3, 100, CRGB::Blue, CRGB::Black }; //4 lights, first half
+LedMeter simpleMeter { 0, 7, 100, 0, CRGB::Blue, CRGB::Black };  //8 lights
+LedMeter reversedMeter { 7, 0, 100,0, CRGB::Blue, CRGB::Black }; //8 lights
+LedMeter subsetMeter { 0, 3, 100,0, CRGB::Blue, CRGB::Black }; //4 lights, first half
 
 void assert_leds_equal(CRGB* expected, int debug){
     CRGB* debug_ptr = expected;
@@ -41,7 +41,8 @@ void assert_leds_equal(CRGB* expected, int debug){
 
 void meterAssertVal(LedMeter meter, int val, CRGB* expectedVals){
     resetLEDS();
-    updateLedMeter(leds,meter,val);
+    meter.val = val;
+    updateLedMeter(leds,meter);
     assert_leds_equal(expectedVals,0);
 }
 

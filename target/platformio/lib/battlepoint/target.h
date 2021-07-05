@@ -27,6 +27,11 @@ typedef struct {
     double peak_frequency;
 } TargetHitScanResult;
 
+typedef struct  {
+    TargetHitScanResult leftScan;
+    TargetHitScanResult rightScan;
+} SensorState;
+
 typedef struct {
     double vReal[TARGET_FFT_SAMPLES];
     double vImag[TARGET_FFT_SAMPLES];

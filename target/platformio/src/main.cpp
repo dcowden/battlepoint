@@ -27,13 +27,8 @@
 RealClock gameClock = RealClock();
 
 //the different types of games we can play
-GameType currentGameType = GameType::GAME_TYPE_KOTH_FIRST_TO_HITS;
-
-FirstToOwnTimeGame ozGame;
-AttackDefendGame adGame;
-MostOwnInTimeGame mostTimeGame;
-MostHitsInTimeGame mostHitsGame;
-FirstToHitsGame firstHitsGame;
+GameState gameState;
+GameSettings gameSettings;
 
 CRGB leftLeds[VERTICAL_LED_SIZE];
 CRGB centerLeds[VERTICAL_LED_SIZE];
@@ -77,9 +72,8 @@ void setupTargets(){
 }
 
 void startGame() {
-  if ( currentGameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
-
-  }  
+  gameSettings.gameType = GameType::GAME_TYPE_KOTH_FIRST_TO_HITS;
+  gameState = startGame(gameSettings, (Clock*)(&gameClock) );
 }
 
 void stopGame(){
@@ -201,7 +195,14 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
   return proceed;
 }
 void updateLEDs(){
-
+  MeterSettings ms = gameState.meters;
+  updateLedMeter(leftLeds, ms.left);
+  updateLedMeter(centerLeds, ms.center);
+  updateLedMeter(rightLeds, ms.right);
+  updateLedMeter(topLeds, ms.leftTop);
+  updateLedMeter(topLeds, ms.rightTop);
+  updateLedMeter(bottomLeds, ms.leftBottom);
+  updateLedMeter(bottomLeds, ms.rightBottom );
   FastLED.show();
 }
 
@@ -238,7 +239,6 @@ void setup() {
   // hardwareOutputTimer.start();
   updateDisplayTimer.start();
   nav.idleTask = menuIdleEvent;
-
 }
 
 void stopTimers(){
@@ -254,13 +254,46 @@ int readRightTarget(){
 }
 
 void updateGame(){
-  if ( currentGameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
-    TargetSettings ts = firstHitsGame.settings.targetSettings;
-    TargetHitScanResult right_result = check_target(readRightTarget,ts,(Clock*)(&gameClock));
-    TargetHitScanResult left_result = check_target(readLeftTarget,ts,(Clock*)(&gameClock));  
-    update(&firstHitsGame, left_result, right_result, (Clock*)(&gameClock));
+  SensorState sensorState;
+  sensorState.rightScan = check_target(readRightTarget,gameSettings.target,(Clock*)(&gameClock));
+  sensorState.leftScan = check_target(readLeftTarget,gameSettings.target,(Clock*)(&gameClock));  
+  gameState = updateGame(gameState, sensorState, gameSettings, (Clock*)(&gameClock));
 
+  if ( gameState.status == GameStatus::GAME_STATUS_ENDED ){
+    appMode = APP_MENU_MODE;
   }
+}
+
+void updateDisplay(){
+  //super simple for now
+  //TODO: needs to be moved to a game method
+  oled.clearBuffer();
+  oled.setFont(u8g2_font_t0_11b_tf);
+  oled.setCursor(35,11);
+
+  switch ( gameState.status ){
+    case GameStatus::GAME_STATUS_RUNNING:
+      oled.print("RUNNING");  
+      break;
+    case GameStatus::GAME_STATUS_OVERTIME:
+      oled.print("OVERTIME");  
+      break;
+    case GameStatus::GAME_STATUS_ENDED:
+      oled.print("ENDED");  
+      break;
+  }  
+  
+  oled.setFont(u8g2_font_fub30_tn);
+  oled.setCursor(5,55);  
+  oled.print(gameState.hits.red_hits);
+  oled.setCursor(70,55);
+  oled.print(gameState.hits.blu_hits);
+  oled.setFont(u8g2_font_helvB14_tf  );
+  oled.setCursor(50,30);
+  oled.print(F("R"));
+  oled.setCursor(115,30);
+  oled.print(F("B"));
+  oled.sendBuffer();
 }
 
 void loop() {
@@ -276,10 +309,8 @@ void loop() {
       do nav.doOutput(); while (oled.nextPage() );
     }
   }
-
   //menu is suspended, app is running
   else if ( appMode == APP_GAME_RUNNING){
-
     updateDisplayTimer.update();
   }
   else{
