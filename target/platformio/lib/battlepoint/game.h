@@ -8,6 +8,15 @@
 //important: keep settings separate from 
 //status, so that settings can be saved in eeprom
 
+typedef struct{
+    LedMeter leftTop;
+    LedMeter leftBottom;
+    LedMeter rightTop;
+    LedMeter rightBottom;
+    LedMeter center;
+    LedMeter left;
+    LedMeter right;
+} Meters;
 
 //////////////////////////////////////
 //Settings Things
@@ -24,15 +33,10 @@ typedef enum {
     GAME_TYPE_ATTACK_DEFEND
 } GameType;
 
-typedef struct{
-    LedMeter leftTop;
-    LedMeter leftBottom;
-    LedMeter rightTop;
-    LedMeter rightBottom;
-    LedMeter center;
-    LedMeter left;
-    LedMeter right;
-} Meters;
+typedef struct {
+    GameType gameType;
+    TargetSettings targetSettings;
+} BaseGameSettings;
 
 typedef struct{
     int hits_to_capture;
@@ -94,6 +98,18 @@ typedef struct {
 } GameResult;
 
 typedef struct {
+    int blu_hits;
+    int red_hits;
+} TeamHits;
+
+typedef struct {
+    GameStatus status;
+    GameTime time;
+    GameResult result;
+    TeamHits hits;
+} BaseGameState;
+
+typedef struct {
     long blu_millis;
     long red_millis;
     Team capturing;
@@ -101,68 +117,45 @@ typedef struct {
     Team owner;
 } Ownership;
 
-typedef struct {
-    int blu_hits;
-    int red_hits;
-} TeamHits;
-
 typedef struct{
-    GameStatus status;
-    GameTime time;
-    GameResult result;
-    TeamHits hits;
+    BaseGameState state;
     FirstToHitsGameSettings settings;
 } FirstToHitsGame;
 
 typedef struct{
-    GameStatus status;    
-    GameTime time;
-    GameResult result;
-    TeamHits hits;
+    BaseGameState state;
     MostHitsInTimeGameSettings settings;
 } MostHitsInTimeGame;
 
 typedef struct{
-    GameStatus status;    
-    GameTime time;
-    GameResult result;
+    BaseGameState state;
     Ownership ownership;
-    TeamHits hits;
     FirstToOwnTimeGameSettings settings;
 } FirstToOwnTimeGame;
 
 typedef struct{
-    GameStatus status;    
-    GameTime time;
-    GameResult result;
+    BaseGameState state;
     Ownership ownership;
     MostOwnInTimeGameSettings settings;
 } MostOwnInTimeGame;
 
 typedef struct{
-    GameStatus status;    
-    GameTime time;
-    GameResult result;
-    TeamHits hits;
+    BaseGameState state;
     AttackDefendGameSettings settings;
 } AttackDefendGame;
 
+//common start methods
+void initGame(BaseGameState* state, Clock* clock);
+void initOwnership(Ownership* ownership, Clock* clock);
 
-//game updates
-//GameAttackDefend update(GameAttackDefend, Clock* clock );
-//GameMostOwnInTime update()
-//GameFirstToOwnTime
-//GameMostHitsInTime
-FirstToHitsGame update(FirstToHitsGame current, Clock* clock);
-
-//GameFirstToHits update(GameFirstToHits current_game, long millis_since_last_update);
-//GameMostHitsInTime update(GameMostHitsInTime current_game, long millis_since_last_update);
-//GameFirstToOwnTime update(GameFirstToOwnTime current_game, long millis_since_last_update);
-//GameMostOwnInTime update(GameMostOwnInTime current_game, long millis_since_last_update);
-
-//computation components
+//common update methods
+void updateTeamHits( TeamHits* hitsToUpdate, TargetHitScanResult leftScan, TargetHitScanResult rightScan ,Clock* clock);
+void updateOwnership(Ownership* ownership, GameTime current_time, Clock* clock);
 
 
-//GameTime _updateGametime(GameTime current, Clock* clock);
-Ownership compute_ownership_time( Ownership current, GameTime current_time, long millis_since_game_start);
+//game specific methods
+void startGame(FirstToHitsGame* game, Clock* clock);
+void update(FirstToHitsGame* game, TargetHitScanResult leftScan, TargetHitScanResult rightScan, Clock* clock);
+
+
 #endif

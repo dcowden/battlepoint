@@ -2,17 +2,53 @@
 #include <Teams.h>
 #include <Clock.h>
 #include <math.h>
+#include <target.h>
 
-GameTime _updateGameTime(GameTime current, Clock* clock){
-    GameTime updated = current;
-    updated.last_update_millis = clock->milliseconds();
-    return updated;
+//common start methods
+void initGame(BaseGameState* state, Clock* clock){
+    state->time.start_time_millis = clock->milliseconds();
+    state->hits.red_hits = 0;
+    state->hits.blu_hits = 0;
+    state->result.winner = Team::NOBODY;
+    state->status = GameStatus::GAME_STATUS_RUNNING;
 }
 
-FirstToHitsGame update(FirstToHitsGame current, Clock* clock){
-    FirstToHitsGame updated = current;
-    updated.time = _updateGameTime(updated.time, clock);
+void initOwnership(Ownership* ownership, Clock* clock){
+    ownership->blu_millis = 0;
+    ownership->red_millis = 0;
+    ownership->capturing = Team::NOBODY;
+    ownership->owner = Team::NOBODY;
+}
 
+void updateTeamHits( TeamHits* hitsToUpdate, TargetHitScanResult leftScan, TargetHitScanResult rightScan ,Clock* clock){
+    if ( rightScan.was_hit ){
+       hitsToUpdate->red_hits++;
+    }
+
+    if ( leftScan.was_hit ){
+      hitsToUpdate->.blu_hits++;
+}
+
+void updateOwnership(Ownership* ownership, GameTime current_time, Clock* clock){
+    long elapsed_millis = clock->milliseconds() - current_time.last_update_millis;
+
+    if ( ownership->owner == Team::BLU ){
+        ownership->blu_millis += elapsed_millis;
+    }
+    else if ( ownership->owner == Team::RED ){
+         ownership->red_millis += elapsed_millis;
+    }
+}
+
+//game specific methods
+void startGame(FirstToHitsGame* game, Clock* clock){
+    initGame(game.state, clock);
+}
+
+void update(FirstToHitsGame* game, TargetHitScanResult leftScan, TargetHitScanResult rightScan, Clock* clock){
+    //updateTeamHits(game->status)
+
+    /**
     if ( current.hits.blu_hits >= current.settings.hitsToWin ){
         updated.result.winner = Team::BLU;
         updated.status = GameStatus::GAME_STATUS_ENDED;
@@ -28,23 +64,10 @@ FirstToHitsGame update(FirstToHitsGame current, Clock* clock){
         updated.status = GameStatus::GAME_STATUS_RUNNING;
     }
     return updated;
+    **/
 }
 
-
-
-
-Ownership compute_ownership_time( Ownership current, GameTime current_time, long millis_since_game_start){
-    Ownership new_ownership = current;
-    long elapsed_millis = millis_since_game_start - current_time.last_update_millis;
-
-    if ( current.owner == Team::BLU ){
-        new_ownership.blu_millis += elapsed_millis;
-    }
-    else if ( current.owner == Team::RED ){
-        new_ownership.red_millis += elapsed_millis;
-    }
-    return new_ownership;
-}
+////////////////////////////////////////////////////////////
 
 /**
 Game update_game(Game current_game, long millis_since_game_start){

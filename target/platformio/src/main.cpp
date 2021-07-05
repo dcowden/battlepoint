@@ -10,6 +10,7 @@
 #include <util.h>
 #include <pins.h>
 #include <constants.h>
+#include <math.h>
 
 //Menu Includes
 #include <menuIO/keyIn.h>
@@ -23,11 +24,11 @@
 #define VERTICAL_LED_SIZE 16
 #define HORIONTAL_LED_SIZE 10
 
-
 RealClock gameClock = RealClock();
 
 //the different types of games we can play
-GameType currentGameType;
+GameType currentGameType = GameType::GAME_TYPE_KOTH_FIRST_TO_HITS;
+
 FirstToOwnTimeGame ozGame;
 AttackDefendGame adGame;
 MostOwnInTimeGame mostTimeGame;
@@ -54,7 +55,6 @@ enum AppModeValues{
 };
 
 int appMode = APP_MENU_MODE;
-//int num_hits = 0;
 
 void setupLEDs(){
 
@@ -70,35 +70,23 @@ void setupLEDs(){
   FastLED.addLeds<NEOPIXEL, Pins::LED_CENTER_VERTICAL>(centerLeds, VERTICAL_LED_SIZE);
   FastLED.addLeds<NEOPIXEL, Pins::LED_RIGHT_EDGE>(rightLeds, VERTICAL_LED_SIZE);
 }
+
 void setupTargets(){
   pinMode(Pins::TARGET_LEFT,INPUT);
   pinMode(Pins::TARGET_RIGHT,INPUT);
 }
 
 void startGame() {
-  //num_hits = 0;
-  oled.clear();    
-  appMode = APP_GAME_RUNNING;
+  if ( currentGameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
+
+  }  
 }
 
 void stopGame(){
-  oled.clear();    
   appMode = APP_MENU_MODE;
 }
 
-
-int getLineLocation(int linenum){
-  return (int)(linenum * fontH) + 1;
-}
-
-void updateDisplay(){  
-  oled.clearBuffer();
-  oled.sendBuffer();
-}
-
 Menu::result doStartGame() {
-  oled.clear();
-
   startGame();
   appMode = APP_GAME_RUNNING;
   return Menu::quit;
@@ -265,45 +253,24 @@ int readRightTarget(){
   return analogRead(Pins::TARGET_RIGHT);
 }
 
-void updateTeamHits( TeamHits* hitsToUpdate, TargetSettings targetSettings){
-    TargetHitScanResult right_result = check_target(readRightTarget,firstHitsGame.settings.targetSettings,(Clock*)(&gameClock));
-    TargetHitScanResult left_result = check_target(readLeftTarget,firstHitsGame.settings.targetSettings,(Clock*)(&gameClock));  
-
-    if ( right_result.was_hit ){
-       firstHitsGame.hits.red_hits++;
-    }
-    
-    if ( left_result.was_hit ){
-      firstHitsGame.hits.blu_hits++;
-    }
-}
-
 void updateGame(){
-
   if ( currentGameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
-    updateTeamHits(&firstHitsGame.hits, firstHitsGame.settings.targetSettings);
-    firstHitsGame = update(firstHitsGame,(Clock*)(&gameClock));
+    TargetSettings ts = firstHitsGame.settings.targetSettings;
+    TargetHitScanResult right_result = check_target(readRightTarget,ts,(Clock*)(&gameClock));
+    TargetHitScanResult left_result = check_target(readLeftTarget,ts,(Clock*)(&gameClock));  
+    update(&firstHitsGame, left_result, right_result, (Clock*)(&gameClock));
+
   }
-
 }
-
-/**
-TeamHits updateTargets(){
-  TargetSettings temporarySettings;
-  TargetHitScanResult right_result = check_target(readRightTarget,temporarySettings,(Clock*)(&gameClock));
-  TargetHitScanResult left_result = check_target(readLeftTarget,temporarySettings,(Clock*)(&gameClock));
-  right_result.
-}**/
 
 void loop() {
   //updateTargets();
-
+  updateGame();
   updateLEDs();  
   nav.doInput();
   
   //user is in a menu
   if ( appMode == APP_MENU_MODE ){
-    
     if ( nav.changed(0) ){
       oled.firstPage();
       do nav.doOutput(); while (oled.nextPage() );
