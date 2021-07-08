@@ -85,8 +85,6 @@ void startGame() {
   Serial.println(gameState.meters.center.max_val);
 }
 
-
-
 Menu::result doStartGame() {
   startGame();
   appMode = APP_GAME_RUNNING;
@@ -298,23 +296,7 @@ void updateGame(){
 }
 
 void updateDisplay(){
-  //super simple for now
-  //TODO: needs to be moved to a game method
   oled.clearBuffer();
-  /**
-  oled.print(getCharForGameType(gameSettings.gameType));
-  oled.print(":");
-  switch ( gameState.status ){
-    case GameStatus::GAME_STATUS_RUNNING:
-      oled.println("RUNNING");  
-      break;
-    case GameStatus::GAME_STATUS_OVERTIME:
-      oled.println("OVERTIME");  
-      break;
-    case GameStatus::GAME_STATUS_ENDED:
-      oled.println("ENDED");  
-      break;
-  }**/
   oled.setCursor(5,15);
   oled.print("HT: R="); oled.print(gameState.hits.red_hits,2); oled.print( "  B="); oled.print(gameState.hits.blu_hits);
 

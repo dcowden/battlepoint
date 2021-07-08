@@ -65,6 +65,9 @@ void updateGame(GameState* current, SensorState sensors, GameSettings settings, 
     int red_hits = current->hits.red_hits;
     int blu_hits = current->hits.blu_hits;
 
+    //update meters
+    current->meters.left.val = blu_hits;
+    current->meters.right.val = red_hits;
 
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
         if ( (blu_hits >= settings.hits.to_win ) && (blu_hits > (red_hits + settings.hits.victory_margin)  )  ){
