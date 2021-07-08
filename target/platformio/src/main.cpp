@@ -24,6 +24,7 @@
 #define VERTICAL_LED_SIZE 16
 #define HORIONTAL_LED_SIZE 10
 #define WINNER_SPLASH_MS 2000
+#define GAME_UPDATE_INTERVAL_MS 50
 RealClock gameClock = RealClock();
 
 //the different types of games we can play
@@ -40,8 +41,10 @@ CRGB bottomLeds[2* HORIONTAL_LED_SIZE];
 
 void updateDisplay();
 void menuIdleEvent();
+void updateGame();
 
 Ticker updateDisplayTimer(updateDisplay,DISPLAY_UPDATE_INTERVAL_MS);
+Ticker gameUpdateTimer(updateGame, GAME_UPDATE_INTERVAL_MS );
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0,  I2C_SDA,I2C_SCL);
 
 enum AppModeValues{
@@ -205,7 +208,7 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
   return proceed;
 }
 void updateLEDs(){
-  Serial.print("Updating LEDs...");
+
   MeterSettings ms = gameState.meters;
   updateLedMeter(leftLeds, ms.left);
   updateLedMeter(centerLeds, ms.center);
@@ -215,7 +218,7 @@ void updateLEDs(){
   updateLedMeter(bottomLeds, ms.leftBottom);
   updateLedMeter(bottomLeds, ms.rightBottom );
   FastLED.show();
-  Serial.println(" [OK]");
+
 }
 
 void displayWelcomeBanner( ){
@@ -250,6 +253,7 @@ void setup() {
   thingy_buttons.begin();
   // hardwareOutputTimer.start();
   updateDisplayTimer.start();
+  gameUpdateTimer.start();
   //nav.idleTask = menuIdleEvent;
   Serial.println("Complete.");
   oled.setFont(u8g2_font_7x13_mf);
@@ -279,11 +283,10 @@ void gameOverDisplay(){
   oled.setFont(u8g2_font_7x13_mf);   
 }
 void updateGame(){
-  Serial.print("Updating Game...");
   SensorState sensorState;
   sensorState.rightScan = check_target(readRightTarget,gameSettings.target,(Clock*)(&gameClock));
   sensorState.leftScan = check_target(readLeftTarget,gameSettings.target,(Clock*)(&gameClock));  
-  gameState = updateGame(gameState, sensorState, gameSettings, (Clock*)(&gameClock));
+  updateGame(&gameState, sensorState, gameSettings, (Clock*)(&gameClock));
 
   if ( gameState.status == GameStatus::GAME_STATUS_ENDED ){
     Serial.println("Game Over!");
@@ -291,38 +294,38 @@ void updateGame(){
     gameOverDisplay();
     stopGame();
   }
-  Serial.println(" [OK]");
+  updateLEDs();
 }
 
 void updateDisplay(){
   //super simple for now
   //TODO: needs to be moved to a game method
   oled.clearBuffer();
-  oled.setFont(u8g2_font_t0_11b_tf);
-  oled.setCursor(35,11);
-
+  /**
+  oled.print(getCharForGameType(gameSettings.gameType));
+  oled.print(":");
   switch ( gameState.status ){
     case GameStatus::GAME_STATUS_RUNNING:
-      oled.print("RUNNING");  
+      oled.println("RUNNING");  
       break;
     case GameStatus::GAME_STATUS_OVERTIME:
-      oled.print("OVERTIME");  
+      oled.println("OVERTIME");  
       break;
     case GameStatus::GAME_STATUS_ENDED:
-      oled.print("ENDED");  
+      oled.println("ENDED");  
       break;
-  }  
-  
-  oled.setFont(u8g2_font_fub30_tn);
-  oled.setCursor(5,55);  
-  oled.print(gameState.hits.red_hits);
-  oled.setCursor(70,55);
-  oled.print(gameState.hits.blu_hits);
-  oled.setFont(u8g2_font_helvB14_tf  );
-  oled.setCursor(50,30);
-  oled.print(F("R"));
-  oled.setCursor(115,30);
-  oled.print(F("B"));
+  }**/
+  oled.setCursor(5,15);
+  oled.print("HT: R="); oled.print(gameState.hits.red_hits,2); oled.print( "  B="); oled.print(gameState.hits.blu_hits);
+
+  long elapsed_millis = millis() - gameState.time.start_time_millis;
+  int elapsed_sec = elapsed_millis/1000;
+  oled.setCursor(5,27);
+  oled.print("T: "); oled.print(elapsed_sec); oled.print("/"); oled.print(gameSettings.timed.game_duration_seconds);
+  oled.setCursor(5,39);
+  oled.print("CAP: "); oled.print(gameState.ownership.capture_hits); oled.print("/"); oled.print(gameSettings.capture.hits_to_capture);
+  oled.setCursor(5,52);
+  oled.print("OWN: B=");oled.print(gameState.ownership.blu_millis/1000);oled.print("  R="); oled.print(gameState.ownership.red_millis/1000);
   oled.sendBuffer();
 }
 
@@ -338,8 +341,7 @@ void loop() {
   }
   //menu is suspended, app is running
   else if ( appMode == APP_GAME_RUNNING){
-    updateGame();
-    updateLEDs();  
+    gameUpdateTimer.update();
     updateDisplayTimer.update();
   }
   else{

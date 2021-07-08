@@ -98,7 +98,7 @@ typedef struct {
 } GameState;
 
 GameState startGame(GameSettings settings, Clock* clock);
-GameState updateGame(GameState current, SensorState sensors, GameSettings settings, Clock* clock);
-
+void updateGame(GameState* game, SensorState sensors, GameSettings settings, Clock* clock);
+const char* getCharForGameType(GameType t);
 
 #endif
