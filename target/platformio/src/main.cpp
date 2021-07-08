@@ -23,7 +23,7 @@
 #define BP_DEBUG 1
 #define VERTICAL_LED_SIZE 16
 #define HORIONTAL_LED_SIZE 10
-
+#define WINNER_SPLASH_MS 2000
 RealClock gameClock = RealClock();
 
 //the different types of games we can play
@@ -72,13 +72,17 @@ void setupTargets(){
 }
 
 void startGame() {
+  gameSettings.hits.to_win = 10;
+  gameSettings.hits.to_capture = 10;
+  gameSettings.hits.victory_margin = 2;
   gameSettings.gameType = GameType::GAME_TYPE_KOTH_FIRST_TO_HITS;
   gameState = startGame(gameSettings, (Clock*)(&gameClock) );
+  Serial.println("Starting Game.");
+  Serial.print("M=");
+  Serial.println(gameState.meters.center.max_val);
 }
 
-void stopGame(){
-  appMode = APP_MENU_MODE;
-}
+
 
 Menu::result doStartGame() {
   startGame();
@@ -127,7 +131,7 @@ CHOOSE(profileSelectionIndex,presetMenu,"Filament:",Menu::doNothing,noEvent,noSt
 );
 **/
 
-MENU(mainMenu, "BP Target v0.2", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
+MENU(mainMenu, "BP Target v0.3", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
   //,SUBMENU(presetMenu)
   //,SUBMENU(settingsSubMenu)
   ,OP("START",doStartGame,Menu::enterEvent)
@@ -154,15 +158,14 @@ Menu::panelsList pList(panels, nodes, 1); //a list of panels and nodes
 Menu::idx_t tops[MENU_MAX_DEPTH] = {0,0}; //store cursor positions for each level
 
 Menu::keyMap btn_map[] = {
-  { -Pins::MOUSE_UP, Menu::options->getCmdChar(upCmd )} ,
-  { -Pins::MOUSE_DOWN, Menu::options->getCmdChar(downCmd )} ,
-  //{ -PIN_LEFT, Menu::options->getCmdChar(escCmd )}  ,
-  //{ -PIN_RIGHT, Menu::options->getCmdChar(enterCmd )}  ,
-  { -Pins::MOUSE_CENTER, Menu::options->getCmdChar(enterCmd )}  ,
+  { -39, Menu::options->getCmdChar(enterCmd) }, 
+  { -34, Menu::options->getCmdChar(upCmd) } ,
+  { -36, Menu::options->getCmdChar(downCmd) } ,
 };
 
-Menu::keyIn<5> thingy_buttons(btn_map);
+Menu::keyIn<3> thingy_buttons(btn_map);
 
+MENU_INPUTS(in,&thingy_buttons);
 MENU_OUTPUTS(out,MENU_MAX_DEPTH
   ,U8G2_OUT(oled,colors,fontW,fontH,OFFSET_X,OFFSET_Y,{0,0,charWidth,lineHeight})
   ,SERIAL_OUT(Serial)
@@ -170,11 +173,18 @@ MENU_OUTPUTS(out,MENU_MAX_DEPTH
 
 NAVROOT(nav,mainMenu,MENU_MAX_DEPTH,thingy_buttons,out);
 
+void stopGame(){
+  appMode = APP_MENU_MODE;
+  oled.setFont(u8g2_font_7x13_mf); 
+  nav.idleOff();   
+  nav.refresh();
+}
+
 Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
   switch (e) {
     case idleStart:{
       Serial.println("suspending menu!"); 
-      appMode=APP_GAME_RUNNING; 
+      //appMode=APP_GAME_RUNNING; 
       oled.clear(); 
       updateDisplay();
       break;
@@ -185,7 +195,7 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
     } 
     case idleEnd:{
        Serial.println("resuming menu."); 
-       appMode=APP_MENU_MODE;
+       stopGame();
        oled.clear();        
        nav.reset();
        nav.refresh();
@@ -195,6 +205,7 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
   return proceed;
 }
 void updateLEDs(){
+  Serial.print("Updating LEDs...");
   MeterSettings ms = gameState.meters;
   updateLedMeter(leftLeds, ms.left);
   updateLedMeter(centerLeds, ms.center);
@@ -204,6 +215,7 @@ void updateLEDs(){
   updateLedMeter(bottomLeds, ms.leftBottom);
   updateLedMeter(bottomLeds, ms.rightBottom );
   FastLED.show();
+  Serial.println(" [OK]");
 }
 
 void displayWelcomeBanner( ){
@@ -212,7 +224,7 @@ void displayWelcomeBanner( ){
   oled.setFontPosBaseline();
   oled.setFont(u8g2_font_logisoso16_tf);
   oled.setCursor(0,40);
-  oled.print("BP Target v0.2");   
+  oled.print("Target v0.2");   
   oled.sendBuffer();
   delay(SPLASH_WAIT_MS);    
 }
@@ -234,11 +246,13 @@ void setup() {
   setupLEDs();    
   Serial.println("LEDS [OK]");  
   setupTargets();
-
+  Serial.println("TARGETS [OK]");
   thingy_buttons.begin();
   // hardwareOutputTimer.start();
   updateDisplayTimer.start();
-  nav.idleTask = menuIdleEvent;
+  //nav.idleTask = menuIdleEvent;
+  Serial.println("Complete.");
+  oled.setFont(u8g2_font_7x13_mf);
 }
 
 void stopTimers(){
@@ -252,16 +266,32 @@ int readLeftTarget(){
 int readRightTarget(){
   return analogRead(Pins::TARGET_RIGHT);
 }
-
+void gameOverDisplay(){
+  oled.clearBuffer();
+  oled.firstPage();
+  oled.setFontPosBaseline();
+  oled.setFont(u8g2_font_logisoso16_tf);
+  oled.setCursor(0,40);
+  oled.print("WIN: ");   
+  oled.print(teamTextChar(gameState.result.winner));
+  oled.sendBuffer();
+  delay(WINNER_SPLASH_MS);
+  oled.setFont(u8g2_font_7x13_mf);   
+}
 void updateGame(){
+  Serial.print("Updating Game...");
   SensorState sensorState;
   sensorState.rightScan = check_target(readRightTarget,gameSettings.target,(Clock*)(&gameClock));
   sensorState.leftScan = check_target(readLeftTarget,gameSettings.target,(Clock*)(&gameClock));  
   gameState = updateGame(gameState, sensorState, gameSettings, (Clock*)(&gameClock));
 
   if ( gameState.status == GameStatus::GAME_STATUS_ENDED ){
-    appMode = APP_MENU_MODE;
+    Serial.println("Game Over!");
+    Serial.print("Winner=");
+    gameOverDisplay();
+    stopGame();
   }
+  Serial.println(" [OK]");
 }
 
 void updateDisplay(){
@@ -296,21 +326,20 @@ void updateDisplay(){
   oled.sendBuffer();
 }
 
-void loop() {
-  //updateTargets();
-  updateGame();
-  updateLEDs();  
+void loop() {  
   nav.doInput();
-  
   //user is in a menu
   if ( appMode == APP_MENU_MODE ){
     if ( nav.changed(0) ){
+      oled.setFont(u8g2_font_7x13_mf);
       oled.firstPage();
       do nav.doOutput(); while (oled.nextPage() );
     }
   }
   //menu is suspended, app is running
   else if ( appMode == APP_GAME_RUNNING){
+    updateGame();
+    updateLEDs();  
     updateDisplayTimer.update();
   }
   else{

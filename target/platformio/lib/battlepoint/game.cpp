@@ -6,7 +6,7 @@
 
 GameState startGame(GameSettings settings, Clock* clock){
     GameState gs;
-    MeterSettings s = gs.meters;
+    
 
     gs.time.start_time_millis = clock->milliseconds();
     gs.hits.blu_hits = 0;
@@ -19,6 +19,7 @@ GameState startGame(GameSettings settings, Clock* clock){
     gs.ownership.capturing = Team::NOBODY;
     gs.ownership.capture_hits = 0;
 
+    MeterSettings s;
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
 
         //configure meters
@@ -31,6 +32,8 @@ GameState startGame(GameSettings settings, Clock* clock){
         s.rightBottom = {.startIndex = 10,.endIndex = 19,.max_val = 10,.val = 10,.fgColor = CRGB::Red,.bgColor = CRGB::Black };                                       
 
     }
+    gs.meters = s;
+    return gs;
 
 }
 
@@ -42,24 +45,14 @@ GameState updateGame(GameState current, SensorState sensors, GameSettings settin
     if ( sensors.leftScan.was_hit ) r.hits.blu_hits++;
 
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
-
-        if ( current.hits.blu_hits >= settings.hits.to_win ){
-            if ( current.hits.blu_hits > current.hits.red_hits + settings.hits.victory_margin ){
+        if ( (current.hits.blu_hits >= settings.hits.to_win ) && (current.hits.blu_hits > (current.hits.red_hits + settings.hits.victory_margin)  )  ){
                 r.result.winner = Team::BLU;
                 r.status = GameStatus::GAME_STATUS_ENDED;
-            }
-            else{
-                r.status = GameStatus::GAME_STATUS_OVERTIME;
-            }
-        }
-        else if ( current.hits.red_hits >= settings.hits.to_win ){
-            if ( current.hits.red_hits > current.hits.blu_hits + settings.hits.victory_margin ){
+        }else if ( (current.hits.red_hits >= settings.hits.to_win ) && (current.hits.red_hits > (current.hits.blu_hits + settings.hits.victory_margin)  )  ){
                 r.result.winner = Team::RED;
                 r.status = GameStatus::GAME_STATUS_ENDED;
-            }
-            else{
+        }else if ( (current.hits.red_hits >= settings.hits.to_win) || (current.hits.red_hits  >= settings.hits.to_win) ){
                 r.status = GameStatus::GAME_STATUS_OVERTIME;
-            }
         }
         else{
             r.status = GameStatus::GAME_STATUS_RUNNING;
