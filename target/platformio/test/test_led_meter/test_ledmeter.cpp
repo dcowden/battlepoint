@@ -18,9 +18,35 @@ void resetLEDS(){
     }
 }
 
-LedMeter simpleMeter { 0, 7, 100, 0, CRGB::Blue, CRGB::Black };  //8 lights
-LedMeter reversedMeter { 7, 0, 100,0, CRGB::Blue, CRGB::Black }; //8 lights
-LedMeter subsetMeter { 0, 3, 100,0, CRGB::Blue, CRGB::Black }; //4 lights, first half
+LedMeter simpleMeter { 
+    .startIndex=0, 
+    .endIndex=7, 
+    .max_val=100, 
+    .val=0, 
+    .flash_interval_millis=FlashInterval::FLASH_NONE, 
+    .last_flash_millis=0,
+    .fgColor=CRGB::Blue, 
+    .bgColor=CRGB::Black };  //8 lights
+
+LedMeter reversedMeter { 
+    .startIndex=7, 
+    .endIndex=0, 
+    .max_val=100,
+    .val=0,
+    .flash_interval_millis=FlashInterval::FLASH_NONE, 
+    .last_flash_millis=0,     
+    .fgColor=CRGB::Blue, 
+    .bgColor=CRGB::Black }; //8 lights
+
+LedMeter subsetMeter { 
+    .startIndex=0, 
+    .endIndex=3, 
+    .max_val=100,
+    .val=0, 
+    .flash_interval_millis=FlashInterval::FLASH_NONE, 
+    .last_flash_millis=0,         
+    .fgColor=CRGB::Blue, 
+    .bgColor=CRGB::Black }; //4 lights, first half
 
 void assert_leds_equal(CRGB* expected, int debug){
     CRGB* debug_ptr = expected;

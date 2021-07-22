@@ -46,13 +46,82 @@ const char* getCharForGameType(GameType t){
     }
 }
 
+
 MeterSettings base_meter_settings(){
-    MeterSettings s;
-    s.leftTop = {.startIndex = 0,.endIndex = 9,.max_val = DEFAULT_MAX_VAL,.val = 0,.fgColor = CRGB::Blue,.bgColor = CRGB::Black };
-    s.leftBottom = {.startIndex = 0,.endIndex = 9,.max_val = DEFAULT_MAX_VAL,.val = 0,.fgColor = CRGB::Blue,.bgColor = CRGB::Black };  
-    s.rightTop = {.startIndex = 10,.endIndex = 19,.max_val = DEFAULT_MAX_VAL,.val = 0,.fgColor = CRGB::Red,.bgColor = CRGB::Black };
-    s.rightBottom = {.startIndex = 10,.endIndex = 19,.max_val = DEFAULT_MAX_VAL,.val = 0,.fgColor = CRGB::Red,.bgColor = CRGB::Black };                   
+
+    //TODO: set up the indexes right once we know the hardware
+    MeterSettings s;        
+    s.leftTop.startIndex = 0;
+    s.leftTop.endIndex=9;
+    s.leftTop.max_val=DEFAULT_MAX_VAL;
+    s.leftTop.val=0;
+    s.leftTop.fgColor=CRGB::Blue;
+    s.leftTop.bgColor=CRGB::Black;
+    s.leftTop.flash_interval_millis=FlashInterval::FLASH_NONE; 
+    s.leftTop.last_flash_millis=0;    
+
+    s.leftBottom.startIndex = 0;
+    s.leftBottom.endIndex = 9;
+    s.leftBottom.max_val = DEFAULT_MAX_VAL;
+    s.leftBottom.val = 0;
+    s.leftBottom.fgColor = CRGB::Blue;
+    s.leftBottom.bgColor = CRGB::Black;
+    s.leftBottom.flash_interval_millis=FlashInterval::FLASH_NONE; 
+    s.leftBottom.last_flash_millis=0;    
+
+    s.rightTop.startIndex = 10;
+    s.rightTop.endIndex = 19;
+    s.rightTop.max_val = DEFAULT_MAX_VAL;
+    s.rightTop.val = 0;
+    s.rightTop.fgColor = CRGB::Red;
+    s.rightTop.bgColor = CRGB::Black;
+    s.rightTop.flash_interval_millis=FlashInterval::FLASH_NONE; 
+    s.rightTop.last_flash_millis=0;    
+
+    s.rightBottom.startIndex = 10;
+    s.rightBottom.endIndex = 19;
+    s.rightBottom.max_val = DEFAULT_MAX_VAL;
+    s.rightBottom.val = 0;
+    s.rightBottom.fgColor = CRGB::Red;
+    s.rightBottom.bgColor = CRGB::Black;
+    s.rightBottom.flash_interval_millis=FlashInterval::FLASH_NONE; 
+    s.rightBottom.last_flash_millis=0;         
+
+    s.center.startIndex = 0;
+    s.center.endIndex = 16;
+    s.center.max_val = DEFAULT_MAX_VAL;
+    s.center.val = 0;
+    s.center.fgColor = CRGB::Red;
+    s.center.bgColor = CRGB::Black;
+    s.center.flash_interval_millis=FlashInterval::FLASH_NONE; 
+    s.center.last_flash_millis=0;
+
+    s.left.startIndex = 0;
+    s.left.endIndex = 16;
+    s.left.max_val = DEFAULT_MAX_VAL;
+    s.left.val = 0;
+    s.left.fgColor = CRGB::Red;
+    s.left.bgColor = CRGB::Black;
+    s.left.flash_interval_millis=FlashInterval::FLASH_NONE; 
+    s.left.last_flash_millis=0;
+
+    s.right.startIndex = 0;
+    s.right.endIndex = 16;
+    s.right.max_val = DEFAULT_MAX_VAL;
+    s.right.val = 0;
+    s.right.fgColor = CRGB::Red;
+    s.right.bgColor = CRGB::Black;
+    s.right.flash_interval_millis=FlashInterval::FLASH_NONE; 
+    s.right.last_flash_millis=0;
+
     return s;
+}
+
+void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg){
+    meter->max_val = max_val;
+    meter->val = val;
+    meter->fgColor = fg;
+    meter->bgColor = bg;   
 }
 
 GameState startGame(GameSettings settings, Clock* clock){
@@ -71,27 +140,25 @@ GameState startGame(GameSettings settings, Clock* clock){
     gs.meters = base_meter_settings();
 
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
-        gs.meters.center = { .startIndex = 0, .endIndex = 15, .max_val = DEFAULT_MAX_VAL, .val = 0, .fgColor = CRGB::Black, .bgColor = CRGB::Black };
-        gs.meters.left = { .startIndex = 0, .endIndex = 15, .max_val = settings.hits.to_win, .val = 0, .fgColor = CRGB::Blue, .bgColor = CRGB::Black };   
-        gs.meters.right = { .startIndex = 0, .endIndex = 15, .max_val = settings.hits.to_win, .val = 0, .fgColor = CRGB::Red, .bgColor = CRGB::Black }; 
+        configureMeter(&gs.meters.center, DEFAULT_MAX_VAL, 0, CRGB::Black, CRGB::Black);   //NOT USED in this mode
+        configureMeter(&gs.meters.left, settings.hits.to_win, 0, CRGB::Blue, CRGB::Black); //hits scored for blue , count from zero to total required to win
+        configureMeter(&gs.meters.right, settings.hits.to_win, 0, CRGB::Red, CRGB::Black); //hits scored for red , count from zero to total required to win
     }
+
     else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME ){
-        MeterSettings s;
-        gs.meters.center = { .startIndex = 0, .endIndex = 15, .max_val = DEFAULT_MAX_VAL, .val = 0, .fgColor = CRGB::Black, .bgColor = CRGB::Black };
-        gs.meters.left = { .startIndex = 0, .endIndex = 15, .max_val = DEFAULT_MAX_VAL, .val = 0, .fgColor = CRGB::Blue, .bgColor = CRGB::Black };   
-        gs.meters.right = { .startIndex = 0, .endIndex = 15, .max_val = DEFAULT_MAX_VAL, .val = 0, .fgColor = CRGB::Red, .bgColor = CRGB::Black }; 
+        configureMeter(&gs.meters.center, DEFAULT_MAX_VAL, 0, CRGB::Red, CRGB::Blue);                          // ratio of red to total hits.  max_val gets changed once there are non-zero total hits
+        configureMeter(&gs.meters.left, settings.timed.max_duration_seconds, 0, CRGB::Blue, CRGB::Black);      // game progress, count from zero to total game duration
+        configureMeter(&gs.meters.right, settings.timed.max_duration_seconds, 0, CRGB::Red, CRGB::Black);      // game progress, count from zero to total game duration
     }
     else if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_OWN_TIME ){
-        MeterSettings s;
-        gs.meters.center = { .startIndex = 0, .endIndex = 15, .max_val = settings.capture.hits_to_capture, .val = 0, .fgColor = CRGB::Black, .bgColor = CRGB::Black };
-        gs.meters.left = { .startIndex = 0, .endIndex = 15, .max_val = settings.timed.ownership_time_seconds, .val = 0, .fgColor = CRGB::Blue, .bgColor = CRGB::Black };   
-        gs.meters.right = { .startIndex = 0, .endIndex = 15, .max_val = settings.timed.ownership_time_seconds, .val = 0, .fgColor = CRGB::Red, .bgColor = CRGB::Black }; 
+        configureMeter(&gs.meters.center, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Blue);       // capture progress: background = owner, foreground: count up from zero to hits required to capture
+        configureMeter(&gs.meters.left, settings.timed.ownership_time_seconds, 0, CRGB::Blue, CRGB::Black);  //ownership time for blue, count from zero to time required to win
+        configureMeter(&gs.meters.right, settings.timed.ownership_time_seconds, 0, CRGB::Red, CRGB::Black);   //ownership time for red, count from zero to time required to win
     }
     else if ( settings.gameType == GameType::GAME_TYPE_ATTACK_DEFEND ){
-        MeterSettings s;
-        gs.meters.center = { .startIndex = 0, .endIndex = 15, .max_val = settings.capture.hits_to_capture, .val = 0, .fgColor = CRGB::Black, .bgColor = CRGB::Black };
-        gs.meters.left = { .startIndex = 0, .endIndex = 15, .max_val = settings.capture.hits_to_capture, .val = 0, .fgColor = CRGB::Blue, .bgColor = CRGB::Black };   
-        gs.meters.right = { .startIndex = 0, .endIndex = 15, .max_val = settings.capture.hits_to_capture, .val = 0, .fgColor = CRGB::Red, .bgColor = CRGB::Black }; 
+        configureMeter(&gs.meters.center, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);   //hit progress: count from zero to hits required to win
+        configureMeter(&gs.meters.left, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
+        configureMeter(&gs.meters.right, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
     }    
     else{
         Serial.println("UNKNOWN GAME TYPE");
