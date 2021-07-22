@@ -13,10 +13,10 @@ void test_team_color_mappings(void){
     TEST_ASSERT_EQUAL(aqua,getTeamColor(Team::ALL) );
 }
 void test_team_chars(void){
-    TEST_ASSERT_EQUAL('B',teamTextChar(Team::BLU) ); 
-    TEST_ASSERT_EQUAL('R',teamTextChar(Team::RED) );  
-    TEST_ASSERT_EQUAL('-',teamTextChar(Team::NOBODY) ); 
-    TEST_ASSERT_EQUAL('+',teamTextChar(Team::ALL) );  
+    TEST_ASSERT_EQUAL_STRING("BLU",teamTextChar(Team::BLU) ); 
+    TEST_ASSERT_EQUAL_STRING("RED",teamTextChar(Team::RED) );  
+    TEST_ASSERT_EQUAL_STRING("NONE",teamTextChar(Team::NOBODY) ); 
+    TEST_ASSERT_EQUAL_STRING("ALL",teamTextChar(Team::ALL) );  
 }
 
 void setup() {

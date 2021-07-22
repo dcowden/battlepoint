@@ -2,6 +2,24 @@
 #include <FastLED.h>
 #include <Teams.h>
 
+void initMeter ( LedMeter* meter, int startIndex, int endIndex ){
+    meter->startIndex = startIndex;
+    meter->endIndex = endIndex;
+    meter->val = 0;
+    meter->max_val = DEFAULT_MAX_VAL;
+    meter->fgColor = CRGB::White;
+    meter->fgColor = CRGB::Black;
+    meter->flash_interval_millis=FlashInterval::FLASH_NONE;
+    meter->last_flash_millis=0;
+}
+
+void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg){
+    meter->max_val = max_val;
+    meter->val = val;
+    meter->fgColor = fg;
+    meter->bgColor = bg;   
+}
+
 int proportionalValue(int in_val, int in_max, int out_max ){
   return in_val * out_max / in_max;
 }

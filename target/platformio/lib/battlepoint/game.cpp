@@ -3,8 +3,8 @@
 #include <Clock.h>
 #include <math.h>
 #include <target.h>
+#include <LedMeter.h>
 
-#define DEFAULT_MAX_VAL 10
 
 GameSettings DEFAULT_GAMESETTINGS(){
     GameSettings gs;
@@ -15,6 +15,7 @@ GameSettings DEFAULT_GAMESETTINGS(){
     gs.capture.capture_offense_to_defense_ratio=4;
     gs.capture.hits_to_capture = 10;
     gs.timed.max_duration_seconds=20;
+    gs.timed.ownership_time_seconds=120;
     return gs;
 }
 const char* getCharForStatus(GameStatus s){
@@ -45,25 +46,6 @@ const char* getCharForGameType(GameType t){
         return "UNKNOWN";
     }
 }
-
-void initMeter ( LedMeter* meter, int startIndex, int endIndex ){
-    meter->startIndex = startIndex;
-    meter->endIndex = endIndex;
-    meter->val = 0;
-    meter->max_val = DEFAULT_MAX_VAL;
-    meter->fgColor = CRGB::White;
-    meter->fgColor = CRGB::Black;
-    meter->flash_interval_millis=FlashInterval::FLASH_NONE;
-    meter->last_flash_millis=0;
-}
-
-void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg){
-    meter->max_val = max_val;
-    meter->val = val;
-    meter->fgColor = fg;
-    meter->bgColor = bg;   
-}
-
 
 MeterSettings base_meter_settings(){
 

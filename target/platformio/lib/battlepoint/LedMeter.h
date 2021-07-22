@@ -4,6 +4,7 @@
 #include <FastLED.h>
 #include <Teams.h>
 
+#define DEFAULT_MAX_VAL 10
 
 typedef enum {
     FLASH_SLOW = 2000,
@@ -25,5 +26,7 @@ typedef struct  {
 
 CRGB getFastLEDColor(TeamColor tc);
 int proportionalValue(int in_val, int in_max, int out_max );
+void initMeter ( LedMeter* meter, int startIndex, int endIndex );
+void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg);
 void updateLedMeter(CRGB* leds, LedMeter meter );
 #endif
