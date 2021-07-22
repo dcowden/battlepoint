@@ -1,0 +1,42 @@
+
+
+HARDWARE: belongs in main sketch
+	CRGB leds
+	Tickers
+	Oled
+	stopTimers
+
+	setup
+	setupLeds()
+	updateLeds()
+	setupTargets()
+	readLeftTarget
+	readRightTarget
+
+	loop
+
+
+Menu Crap
+	menu mode? 
+	menu handlers:
+		doStartGame
+		doStop
+		saveSettings
+		settings
+	menu idle handlers
+
+display
+	gameOverDisplay
+	displayWelcomeBanner
+	initDisplay()
+	updatedisplay
+
+
+
+
+game
+	updategame
+	startGame()
+	stopGame()
+
+

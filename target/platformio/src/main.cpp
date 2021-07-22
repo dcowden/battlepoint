@@ -12,24 +12,29 @@
 #include <constants.h>
 #include <math.h>
 
+
 //Menu Includes
-#include <menuIO/keyIn.h>
 #include <menu.h>
+#include <menuIO/keyIn.h>
 #include <menuIO/u8g2Out.h>
 #include <menuIO/serialOut.h>
+#include <menuIO/serialIO.h>
 #include <menuIO/chainStream.h>
 #include <menuIO/serialIn.h>
 
 #define BP_DEBUG 1
 #define VERTICAL_LED_SIZE 16
 #define HORIONTAL_LED_SIZE 10
-#define WINNER_SPLASH_MS 2000
+#define WINNER_SPLASH_MS 5000
 #define GAME_UPDATE_INTERVAL_MS 50
+
+
 RealClock gameClock = RealClock();
 
 //the different types of games we can play
 GameState gameState;
 GameSettings gameSettings;
+
 
 CRGB leftLeds[VERTICAL_LED_SIZE];
 CRGB centerLeds[VERTICAL_LED_SIZE];
@@ -42,6 +47,7 @@ CRGB bottomLeds[2* HORIONTAL_LED_SIZE];
 void updateDisplay();
 void menuIdleEvent();
 void updateGame();
+Menu::result doStartGame();
 
 Ticker updateDisplayTimer(updateDisplay,DISPLAY_UPDATE_INTERVAL_MS);
 Ticker gameUpdateTimer(updateGame, GAME_UPDATE_INTERVAL_MS );
@@ -51,7 +57,6 @@ enum AppModeValues{
   APP_MENU_MODE,
   APP_GAME_RUNNING
 };
-
 int appMode = APP_MENU_MODE;
 
 void setupLEDs(){
@@ -74,22 +79,11 @@ void setupTargets(){
   pinMode(Pins::TARGET_RIGHT,INPUT);
 }
 
-void startGame() {
-  gameSettings.hits.to_win = 10;
-  gameSettings.hits.to_capture = 10;
-  gameSettings.hits.victory_margin = 2;
-  gameSettings.gameType = GameType::GAME_TYPE_KOTH_FIRST_TO_HITS;
-  gameState = startGame(gameSettings, (Clock*)(&gameClock) );
-  Serial.println("Starting Game.");
-  Serial.print("M=");
-  Serial.println(gameState.meters.center.max_val);
+void startGame(){  
+  gameState = startGame(gameSettings, &gameClock);
 }
 
-Menu::result doStartGame() {
-  startGame();
-  appMode = APP_GAME_RUNNING;
-  return Menu::quit;
-}
+
 
 Menu::result doStop() {
   appMode = APP_MENU_MODE;
@@ -132,20 +126,54 @@ CHOOSE(profileSelectionIndex,presetMenu,"Filament:",Menu::doNothing,noEvent,noSt
 );
 **/
 
-MENU(mainMenu, "BP Target v0.3", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
-  //,SUBMENU(presetMenu)
-  //,SUBMENU(settingsSubMenu)
-  ,OP("START",doStartGame,Menu::enterEvent)
-  ,OP("STOP",doStop,Menu::enterEvent)
+MENU(mostHitsSubMenu, "MostHits", Menu::doNothing, Menu::noEvent, Menu::noStyle
+    ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",0,10,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,OP("Start",doStartGame, Menu::enterEvent)
+    ,EXIT("<Back")
 );
 
+MENU(firstToHitsSubMenu, "FirstToHits", Menu::doNothing, Menu::noEvent, Menu::noStyle
+    ,FIELD(gameSettings.hits.to_win,"Hits","",0,100,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",0,10,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,OP("Start",doStartGame, Menu::enterEvent)
+    ,EXIT("<Back")
+);
+
+MENU(ozSubMenu, "OwnZone", Menu::doNothing, Menu::noEvent, Menu::noStyle
+    ,FIELD(gameSettings.capture.capture_cooldown_seconds,"Capture Cooldown","s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,FIELD(gameSettings.capture.capture_decay_rate_secs_per_hit,"Capture Decay","/s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.capture.hits_to_capture,"HitsToCapture","",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.capture.capture_offense_to_defense_ratio,"DefenseOffenseRatio","",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.timed.ownership_time_seconds,"OwnTimeToWin","s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,OP("Start",doStartGame, Menu::enterEvent)
+    ,EXIT("<Back")
+);
+
+MENU(adSubMenu, "Capture", Menu::doNothing, Menu::noEvent, Menu::noStyle
+    ,FIELD(gameSettings.hits.to_win,"Hits","",0,100,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,OP("Start",doStartGame, Menu::enterEvent)
+    ,EXIT("<Back")
+);
+
+MENU(mainMenu, "BP Target v0.4", Menu::doNothing, Menu::noEvent, Menu::noStyle
+  ,SUBMENU(mostHitsSubMenu)
+  ,SUBMENU(ozSubMenu)
+  ,SUBMENU(firstToHitsSubMenu)
+  ,SUBMENU(adSubMenu)
+);
+
+//{{disabled normal,disabled selected},{enabled normal,enabled selected, enabled editing}}
 const colorDef<uint8_t> colors[6] MEMMODE={
   {{0,0},{0,1,1}},//bgColor
   {{1,1},{1,0,0}},//fgColor
   {{1,1},{1,0,0}},//valColor
   {{1,1},{1,0,0}},//unitColor
   {{0,1},{0,0,1}},//cursorColor
-  {{1,1},{1,0,0}},//titleColor
+  {{0,0},{0,1,1}},//titleColor
 };
 
 short charWidth = U8_WIDTH/fontW;
@@ -160,11 +188,11 @@ Menu::idx_t tops[MENU_MAX_DEPTH] = {0,0}; //store cursor positions for each leve
 
 Menu::keyMap btn_map[] = {
   { -39, Menu::options->getCmdChar(enterCmd) }, 
-  { -34, Menu::options->getCmdChar(upCmd) } ,
-  { -36, Menu::options->getCmdChar(downCmd) } ,
+  { -34, Menu::options->getCmdChar(downCmd) } ,
+  { -36, Menu::options->getCmdChar(upCmd) }
 };
 
-Menu::keyIn<3> thingy_buttons(btn_map);
+Menu::keyIn<4> thingy_buttons(btn_map);
 
 MENU_INPUTS(in,&thingy_buttons);
 MENU_OUTPUTS(out,MENU_MAX_DEPTH
@@ -174,18 +202,27 @@ MENU_OUTPUTS(out,MENU_MAX_DEPTH
 
 NAVROOT(nav,mainMenu,MENU_MAX_DEPTH,thingy_buttons,out);
 
+Menu::result doStartGame() {
+  startGame();
+  Serial.print("ToWin"); Serial.println(gameSettings.hits.to_win);
+  appMode = APP_GAME_RUNNING;
+  nav.idleOn();
+  return Menu::quit;
+}
+
 void stopGame(){
   appMode = APP_MENU_MODE;
   oled.setFont(u8g2_font_7x13_mf); 
   nav.idleOff();   
   nav.refresh();
+
 }
 
 Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
   switch (e) {
     case idleStart:{
       Serial.println("suspending menu!"); 
-      //appMode=APP_GAME_RUNNING; 
+      appMode=APP_GAME_RUNNING; 
       oled.clear(); 
       updateDisplay();
       break;
@@ -253,8 +290,11 @@ void setup() {
   updateDisplayTimer.start();
   gameUpdateTimer.start();
   //nav.idleTask = menuIdleEvent;
+  options->invertFieldKeys = true;
   Serial.println("Complete.");
   oled.setFont(u8g2_font_7x13_mf);
+
+  gameSettings = DEFAULT_GAMESETTINGS();
 }
 
 void stopTimers(){
@@ -274,7 +314,8 @@ void gameOverDisplay(){
   oled.setFontPosBaseline();
   oled.setFont(u8g2_font_logisoso16_tf);
   oled.setCursor(0,40);
-  oled.print("WIN: ");   
+  oled.print("WIN: "); 
+  oled.setCursor(50,40);  
   oled.print(teamTextChar(gameState.result.winner));
   oled.sendBuffer();
   delay(WINNER_SPLASH_MS);
@@ -298,12 +339,13 @@ void updateGame(){
 void updateDisplay(){
   oled.clearBuffer();
   oled.setCursor(5,15);
-  oled.print("HT: R="); oled.print(gameState.hits.red_hits,2); oled.print( "  B="); oled.print(gameState.hits.blu_hits);
+  oled.print("HT: R="); oled.print(gameState.hits.red_hits); oled.print( "  B="); oled.print(gameState.hits.blu_hits);
 
   long elapsed_millis = millis() - gameState.time.start_time_millis;
   int elapsed_sec = elapsed_millis/1000;
   oled.setCursor(5,27);
-  oled.print("T: "); oled.print(elapsed_sec); oled.print("/"); oled.print(gameSettings.timed.game_duration_seconds);
+  oled.print("T: "); oled.print(elapsed_sec); oled.print("/"); oled.print(gameSettings.timed.max_duration_seconds); 
+  oled.print(" ["); oled.print(getCharForStatus(gameState.status)); oled.print("]");
   oled.setCursor(5,39);
   oled.print("CAP: "); oled.print(gameState.ownership.capture_hits); oled.print("/"); oled.print(gameSettings.capture.hits_to_capture);
   oled.setCursor(5,52);
@@ -325,6 +367,7 @@ void loop() {
   else if ( appMode == APP_GAME_RUNNING){
     gameUpdateTimer.update();
     updateDisplayTimer.update();
+
   }
   else{
     Serial.println("Unknown Mode");

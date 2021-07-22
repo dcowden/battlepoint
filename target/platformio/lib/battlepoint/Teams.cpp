@@ -27,38 +27,20 @@ TeamColor getTeamColor(Team t){
     }
 }
 
-char teamTextChar(Team team){
+const char* teamTextChar(Team team){
   if ( team == Team::RED ){
-    return 'R';
+    return "RED";
   }
   else if ( team == Team::BLU ){
-    return 'B';
+    return "BLU";
   }  
   else if ( team == Team::ALL ){
-    return '+';
+    return "ALL";
   }  
   else if ( team == Team::NOBODY ){
-    return '-';
+    return "NONE";
   }
   else{
-    return '?'; 
+    return "?"; 
   }
 }
-
-/*
-void printTeamText(char* buffer, Team team){
-
-  if ( team == Team::RED ){
-    strcpy(buffer,"RED");
-  }
-  else if ( team == Team::BLU ){
-    strcpy(buffer, "BLU");
-  }  
-  else if ( team == Team::ALL ){
-    strcpy(buffer, "ALL");
-  }  
-  else if ( team == Team::NOBODY ){
-    strcpy(buffer,"---");
-  }
- 
-}*/

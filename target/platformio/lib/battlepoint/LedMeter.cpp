@@ -8,7 +8,6 @@ int proportionalValue(int in_val, int in_max, int out_max ){
 
 void updateLedMeter(CRGB* leds, LedMeter meter ){
 
-
   int indexIncrement =0;
   int total_lights = 0;
   if ( meter.startIndex < meter.endIndex ){

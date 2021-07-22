@@ -14,18 +14,11 @@
 //Settings Things
 //////////////////////////////////////
 typedef struct {
-    int game_duration_seconds;
+    int max_duration_seconds;
+    int ownership_time_seconds;
 } TimedGame;
 
-typedef struct{
-    LedMeter leftTop;
-    LedMeter leftBottom;
-    LedMeter rightTop;
-    LedMeter rightBottom;
-    LedMeter center;
-    LedMeter left;
-    LedMeter right;
-} MeterSettings;
+
 
 typedef enum {
     GAME_TYPE_KOTH_FIRST_TO_HITS,
@@ -36,7 +29,6 @@ typedef enum {
 } GameType;
 
 typedef struct {
-    int to_capture;
     int to_win;
     int victory_margin;
 } HitCounts;
@@ -61,10 +53,20 @@ typedef struct {
 ///  Status Things
 //////////////////////////////////////
 typedef enum {
-    GAME_STATUS_OVERTIME,
-    GAME_STATUS_RUNNING,
-    GAME_STATUS_ENDED
+    GAME_STATUS_OVERTIME='O',
+    GAME_STATUS_RUNNING = 'R',
+    GAME_STATUS_ENDED= 'E'
 } GameStatus;
+
+typedef struct{
+    LedMeter leftTop;
+    LedMeter leftBottom;
+    LedMeter rightTop;
+    LedMeter rightBottom;
+    LedMeter center;
+    LedMeter left;
+    LedMeter right;
+} MeterSettings;
 
 typedef struct {
     long start_time_millis;
@@ -97,8 +99,9 @@ typedef struct {
     MeterSettings meters;
 } GameState;
 
+GameSettings DEFAULT_GAMESETTINGS();
 GameState startGame(GameSettings settings, Clock* clock);
 void updateGame(GameState* game, SensorState sensors, GameSettings settings, Clock* clock);
 const char* getCharForGameType(GameType t);
-
+const char* getCharForStatus(GameStatus s);
 #endif
