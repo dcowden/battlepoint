@@ -4,6 +4,7 @@
 #include <Clock.h>
 #include <LedMeter.h>
 #include <target.h>
+#define BP_CURRENT_SETTINGS_VERSION 203
 
 //important: keep settings separate from 
 //status, so that settings can be saved in eeprom
@@ -18,14 +19,21 @@ typedef struct {
     int ownership_time_seconds;
 } TimedGame;
 
+typedef enum {
+    SLOT_1 = 1,
+    SLOT_2 = 2,
+    SLOT_3 = 3,
+    SLOT_4 = 4
+} GameSettingSlot;
 
 
 typedef enum {
-    GAME_TYPE_KOTH_FIRST_TO_HITS,
-    GAME_TYPE_KOTH_MOST_HITS_IN_TIME,
-    GAME_TYPE_KOTH_FIRST_TO_OWN_TIME,
-    GAME_TYPE_KOTH_MOST_OWN_IN_TIME,
-    GAME_TYPE_ATTACK_DEFEND
+    GAME_TYPE_KOTH_FIRST_TO_HITS=0,
+    GAME_TYPE_KOTH_MOST_HITS_IN_TIME=1,
+    GAME_TYPE_KOTH_FIRST_TO_OWN_TIME=2,
+    GAME_TYPE_KOTH_MOST_OWN_IN_TIME=3,
+    GAME_TYPE_ATTACK_DEFEND=4,
+    GAME_TYPE_UNSELECTED=5
 } GameType;
 
 typedef struct {
@@ -41,6 +49,7 @@ typedef struct{
 } CaptureSettings;
 
 typedef struct {    
+    int BP_VERSION;
     GameType gameType;
     TargetSettings target;
     TimedGame timed;

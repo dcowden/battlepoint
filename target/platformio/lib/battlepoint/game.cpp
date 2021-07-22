@@ -4,20 +4,28 @@
 #include <math.h>
 #include <target.h>
 #include <LedMeter.h>
-
+#include <ArduinoLog.h>
 
 GameSettings DEFAULT_GAMESETTINGS(){
     GameSettings gs;
+    gs.BP_VERSION = BP_CURRENT_SETTINGS_VERSION;
     gs.hits.to_win = 10;
     gs.hits.victory_margin=1;
+    gs.gameType = GameType::GAME_TYPE_UNSELECTED;
     gs.capture.capture_cooldown_seconds=10;
     gs.capture.capture_decay_rate_secs_per_hit=1;
     gs.capture.capture_offense_to_defense_ratio=4;
     gs.capture.hits_to_capture = 10;
+    
     gs.timed.max_duration_seconds=20;
     gs.timed.ownership_time_seconds=120;
+
+    gs.target.hit_energy_threshold = 100;
+    gs.target.last_hit_millis=0;
+    gs.target.trigger_threshold=1000;
     return gs;
 }
+
 const char* getCharForStatus(GameStatus s){
     if ( s == GameStatus::GAME_STATUS_ENDED){
         return "E";
@@ -98,7 +106,7 @@ GameState startGame(GameSettings settings, Clock* clock){
         configureMeter(&gs.meters.right, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
     }    
     else{
-        Serial.println("UNKNOWN GAME TYPE");
+       Log.errorln("UNKNOWN GAME TYPE");
     }
     return gs;
 
