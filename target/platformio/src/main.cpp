@@ -335,6 +335,7 @@ int readLeftTarget(){
 int readRightTarget(){
   return analogRead(Pins::TARGET_RIGHT);
 }
+
 void gameOverDisplay(){
   oled.clearBuffer();
   oled.firstPage();
@@ -348,6 +349,7 @@ void gameOverDisplay(){
   delay(WINNER_SPLASH_MS);
   oled.setFont(u8g2_font_7x13_mf);   
 }
+
 void updateGame(){
   SensorState sensorState;
   sensorState.rightScan = check_target(readRightTarget,gameSettings.target,(Clock*)(&gameClock));
