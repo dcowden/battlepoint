@@ -15,11 +15,12 @@ GameSettings DEFAULT_GAMESETTINGS(){
     gs.capture.capture_cooldown_seconds=10;
     gs.capture.capture_decay_rate_secs_per_hit=1;
     gs.capture.capture_offense_to_defense_ratio=4;
+    gs.capture.capture_overtime_seconds = 30;
     gs.capture.hits_to_capture = 10;
     
     gs.timed.max_duration_seconds=120;
     gs.timed.ownership_time_seconds=120;
-    gs.timed.max_overtime_seconds=30;
+    gs.timed.max_overtime_seconds=120;
 
     gs.target.hit_energy_threshold = 100;
     gs.target.last_hit_millis=0;
@@ -75,8 +76,12 @@ GameState startGame(GameSettings settings, Clock* clock){
     GameState gs;
     
     gs.time.start_time_millis = clock->milliseconds();
-    gs.hits.blu_hits = 0;
-    gs.hits.red_hits = 0;
+    gs.bluHits.hits = 0;
+    gs.bluHits.last_decay_millis = 0;
+    gs.bluHits.last_hit_millis = 0;
+    gs.redHits.hits = 0;
+    gs.redHits.last_decay_millis = 0;
+    gs.redHits.last_hit_millis = 0;    
     gs.status = GameStatus::GAME_STATUS_RUNNING;
     gs.result.winner = Team::NOBODY;
     gs.ownership.blu_millis = 0;
@@ -112,30 +117,67 @@ GameState startGame(GameSettings settings, Clock* clock){
     return gs;
 
 }
-void updateGameHits(GameState* current, SensorState sensors){
-    if ( sensors.rightScan.was_hit ) current->hits.red_hits++;
-    if ( sensors.leftScan.was_hit ) current->hits.blu_hits++;
+void updateGameHits(GameState* current, SensorState sensors, Clock* clock){
+    if ( sensors.rightScan.was_hit ){
+       current->redHits.hits++;
+       current->redHits.last_hit_millis = clock->milliseconds();
+    } 
+    if ( sensors.leftScan.was_hit ){
+       current->bluHits.hits++;
+       current->bluHits.last_hit_millis = clock->milliseconds();
+    } 
 }
 
+
+void applyHitDecay(GameState* current, GameSettings settings, Clock* clock){
+    long current_time_millis = clock->milliseconds();
+    if ( settings.capture.capture_decay_rate_secs_per_hit > 0 ){
+        //assumption: we update the game pretty frequently
+
+        //TODO: factor, probably requires moving these various things into one structure
+        //organized by team
+        if(current->ownership.capturing == Team::RED){
+            long millis_since_last_decay = (current_time_millis - current->redHits.last_decay_millis);
+            long decay_millis = settings.capture.capture_decay_rate_secs_per_hit*1000;
+            if ( millis_since_last_decay > decay_millis){
+                if ( current->ownership.capture_hits > 0 ){
+                    current->ownership.capture_hits -= 1;
+                    current->redHits.last_decay_millis = current_time_millis;
+                }
+            }
+        }
+
+
+    }
+}
 //updates timeExpired based on game state. 
 //makes testing easier, so we dont have to set up all those conditions
 void updateGameTime(GameState* current,GameSettings settings, Clock* clock){
-    current->time.last_update_millis = clock->milliseconds();
-    long elapsed = (clock->milliseconds() - current->time.start_time_millis)/1000;
 
-    
+    long elapsed_since_start = (clock->milliseconds() - current->time.start_time_millis)/1000;
+    long elapsed_since_last_update = (clock->milliseconds() - current->time.last_update_millis);
+
+    if ( current->ownership.owner== Team::RED){
+        current->ownership.red_millis += elapsed_since_last_update;
+    }
+
+    if ( current->ownership.owner== Team::BLU){
+        current->ownership.blu_millis += elapsed_since_last_update;
+    }
+
     bool isExpired = false;
     bool isOvertimeExpired = false;
     if ( settings.timed.max_duration_seconds > 0){
-        if ( elapsed > settings.timed.max_duration_seconds){
+        if ( elapsed_since_start > settings.timed.max_duration_seconds){
             isExpired =  true;
         }
-        if ( elapsed > settings.timed.max_duration_seconds + settings.timed.max_overtime_seconds){
+        if ( elapsed_since_start > settings.timed.max_duration_seconds + settings.timed.max_overtime_seconds){
             isOvertimeExpired = true;
         }
     }
     current->timeExpired = isExpired;
     current->overtimeExpired = isOvertimeExpired;
+    
 }
 
 void endGame( GameState* current, Team winner){
@@ -174,8 +216,8 @@ void updateFirstToHitsGame(GameState* current,  GameSettings settings){
         If the teams are tied after the overtime period, the game ends in a tie
         
     */
-    int red_hits = current->hits.red_hits;
-    int blu_hits = current->hits.blu_hits;
+    int red_hits = current->redHits.hits;
+    int blu_hits = current->bluHits.hits;
     Log.traceln("RedHits=%d, BluHits=%d",red_hits,blu_hits);
 
     //TODO: update meters all in one place?        
@@ -218,8 +260,8 @@ void updateMostHitsInTimeGame(GameState* current,  GameSettings settings){
         If the teams are tied after overtime, the result is a TIE
         
     */
-    int red_hits = current->hits.red_hits;
-    int blu_hits = current->hits.blu_hits;
+    int red_hits = current->redHits.hits;
+    int blu_hits = current->bluHits.hits;
 
     //TODO: update meters all in one place?        
     current->meters.left.meter.val = blu_hits;
@@ -243,9 +285,7 @@ void updateMostHitsInTimeGame(GameState* current,  GameSettings settings){
     }
 
 }
-void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings){
-    endGame(current, Team::NOBODY);
-}
+
 void updateAttackDefendGame(GameState* current,  GameSettings settings){
     /*
         VICTORY
@@ -260,7 +300,7 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings){
          is within victory margin of getting the desired number of hits.
         If time and overtime expires, the defending team (red) wins 
     */    
-    int blu_hits = current->hits.blu_hits;
+    int blu_hits = current->bluHits.hits;
 
     if ( blu_hits >= settings.capture.hits_to_capture){
         endGame(current, Team::BLU);
@@ -281,6 +321,55 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings){
     }   
 }
 
+void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings){
+    /*
+        VICTORY
+        Capturing the point requires a given number of hits.
+        Once the point is captured, the owning team accumulates time. 
+
+        The winner is the first team to accumulate the given amount of ownership time, 
+        AND survive any contests.
+
+        HITS
+        in this game, hits decay at the rate provided by capture settings. 
+        defense and offense can both score hits, but offense hits are weighed hire than defense its        
+
+        TIME
+        Any time the team owns the point, their time accumulates.
+        The first team to accumulate the given amount of ownership time wins, after any overtime contests are resolved.
+        The time for a capture overtime are defined separately from the maximum game overtime.
+
+        an overtime contest is triggered when any of these events occur:
+           (1) the opposing team beings capturing
+           (2) one team passes the game winning time, but the other team has already passed the required too
+
+        If there is a time limit on the game, the team with the most ownership wins, subject to the usual contest rules.
+        if the time limit on a game passes, and neither team has any ownership, the game ends in a TIE.
+
+        if the game lasts as long as the maximum overtime limit, then the game ends immediately:
+            the team with the most ownership wins
+            if that's tied, the team capturing wins
+            if nobody has ownership or capture progress, the game ends in a TIE
+
+
+    */     
+    /*
+    long ownership_time_to_win_millis = 1000*settings.timed.ownership_time_seconds;
+
+    if ( current->ownership.owner == Team::RED){
+        current->ownership.
+    }
+    if ( current->ownership.blu_millis > ownership_time_to_win_millis){
+        if ( current->ownership.capturing == Team::RED ){
+
+        }
+    }
+    else if (current->ownership.blu_millis > ownership_time_to_win_millis){
+
+    } */
+    endGame(current, Team::NOBODY);
+}
+
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings){
     endGame(current, Team::NOBODY);
 }
@@ -288,7 +377,7 @@ void updateMostOwnInTimeGame(GameState* current,  GameSettings settings){
 void updateGame(GameState* current, SensorState sensors, GameSettings settings, Clock* clock){
    
     updateGameTime(current, settings, clock);
-    updateGameHits(current,sensors);
+    updateGameHits(current,sensors,clock);
 
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
         updateFirstToHitsGame(current,settings);
@@ -308,6 +397,9 @@ void updateGame(GameState* current, SensorState sensors, GameSettings settings, 
     else{
         Log.errorln("Unknown Game Type: %d", settings.gameType);
     }
+
+    //very last to make sure everyone can see the time delta during update
+    current->time.last_update_millis = clock->milliseconds();
 }
 
 

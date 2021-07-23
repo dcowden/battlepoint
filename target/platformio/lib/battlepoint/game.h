@@ -47,6 +47,7 @@ typedef struct{
     int capture_cooldown_seconds;
     int capture_decay_rate_secs_per_hit;
     int capture_offense_to_defense_ratio;
+    int capture_overtime_seconds;
 } CaptureSettings;
 
 typedef struct {    
@@ -88,17 +89,20 @@ typedef struct {
     Team winner;
 } GameResult;
 
+//for hit counting games each team has one
+//for capturing games, there is only one
 typedef struct {
-    int blu_hits;
-    int red_hits;
-} TeamHits;
+    int hits=0;
+    long last_hit_millis=0;
+    long last_decay_millis=0;
+} HitTracker;
 
 typedef struct {
-    long blu_millis;
-    long red_millis;
-    Team capturing;
-    int capture_hits;
-    Team owner;
+    long blu_millis=0;
+    long red_millis=0;
+    Team capturing = Team::NOBODY;
+    int capture_hits = 0;
+    Team owner = Team::NOBODY;
 } Ownership;
 
 typedef struct {
@@ -107,7 +111,9 @@ typedef struct {
     GameStatus status;
     GameResult result;
     GameTime time;
-    TeamHits hits;
+    HitTracker captureHits; //used in capture games
+    HitTracker redHits; //used in team games
+    HitTracker bluHits;
     Ownership ownership;
     MeterSettings meters;
 } GameState;

@@ -14,8 +14,8 @@ void assertEndedWithWinner ( Team t){
 void test_in_progress(){
 
     settings.hits.victory_margin = 2;
-    state.hits.red_hits = 4;
-    state.hits.blu_hits = 5;
+    state.redHits.hits = 4;
+    state.bluHits.hits = 5;
     state.timeExpired=false;
     state.overtimeExpired=false;
     updateMostHitsInTimeGame(&state,settings);
@@ -26,8 +26,8 @@ void test_in_progress(){
 void test_in_progress_tied(){
 
     settings.hits.victory_margin = 1;
-    state.hits.red_hits = 4;
-    state.hits.blu_hits = 8;
+    state.redHits.hits = 4;
+    state.bluHits.hits = 8;
     state.timeExpired=false;
     state.overtimeExpired=false;
     updateMostHitsInTimeGame(&state,settings);
@@ -38,8 +38,8 @@ void test_in_progress_tied(){
 void test_end_in_time(){
     settings.hits.to_win = 10;
     settings.hits.victory_margin = 2;
-    state.hits.red_hits = 10;
-    state.hits.blu_hits = 11;
+    state.redHits.hits = 10;
+    state.bluHits.hits = 11;
     state.timeExpired=true;
     state.overtimeExpired=false;
     updateMostHitsInTimeGame(&state,settings);
@@ -51,8 +51,8 @@ void test_end_in_time(){
 void test_victory_in_overtime(){
     settings.hits.to_win = 10;
     settings.hits.victory_margin = 2;
-    state.hits.red_hits = 10;
-    state.hits.blu_hits = 12;
+    state.redHits.hits = 10;
+    state.bluHits.hits = 12;
     state.timeExpired=true;
     state.overtimeExpired=false;
     updateMostHitsInTimeGame(&state,settings);
@@ -61,8 +61,8 @@ void test_victory_in_overtime(){
 void test_end_in_slight_victory(){
     settings.hits.to_win = 10;
     settings.hits.victory_margin = 4;
-    state.hits.red_hits = 11;
-    state.hits.blu_hits = 12;
+    state.redHits.hits = 11;
+    state.bluHits.hits = 12;
     state.timeExpired=true;
     state.overtimeExpired=true;
     updateMostHitsInTimeGame(&state,settings);
@@ -71,8 +71,8 @@ void test_end_in_slight_victory(){
 void test_end_in_tie(){
     settings.hits.to_win = 10;
     settings.hits.victory_margin = 2;
-    state.hits.red_hits = 11;
-    state.hits.blu_hits = 11;
+    state.redHits.hits = 11;
+    state.bluHits.hits = 11;
     state.timeExpired=true;
     state.overtimeExpired=true;
     updateMostHitsInTimeGame(&state,settings);

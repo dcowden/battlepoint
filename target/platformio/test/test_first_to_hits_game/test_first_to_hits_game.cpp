@@ -14,8 +14,8 @@ void assertEndedWithWinner ( Team t){
 void test_in_progress(){
     settings.hits.to_win = 10;
     settings.hits.victory_margin = 2;
-    state.hits.red_hits = 4;
-    state.hits.blu_hits = 2;
+    state.redHits.hits = 4;
+    state.bluHits.hits = 2;
     state.timeExpired=false;
     state.overtimeExpired=false;    
     updateFirstToHitsGame(&state,settings);
@@ -27,8 +27,8 @@ void test_in_progress(){
 void test_victory_not_in_overtime(){
     settings.hits.to_win = 10;
     settings.hits.victory_margin = 2;
-    state.hits.red_hits = 10;
-    state.hits.blu_hits = 8;
+    state.redHits.hits = 10;
+    state.bluHits.hits = 8;
     state.timeExpired=false;
     state.overtimeExpired=false ;   
     updateFirstToHitsGame(&state,settings);
@@ -38,8 +38,8 @@ void test_victory_not_in_overtime(){
 void test_in_progress_within_margin(){
     settings.hits.to_win = 10;
     settings.hits.victory_margin = 2;
-    state.hits.red_hits = 10;
-    state.hits.blu_hits = 11;
+    state.redHits.hits = 10;
+    state.bluHits.hits = 11;
     state.timeExpired=false;
     state.overtimeExpired=false  ;  
     updateFirstToHitsGame(&state,settings);
@@ -53,8 +53,8 @@ void test_in_progress_within_margin(){
 void test_victory_in_overtime(){
     settings.hits.to_win = 10;
     settings.hits.victory_margin = 2;
-    state.hits.red_hits = 10;
-    state.hits.blu_hits = 12;
+    state.redHits.hits = 10;
+    state.bluHits.hits = 12;
     state.timeExpired=true;
     state.overtimeExpired=false;
     updateFirstToHitsGame(&state,settings);
@@ -63,8 +63,8 @@ void test_victory_in_overtime(){
 void test_end_in_tie(){
     settings.hits.to_win = 10;
     settings.hits.victory_margin = 2;
-    state.hits.red_hits = 11;
-    state.hits.blu_hits = 11;
+    state.redHits.hits = 11;
+    state.bluHits.hits = 11;
     state.timeExpired=true;
     state.overtimeExpired=true;
     updateFirstToHitsGame(&state,settings);

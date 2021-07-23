@@ -368,7 +368,7 @@ void updateGame(){
 void updateDisplay(){
   oled.clearBuffer();
   oled.setCursor(5,15);
-  oled.print("HT: R="); oled.print(gameState.hits.red_hits); oled.print( "  B="); oled.print(gameState.hits.blu_hits);
+  oled.print("HT: R="); oled.print(gameState.redHits.hits); oled.print( "  B="); oled.print(gameState.bluHits.hits);
 
   long elapsed_millis = millis() - gameState.time.start_time_millis;
   int elapsed_sec = elapsed_millis/1000;
