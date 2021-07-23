@@ -68,13 +68,14 @@ typedef enum {
 } GameStatus;
 
 typedef struct{
-    LedMeter leftTop;
-    LedMeter leftBottom;
-    LedMeter rightTop;
-    LedMeter rightBottom;
-    LedMeter center;
-    LedMeter left;
-    LedMeter right;
+    //TODO: should these be composed?
+    LedController leftTop;
+    LedController leftBottom;
+    LedController rightTop;
+    LedController rightBottom;
+    LedController center;
+    LedController left;
+    LedController right;
 } MeterSettings;
 
 typedef struct {

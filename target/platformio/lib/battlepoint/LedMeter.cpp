@@ -9,8 +9,7 @@ void initMeter ( LedMeter* meter, int startIndex, int endIndex ){
     meter->max_val = DEFAULT_MAX_VAL;
     meter->fgColor = CRGB::White;
     meter->fgColor = CRGB::Black;
-    meter->flash_interval_millis=FlashInterval::FLASH_NONE;
-    meter->last_flash_millis=0;
+    meter->flash_interval_millis=FlashInterval::FLASH_NONE;    
 }
 
 void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg){
@@ -22,6 +21,33 @@ void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg){
 
 int proportionalValue(int in_val, int in_max, int out_max ){
   return in_val * out_max / in_max;
+}
+
+bool isOn ( LedFlashState* state, long flash_interval_millis, long current_time_millis){
+  if ( flash_interval_millis > 0){
+     long elapsed = current_time_millis - state->last_flash_millis;
+     if ( elapsed > flash_interval_millis){
+       state->flash_state = ! state->flash_state;
+       state->last_flash_millis = current_time_millis;
+       if ( state->flash_state == 0 ){
+         return true;
+       }
+       else{
+         return false;
+       }
+     }
+  }
+  return true;
+}
+
+
+//blank is different than value=0: the background color for blank is always 
+//black (off)
+void blankLedMeter( CRGB* leds, LedMeter meter ){
+  //note: use non pointer here so our changes do not take affect
+  meter.fgColor = CRGB::Black;
+  meter.bgColor = CRGB::Black;
+  updateLedMeter(leds, meter);
 }
 
 void updateLedMeter(CRGB* leds, LedMeter meter ){
@@ -40,29 +66,8 @@ void updateLedMeter(CRGB* leds, LedMeter meter ){
 
   int num_lights_on = proportionalValue( meter.val, meter.max_val, total_lights); 
   int currentIndex = meter.startIndex;
- 
-  #ifdef BP_DEBUG
-    Serial.print("Val=");
-    Serial.println(val);  
-    Serial.print("Total Lights=");
-    Serial.println(total_lights);
-    Serial.print("Lights On=");
-    Serial.println(num_lights_on);
-    Serial.print("CurrentIndex=");
-    Serial.println(currentIndex);
-    Serial.print("startIndex=");
-    Serial.println(meter.startIndex); 
-    Serial.print("indexIncrement=");
-    Serial.println(indexIncrement);        
-  #endif
-
 
   for(int i=0;i<total_lights;i++){
-    #ifdef BP_DEBUG
-      Serial.print(i);
-      Serial.print(",");
-      Serial.println(currentIndex);
-    #endif
     if ( i < num_lights_on ){
       leds[currentIndex] = meter.fgColor;
     }
@@ -71,5 +76,13 @@ void updateLedMeter(CRGB* leds, LedMeter meter ){
     }
     currentIndex += indexIncrement;
   }
-
 } 
+
+void updateController(CRGB* leds, LedController controller, long current_time_millis){
+   if ( isOn( &controller.flashState, controller.meter.flash_interval_millis, current_time_millis)){
+     updateLedMeter(leds, controller.meter);
+   }
+   else{
+     blankLedMeter( leds, controller.meter);
+   }
+}

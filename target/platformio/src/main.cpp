@@ -44,6 +44,7 @@ CRGB rightLeds[VERTICAL_LED_SIZE];
 CRGB topLeds[2* HORIONTAL_LED_SIZE];
 CRGB bottomLeds[2* HORIONTAL_LED_SIZE];
 
+
 //prototypes
 
 void updateDisplay();
@@ -269,13 +270,13 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
 void updateLEDs(){
 
   MeterSettings ms = gameState.meters;
-  updateLedMeter(leftLeds, ms.left);
-  updateLedMeter(centerLeds, ms.center);
-  updateLedMeter(rightLeds, ms.right);
-  updateLedMeter(topLeds, ms.leftTop);
-  updateLedMeter(topLeds, ms.rightTop);
-  updateLedMeter(bottomLeds, ms.leftBottom);
-  updateLedMeter(bottomLeds, ms.rightBottom );
+  updateController(leftLeds, ms.left, gameClock.milliseconds());
+  updateController(centerLeds, ms.center, gameClock.milliseconds());
+  updateController(rightLeds, ms.right, gameClock.milliseconds());
+  updateController(topLeds, ms.leftTop, gameClock.milliseconds());
+  updateController(topLeds, ms.rightTop, gameClock.milliseconds());
+  updateController(bottomLeds, ms.leftBottom, gameClock.milliseconds());
+  updateController(bottomLeds, ms.rightBottom , gameClock.milliseconds());
   FastLED.show();
 
 }

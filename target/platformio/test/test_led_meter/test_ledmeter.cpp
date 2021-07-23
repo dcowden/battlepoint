@@ -24,7 +24,6 @@ LedMeter simpleMeter {
     .max_val=100, 
     .val=0, 
     .flash_interval_millis=FlashInterval::FLASH_NONE, 
-    .last_flash_millis=0,
     .fgColor=CRGB::Blue, 
     .bgColor=CRGB::Black };  //8 lights
 
@@ -34,7 +33,6 @@ LedMeter reversedMeter {
     .max_val=100,
     .val=0,
     .flash_interval_millis=FlashInterval::FLASH_NONE, 
-    .last_flash_millis=0,     
     .fgColor=CRGB::Blue, 
     .bgColor=CRGB::Black }; //8 lights
 
@@ -43,8 +41,7 @@ LedMeter subsetMeter {
     .endIndex=3, 
     .max_val=100,
     .val=0, 
-    .flash_interval_millis=FlashInterval::FLASH_NONE, 
-    .last_flash_millis=0,         
+    .flash_interval_millis=FlashInterval::FLASH_NONE,      
     .fgColor=CRGB::Blue, 
     .bgColor=CRGB::Black }; //4 lights, first half
 

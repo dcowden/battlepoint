@@ -13,4 +13,13 @@ how to avoid duplicate menu handler functions for each game type? ie,
 
 
 # expansions/generalizations
-   how to provide more slots? 
+how to provide more slots? 
+
+
+
+# testing
+really need to add tests for game updates
+add tests for meter flashing
+
+# functions
+add code for meter flashing

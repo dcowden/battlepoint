@@ -59,13 +59,13 @@ MeterSettings base_meter_settings(){
 
     //TODO: set up the indexes right once we know the hardware
     MeterSettings s;        
-    initMeter(&s.leftTop,0,9);
-    initMeter(&s.leftBottom,0,9);
-    initMeter(&s.rightTop,10,19);
-    initMeter(&s.rightBottom,10,19);
-    initMeter(&s.center,0,15);
-    initMeter(&s.left,0,15);
-    initMeter(&s.right,0,15);
+    initMeter(&s.leftTop.meter,0,9);
+    initMeter(&s.leftBottom.meter,0,9);
+    initMeter(&s.rightTop.meter,10,19);
+    initMeter(&s.rightBottom.meter,10,19);
+    initMeter(&s.center.meter,0,15);
+    initMeter(&s.left.meter,0,15);
+    initMeter(&s.right.meter,0,15);
     return s;
 }
 
@@ -86,24 +86,24 @@ GameState startGame(GameSettings settings, Clock* clock){
     gs.meters = base_meter_settings();
 
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
-        configureMeter(&gs.meters.center, DEFAULT_MAX_VAL, 0, CRGB::Black, CRGB::Black);   //NOT USED in this mode
-        configureMeter(&gs.meters.left, settings.hits.to_win, 0, CRGB::Blue, CRGB::Black); //hits scored for blue , count from zero to total required to win
-        configureMeter(&gs.meters.right, settings.hits.to_win, 0, CRGB::Red, CRGB::Black); //hits scored for red , count from zero to total required to win
+        configureMeter(&gs.meters.center.meter, DEFAULT_MAX_VAL, 0, CRGB::Black, CRGB::Black);   //NOT USED in this mode
+        configureMeter(&gs.meters.left.meter, settings.hits.to_win, 0, CRGB::Blue, CRGB::Black); //hits scored for blue , count from zero to total required to win
+        configureMeter(&gs.meters.right.meter, settings.hits.to_win, 0, CRGB::Red, CRGB::Black); //hits scored for red , count from zero to total required to win
     }
     else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME ){
-        configureMeter(&gs.meters.center, DEFAULT_MAX_VAL, 0, CRGB::Red, CRGB::Blue);                          // ratio of red to total hits.  max_val gets changed once there are non-zero total hits
-        configureMeter(&gs.meters.left, settings.timed.max_duration_seconds, 0, CRGB::Blue, CRGB::Black);      // game progress, count from zero to total game duration
-        configureMeter(&gs.meters.right, settings.timed.max_duration_seconds, 0, CRGB::Red, CRGB::Black);      // game progress, count from zero to total game duration
+        configureMeter(&gs.meters.center.meter, DEFAULT_MAX_VAL, 0, CRGB::Red, CRGB::Blue);                          // ratio of red to total hits.  max_val gets changed once there are non-zero total hits
+        configureMeter(&gs.meters.left.meter, settings.timed.max_duration_seconds, 0, CRGB::Blue, CRGB::Black);      // game progress, count from zero to total game duration
+        configureMeter(&gs.meters.right.meter, settings.timed.max_duration_seconds, 0, CRGB::Red, CRGB::Black);      // game progress, count from zero to total game duration
     }
     else if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_OWN_TIME ){
-        configureMeter(&gs.meters.center, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Blue);       // capture progress: background = owner, foreground: count up from zero to hits required to capture
-        configureMeter(&gs.meters.left, settings.timed.ownership_time_seconds, 0, CRGB::Blue, CRGB::Black);  //ownership time for blue, count from zero to time required to win
-        configureMeter(&gs.meters.right, settings.timed.ownership_time_seconds, 0, CRGB::Red, CRGB::Black);   //ownership time for red, count from zero to time required to win
+        configureMeter(&gs.meters.center.meter, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Blue);       // capture progress: background = owner, foreground: count up from zero to hits required to capture
+        configureMeter(&gs.meters.left.meter, settings.timed.ownership_time_seconds, 0, CRGB::Blue, CRGB::Black);  //ownership time for blue, count from zero to time required to win
+        configureMeter(&gs.meters.right.meter, settings.timed.ownership_time_seconds, 0, CRGB::Red, CRGB::Black);   //ownership time for red, count from zero to time required to win
     }
     else if ( settings.gameType == GameType::GAME_TYPE_ATTACK_DEFEND ){
-        configureMeter(&gs.meters.center, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);   //hit progress: count from zero to hits required to win
-        configureMeter(&gs.meters.left, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
-        configureMeter(&gs.meters.right, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
+        configureMeter(&gs.meters.center.meter, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);   //hit progress: count from zero to hits required to win
+        configureMeter(&gs.meters.left.meter, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
+        configureMeter(&gs.meters.right.meter, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
     }    
     else{
        Log.errorln("UNKNOWN GAME TYPE");
@@ -132,7 +132,6 @@ bool isGameTimedOut(GameState* current,GameSettings settings, Clock* clock){
     return false;
 }
 
-
 void updateGame(GameState* current, SensorState sensors, GameSettings settings, Clock* clock){
     
     bool timedOut = isGameTimedOut(current, settings, clock);
@@ -143,8 +142,8 @@ void updateGame(GameState* current, SensorState sensors, GameSettings settings, 
 
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
 
-        current->meters.left.val = blu_hits;
-        current->meters.right.val = red_hits;
+        current->meters.left.meter.val = blu_hits;
+        current->meters.right.meter.val = red_hits;
 
         if ( (blu_hits >= settings.hits.to_win ) && (blu_hits > (red_hits + settings.hits.victory_margin)  )  ){
             current->result.winner = Team::BLU;
