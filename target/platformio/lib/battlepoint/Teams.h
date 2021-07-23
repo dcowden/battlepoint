@@ -2,10 +2,11 @@
 #define __INC_TEAMS_H
 
 typedef enum{
-    RED,
-    BLU,
-    NOBODY,
-    ALL  
+    RED=1,
+    BLU=2,
+    NOBODY=3,
+    ALL=4,
+    TIE=5  
 } Team;
 
 typedef enum{

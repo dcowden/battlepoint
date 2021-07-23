@@ -16,6 +16,7 @@
 //////////////////////////////////////
 typedef struct {
     int max_duration_seconds;
+    int max_overtime_seconds;
     int ownership_time_seconds;
 } TimedGame;
 
@@ -101,6 +102,8 @@ typedef struct {
 } Ownership;
 
 typedef struct {
+    bool timeExpired = false;
+    bool overtimeExpired = false;
     GameStatus status;
     GameResult result;
     GameTime time;
@@ -111,7 +114,17 @@ typedef struct {
 
 GameSettings DEFAULT_GAMESETTINGS();
 GameState startGame(GameSettings settings, Clock* clock);
+
+//exposed for testing
+void updateFirstToHitsGame(GameState* current,  GameSettings settings);
+void updateMostHitsInTimeGame(GameState* current,  GameSettings settings);
+void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings);
+void updateAttackDefendGame(GameState* current,  GameSettings settings);
+void updateMostOwnInTimeGame(GameState* current,  GameSettings settings);
 void updateGame(GameState* game, SensorState sensors, GameSettings settings, Clock* clock);
+
+
+
 const char* getCharForGameType(GameType t);
 const char* getCharForStatus(GameStatus s);
 #endif

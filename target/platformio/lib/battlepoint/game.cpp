@@ -17,8 +17,9 @@ GameSettings DEFAULT_GAMESETTINGS(){
     gs.capture.capture_offense_to_defense_ratio=4;
     gs.capture.hits_to_capture = 10;
     
-    gs.timed.max_duration_seconds=20;
+    gs.timed.max_duration_seconds=120;
     gs.timed.ownership_time_seconds=120;
+    gs.timed.max_overtime_seconds=30;
 
     gs.target.hit_energy_threshold = 100;
     gs.target.last_hit_millis=0;
@@ -116,61 +117,196 @@ void updateGameHits(GameState* current, SensorState sensors){
     if ( sensors.leftScan.was_hit ) current->hits.blu_hits++;
 }
 
-bool isGameTimedOut(GameState* current,GameSettings settings, Clock* clock){
+//updates timeExpired based on game state. 
+//makes testing easier, so we dont have to set up all those conditions
+void updateGameTime(GameState* current,GameSettings settings, Clock* clock){
     current->time.last_update_millis = clock->milliseconds();
     long elapsed = (clock->milliseconds() - current->time.start_time_millis)/1000;
 
-    int game_secs = settings.timed.max_duration_seconds;
-    if ( game_secs > 0){
-        if ( elapsed > game_secs){
-            return true;
+    
+    bool isExpired = false;
+    bool isOvertimeExpired = false;
+    if ( settings.timed.max_duration_seconds > 0){
+        if ( elapsed > settings.timed.max_duration_seconds){
+            isExpired =  true;
         }
-        else{
-            return false;
+        if ( elapsed > settings.timed.max_duration_seconds + settings.timed.max_overtime_seconds){
+            isOvertimeExpired = true;
         }
     }
-    return false;
+    current->timeExpired = isExpired;
+    current->overtimeExpired = isOvertimeExpired;
+}
+
+void endGame( GameState* current, Team winner){
+    current->result.winner = winner;
+    current->status = GameStatus::GAME_STATUS_ENDED;
+}
+
+void endGameWithMostHits(GameState* current, int red_hits, int blu_hits ){
+    if ( blu_hits > red_hits){
+        endGame(current, Team::BLU);
+    }
+    else if (red_hits > blu_hits ){
+        endGame(current, Team::RED);
+    }
+    else{
+        endGame(current, Team::TIE);
+    }    
+}
+
+void updateFirstToHitsGame(GameState* current,  GameSettings settings){
+
+    /*
+
+        VICTORY
+        Reach the target number of hits, AND more hits than the other team by the victory margin
+        If the overtime period does not produce a victory, the game ends in a tie
+
+        HITS
+        in this game, hits do not decay. Each team's hits are tracked separately
+
+        TIME
+        Overtime begins if a team has reached the target hit count, but is not above the other team by the 
+        victory margin, OR if time expires but overtime has not expired
+
+        
+        If the teams are tied after the overtime period, the game ends in a tie
+        
+    */
+    int red_hits = current->hits.red_hits;
+    int blu_hits = current->hits.blu_hits;
+    Log.traceln("RedHits=%d, BluHits=%d",red_hits,blu_hits);
+
+    //TODO: update meters all in one place?        
+    current->meters.left.meter.val = blu_hits;
+    current->meters.right.meter.val = red_hits;
+
+    //TODO: how to factor out this threshold code? 
+    if ( (blu_hits >= settings.hits.to_win ) && (blu_hits >= (red_hits + settings.hits.victory_margin)  )  ){
+        endGame(current, Team::BLU);
+    }else if ( (red_hits >= settings.hits.to_win ) && (red_hits >= (blu_hits + settings.hits.victory_margin)  )  ){
+        endGame(current, Team::RED);
+    }else if ( (red_hits >= settings.hits.to_win) || (red_hits  >= settings.hits.to_win) ){                
+        //in this game you're in overtime if time is expired OR 
+        //one team has reached the target but has not exceeded victory margin
+        if ( current->overtimeExpired ){
+            endGameWithMostHits(current,red_hits, blu_hits);
+        }
+        else{
+            current->status = GameStatus::GAME_STATUS_OVERTIME;
+        }
+    }
+    else{
+        current->status = GameStatus::GAME_STATUS_RUNNING;    
+    }
+    
+
+}
+
+void updateMostHitsInTimeGame(GameState* current,  GameSettings settings){
+    /*
+        VICTORY
+        Acheive more hits than the other time in the specified time, and win by the victory margin
+
+        HITS
+        in this game, hits do not decay. Each team's hits are tracked separately
+
+
+        TIMEOUT
+        If time up, but neither team is ahead by the victory margin, overtime
+        If the teams are tied after overtime, the result is a TIE
+        
+    */
+    int red_hits = current->hits.red_hits;
+    int blu_hits = current->hits.blu_hits;
+
+    //TODO: update meters all in one place?        
+    current->meters.left.meter.val = blu_hits;
+    current->meters.right.meter.val = red_hits;
+    if ( current->overtimeExpired ){
+        endGameWithMostHits(current,red_hits, blu_hits);
+    }
+    else if ( current->timeExpired ){
+        //TODO: how to factor out this threshold code? 
+        if ( (blu_hits >= settings.hits.to_win ) && (blu_hits >= (red_hits + settings.hits.victory_margin)  )  ){
+            endGame(current, Team::BLU);
+        }else if ( (red_hits >= settings.hits.to_win ) && (red_hits >= (blu_hits + settings.hits.victory_margin)  )  ){
+            endGame(current, Team::RED);
+        }
+        else{
+            current->status = GameStatus::GAME_STATUS_OVERTIME;    
+        }
+    }
+    else{
+        current->status = GameStatus::GAME_STATUS_RUNNING;
+    }
+
+}
+void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings){
+    endGame(current, Team::NOBODY);
+}
+void updateAttackDefendGame(GameState* current,  GameSettings settings){
+    /*
+        VICTORY
+        Blue is the attacking team, and wins if it achieves the desired number of hits
+        within the time alotted.
+
+        HITS
+        in this game, hits decay at the rate provided by capture settings.
+
+        TIME
+        Overtime is triggered if time is expired, but the attacking team
+         is within victory margin of getting the desired number of hits.
+        If time and overtime expires, the defending team (red) wins 
+    */    
+    int blu_hits = current->hits.blu_hits;
+
+    if ( blu_hits >= settings.capture.hits_to_capture){
+        endGame(current, Team::BLU);
+    }
+    else if ( current->overtimeExpired){
+        endGame(current, Team::RED);
+    }
+    else if ( current->timeExpired ){
+        if ( blu_hits >= (settings.capture.hits_to_capture - settings.hits.victory_margin)){
+             current->status = GameStatus::GAME_STATUS_OVERTIME;
+        }
+        else{
+            endGame(current,Team::RED);
+        }
+    }
+    else {
+        current->status = GameStatus::GAME_STATUS_RUNNING;
+    }   
+}
+
+void updateMostOwnInTimeGame(GameState* current,  GameSettings settings){
+    endGame(current, Team::NOBODY);
 }
 
 void updateGame(GameState* current, SensorState sensors, GameSettings settings, Clock* clock){
-    
-    bool timedOut = isGameTimedOut(current, settings, clock);
+   
+    updateGameTime(current, settings, clock);
     updateGameHits(current,sensors);
 
-    int red_hits = current->hits.red_hits;
-    int blu_hits = current->hits.blu_hits;        
-
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
-
-        current->meters.left.meter.val = blu_hits;
-        current->meters.right.meter.val = red_hits;
-
-        if ( (blu_hits >= settings.hits.to_win ) && (blu_hits > (red_hits + settings.hits.victory_margin)  )  ){
-            current->result.winner = Team::BLU;
-            current->status = GameStatus::GAME_STATUS_ENDED;
-        }else if ( (red_hits >= settings.hits.to_win ) && (red_hits > (blu_hits + settings.hits.victory_margin)  )  ){
-            current->result.winner = Team::RED;
-            current->status = GameStatus::GAME_STATUS_ENDED;
-        }else if ( (red_hits >= settings.hits.to_win) || (red_hits  >= settings.hits.to_win) ){
-            if ( timedOut ){
-                current->status = GameStatus::GAME_STATUS_ENDED;
-                if ( blu_hits > red_hits){
-                    current->result.winner = Team::BLU;
-                }
-                else if (red_hits > blu_hits ){
-                    current->result.winner = Team::RED;
-                }
-                else{
-                    current->result.winner = Team::NOBODY;
-                }
-            }
-            else{
-                current->status = GameStatus::GAME_STATUS_OVERTIME;
-            }
-        }
-        else{
-            current->status = GameStatus::GAME_STATUS_RUNNING;    
-        }
+        updateFirstToHitsGame(current,settings);
+    }
+    else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME){
+        updateMostHitsInTimeGame(current,settings);
+    }
+    else if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_OWN_TIME){
+        updateFirstToOwnTimeGame(current,settings);
+    }
+    else if ( settings.gameType == GameType::GAME_TYPE_ATTACK_DEFEND){
+        updateAttackDefendGame(current,settings);
+    }
+    else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_OWN_IN_TIME){
+        updateMostOwnInTimeGame(current,settings);
+    }
+    else{
+        Log.errorln("Unknown Game Type: %d", settings.gameType);
     }
 }
 

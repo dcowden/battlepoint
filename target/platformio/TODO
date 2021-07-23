@@ -15,7 +15,8 @@ how to avoid duplicate menu handler functions for each game type? ie,
 # expansions/generalizations
 how to provide more slots? 
 
-
+#hardware
+wire in encoder. i hate the button. can use the same pins the buttons were on since they are pull down
 
 # testing
 really need to add tests for game updates
