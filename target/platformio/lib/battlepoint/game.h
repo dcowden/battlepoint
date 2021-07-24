@@ -46,7 +46,6 @@ typedef struct{
     int hits_to_capture;
     int capture_cooldown_seconds;
     int capture_decay_rate_secs_per_hit;
-    int capture_offense_to_defense_ratio;
     int capture_overtime_seconds;
 } CaptureSettings;
 
@@ -81,8 +80,10 @@ typedef struct{
 } MeterSettings;
 
 typedef struct {
-    long start_time_millis;
-    long last_update_millis;
+    long start_time_millis=0;
+    long last_update_millis=0;
+    bool timeExpired = false;
+    bool overtimeExpired = false;
 } GameTime;
 
 typedef struct {
@@ -104,16 +105,15 @@ typedef struct {
     int capture_hits = 0;
     Team owner = Team::NOBODY;
     long overtime_remaining_millis = 0;
+    long last_hit_millis=0;
+    long last_decay_millis=0;
 } Ownership;
 
 typedef struct {
-    bool timeExpired = false;
-    bool overtimeExpired = false;
     GameStatus status;
     GameResult result;
     GameTime time;
-    HitTracker captureHits; //used in capture games
-    HitTracker redHits; //used in team games
+    HitTracker redHits; 
     HitTracker bluHits;
     Ownership ownership;
     MeterSettings meters;
@@ -123,6 +123,10 @@ GameSettings DEFAULT_GAMESETTINGS();
 GameState startGame(GameSettings settings, Clock* clock);
 
 //exposed for testing
+void updateGameTime(GameState* current,GameSettings settings, long current_time_millis);
+void updateOwnership(GameState* current,  GameSettings settings, long current_time_millis);
+void applyHitDecay(GameState* current, GameSettings settings, long current_time_millis);
+void updateGameHits(GameState* current, SensorState sensors, long current_time_millis);
 void updateFirstToHitsGame(GameState* current,  GameSettings settings);
 void updateMostHitsInTimeGame(GameState* current,  GameSettings settings);
 void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings);

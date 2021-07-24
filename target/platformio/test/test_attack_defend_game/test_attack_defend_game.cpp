@@ -15,8 +15,8 @@ void test_in_progress(){
     settings.capture.hits_to_capture=10;
     settings.hits.victory_margin = 2;
     state.bluHits.hits = 2;
-    state.timeExpired=false;
-    state.overtimeExpired=false;    
+    state.time.timeExpired=false;
+    state.time.overtimeExpired=false;  
     updateAttackDefendGame(&state,settings);
 
     TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_RUNNING, state.status);    
@@ -27,8 +27,8 @@ void test_victory_not_in_overtime(){
     settings.capture.hits_to_capture=10;
     settings.hits.victory_margin = 2;
     state.bluHits.hits = 10;
-    state.timeExpired=false;
-    state.overtimeExpired=false ;   
+    state.time.timeExpired=false;
+    state.time.overtimeExpired=false;
     updateAttackDefendGame(&state,settings);
     assertEndedWithWinner(Team::BLU);
 }
@@ -37,8 +37,8 @@ void test_in_progress_within_margin(){
     settings.capture.hits_to_capture=10;
     settings.hits.victory_margin = 2;
     state.bluHits.hits = 8;
-    state.timeExpired=false;
-    state.overtimeExpired=false  ;  
+    state.time.timeExpired=false;
+    state.time.overtimeExpired=false;
     updateAttackDefendGame(&state,settings);
     
     TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_RUNNING, state.status );    
@@ -49,8 +49,8 @@ void test_victory_in_overtime(){
     settings.capture.hits_to_capture=10;
     settings.hits.victory_margin = 2;
     state.bluHits.hits = 12;
-    state.timeExpired=true;
-    state.overtimeExpired=false;
+    state.time.timeExpired=true;
+    state.time.overtimeExpired=false;
     updateAttackDefendGame(&state,settings);
     assertEndedWithWinner(Team::BLU);
 }
@@ -58,8 +58,8 @@ void test_end_in_fail(){
     settings.capture.hits_to_capture=10;
     settings.hits.victory_margin = 2;
     state.bluHits.hits = 9;
-    state.timeExpired=true;
-    state.overtimeExpired=true;
+    state.time.timeExpired=true;
+    state.time.overtimeExpired=true;
     updateAttackDefendGame(&state,settings);
     assertEndedWithWinner(Team::RED);
 }

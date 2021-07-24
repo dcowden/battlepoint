@@ -16,8 +16,8 @@ void test_in_progress(){
     settings.hits.victory_margin = 2;
     state.redHits.hits = 4;
     state.bluHits.hits = 5;
-    state.timeExpired=false;
-    state.overtimeExpired=false;
+    state.time.timeExpired=false;
+    state.time.overtimeExpired=false;
     updateMostHitsInTimeGame(&state,settings);
 
     TEST_ASSERT_EQUAL( state.status, GameStatus::GAME_STATUS_RUNNING);    
@@ -28,8 +28,8 @@ void test_in_progress_tied(){
     settings.hits.victory_margin = 1;
     state.redHits.hits = 4;
     state.bluHits.hits = 8;
-    state.timeExpired=false;
-    state.overtimeExpired=false;
+    state.time.timeExpired=false;
+    state.time.overtimeExpired=false;
     updateMostHitsInTimeGame(&state,settings);
 
     TEST_ASSERT_EQUAL( state.status, GameStatus::GAME_STATUS_RUNNING);    
@@ -40,8 +40,8 @@ void test_end_in_time(){
     settings.hits.victory_margin = 2;
     state.redHits.hits = 10;
     state.bluHits.hits = 11;
-    state.timeExpired=true;
-    state.overtimeExpired=false;
+    state.time.timeExpired=true;
+    state.time.overtimeExpired=false;
     updateMostHitsInTimeGame(&state,settings);
     
     TEST_ASSERT_EQUAL( state.status, GameStatus::GAME_STATUS_OVERTIME);    
@@ -53,8 +53,8 @@ void test_victory_in_overtime(){
     settings.hits.victory_margin = 2;
     state.redHits.hits = 10;
     state.bluHits.hits = 12;
-    state.timeExpired=true;
-    state.overtimeExpired=false;
+    state.time.timeExpired=true;
+    state.time.overtimeExpired=false;
     updateMostHitsInTimeGame(&state,settings);
     assertEndedWithWinner(Team::BLU);
 }
@@ -63,8 +63,8 @@ void test_end_in_slight_victory(){
     settings.hits.victory_margin = 4;
     state.redHits.hits = 11;
     state.bluHits.hits = 12;
-    state.timeExpired=true;
-    state.overtimeExpired=true;
+    state.time.timeExpired=true;
+    state.time.overtimeExpired=true;
     updateMostHitsInTimeGame(&state,settings);
     assertEndedWithWinner(Team::BLU);
 }
@@ -73,8 +73,8 @@ void test_end_in_tie(){
     settings.hits.victory_margin = 2;
     state.redHits.hits = 11;
     state.bluHits.hits = 11;
-    state.timeExpired=true;
-    state.overtimeExpired=true;
+    state.time.timeExpired=true;
+    state.time.overtimeExpired=true;
     updateMostHitsInTimeGame(&state,settings);
     assertEndedWithWinner(Team::TIE);
 }

@@ -16,8 +16,8 @@ void test_in_progress(){
     settings.hits.victory_margin = 2;
     state.redHits.hits = 4;
     state.bluHits.hits = 2;
-    state.timeExpired=false;
-    state.overtimeExpired=false;    
+    state.time.timeExpired=false;
+    state.time.overtimeExpired=false;    
     updateFirstToHitsGame(&state,settings);
 
     TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_RUNNING, state.status);    
@@ -29,8 +29,8 @@ void test_victory_not_in_overtime(){
     settings.hits.victory_margin = 2;
     state.redHits.hits = 10;
     state.bluHits.hits = 8;
-    state.timeExpired=false;
-    state.overtimeExpired=false ;   
+    state.time.timeExpired=false;
+    state.time.overtimeExpired=false ;   
     updateFirstToHitsGame(&state,settings);
     assertEndedWithWinner(Team::RED);
 }
@@ -40,8 +40,8 @@ void test_in_progress_within_margin(){
     settings.hits.victory_margin = 2;
     state.redHits.hits = 10;
     state.bluHits.hits = 11;
-    state.timeExpired=false;
-    state.overtimeExpired=false  ;  
+    state.time.timeExpired=false;
+    state.time.overtimeExpired=false  ;  
     updateFirstToHitsGame(&state,settings);
     
     TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_OVERTIME, state.status );    
@@ -55,8 +55,8 @@ void test_victory_in_overtime(){
     settings.hits.victory_margin = 2;
     state.redHits.hits = 10;
     state.bluHits.hits = 12;
-    state.timeExpired=true;
-    state.overtimeExpired=false;
+    state.time.timeExpired=true;
+    state.time.overtimeExpired=false;
     updateFirstToHitsGame(&state,settings);
     assertEndedWithWinner(Team::BLU);
 }
@@ -65,8 +65,8 @@ void test_end_in_tie(){
     settings.hits.victory_margin = 2;
     state.redHits.hits = 11;
     state.bluHits.hits = 11;
-    state.timeExpired=true;
-    state.overtimeExpired=true;
+    state.time.timeExpired=true;
+    state.time.overtimeExpired=true;
     updateFirstToHitsGame(&state,settings);
     assertEndedWithWinner(Team::TIE);
 }
