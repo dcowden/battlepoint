@@ -117,37 +117,45 @@ GameState startGame(GameSettings settings, Clock* clock){
     return gs;
 
 }
+
+//TODO: refactor, it's nearly all duplicated!
 void updateGameHits(GameState* current, SensorState sensors, Clock* clock){
     if ( sensors.rightScan.was_hit ){
        current->redHits.hits++;
        current->redHits.last_hit_millis = clock->milliseconds();
+
+       if ( current->ownership.capturing == Team::RED){
+           current->captureHits.hits++;
+           current->captureHits.last_hit_millis = clock->milliseconds();
+       }
     } 
+
     if ( sensors.leftScan.was_hit ){
        current->bluHits.hits++;
        current->bluHits.last_hit_millis = clock->milliseconds();
+
+       if ( current->ownership.capturing == Team::BLU){
+           current->captureHits.hits++;
+           current->captureHits.last_hit_millis = clock->milliseconds();
+       }       
     } 
 }
 
 
+//assumes that captureHits is being updated
 void applyHitDecay(GameState* current, GameSettings settings, Clock* clock){
     long current_time_millis = clock->milliseconds();
     if ( settings.capture.capture_decay_rate_secs_per_hit > 0 ){
-        //assumption: we update the game pretty frequently
-
-        //TODO: factor, probably requires moving these various things into one structure
-        //organized by team
-        if(current->ownership.capturing == Team::RED){
-            long millis_since_last_decay = (current_time_millis - current->redHits.last_decay_millis);
+        if(current->ownership.capturing == Team::RED || current->ownership.capturing == Team::BLU ){
+            long millis_since_last_decay = (current_time_millis - current->captureHits.last_decay_millis);
             long decay_millis = settings.capture.capture_decay_rate_secs_per_hit*1000;
             if ( millis_since_last_decay > decay_millis){
-                if ( current->ownership.capture_hits > 0 ){
-                    current->ownership.capture_hits -= 1;
-                    current->redHits.last_decay_millis = current_time_millis;
+                if ( current->captureHits.hits > 0 ){
+                    current->captureHits.hits -= 1;
+                    current->captureHits.last_decay_millis = current_time_millis;
                 }
             }
         }
-
-
     }
 }
 //updates timeExpired based on game state. 
@@ -353,21 +361,43 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings){
 
 
     */     
-    /*
+    
     long ownership_time_to_win_millis = 1000*settings.timed.ownership_time_seconds;
+    bool blue_time_complete = (current->ownership.blu_millis > ownership_time_to_win_millis);
+    bool red_time_complete = (current->ownership.red_millis > ownership_time_to_win_millis);
 
-    if ( current->ownership.owner == Team::RED){
-        current->ownership.
+    bool isContested  = ( current->ownership.overtime_remaining_millis > 0 );
+
+    if ( blue_time_complete ){
+        if ( current->ownership.owner == Team::BLU){
+            endGame(current,Team::BLU);
+        }
+        else{
+            
+        }
+        if ( isContested ){
+            current->status = GameStatus::GAME_STATUS_OVERTIME;
+        }
+        else{
+            endGame(current,Team::BLU);
+        }
     }
-    if ( current->ownership.blu_millis > ownership_time_to_win_millis){
+    else if ( red_time_complete ){
+        if ( isContested ){
+            current->status = GameStatus::GAME_STATUS_OVERTIME;
+        }
+        else{
+            endGame(current,Team::RED);
+        }
+    }
         if ( current->ownership.capturing == Team::RED ){
 
         }
     }
     else if (current->ownership.blu_millis > ownership_time_to_win_millis){
 
-    } */
-    endGame(current, Team::NOBODY);
+    }
+    
 }
 
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings){
@@ -378,6 +408,7 @@ void updateGame(GameState* current, SensorState sensors, GameSettings settings, 
    
     updateGameTime(current, settings, clock);
     updateGameHits(current,sensors,clock);
+    applyHitDecay(current, settings,clock)
 
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
         updateFirstToHitsGame(current,settings);

@@ -103,6 +103,7 @@ typedef struct {
     Team capturing = Team::NOBODY;
     int capture_hits = 0;
     Team owner = Team::NOBODY;
+    long overtime_remaining_millis = 0;
 } Ownership;
 
 typedef struct {
