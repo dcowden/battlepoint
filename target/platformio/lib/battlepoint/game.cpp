@@ -326,7 +326,15 @@ void updateOwnership(GameState* current,  GameSettings settings, long current_ti
     if ( current->ownership.owner== Team::BLU){
         current->ownership.blu_millis += elapsed_since_last_update;
     }
-
+    Log.info("Checking for Capture, %d/%d to capture.",current->ownership.capture_hits,settings.capture.hits_to_capture);
+    if ( current->ownership.capture_hits >= settings.capture.hits_to_capture ){
+        if ( current->ownership.owner != Team::NOBODY){
+            current->ownership.overtime_remaining_millis = settings.capture.capture_overtime_seconds;
+        }
+        current->ownership.owner = current->ownership.capturing;
+        current->ownership.capturing = Team::NOBODY;        
+        current->ownership.capture_hits = 0;
+    }
 
 }
 
