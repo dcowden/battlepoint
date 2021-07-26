@@ -2,6 +2,7 @@
 #include <unity.h>
 #include <game.h>
 #include <ArduinoLog.h>
+#define DEFAULT_UPDATE_TIME 1000
 
 GameState state;
 GameSettings settings;
@@ -19,7 +20,7 @@ void test_in_progress_no_capture_yet(){
     state.ownership.capture_hits=3;
     state.time.timeExpired=false;
     state.time.overtimeExpired=false;
-    updateFirstToOwnTimeGame(&state,settings);
+    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
     TEST_ASSERT_EQUAL( state.status, GameStatus::GAME_STATUS_RUNNING);    
 }
 
@@ -31,7 +32,7 @@ void test_in_progress_one_team_has_some_time(){
     state.ownership.capture_hits=0;
     state.time.timeExpired=false;
     state.time.overtimeExpired=false;
-    updateFirstToOwnTimeGame(&state,settings);
+    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
     TEST_ASSERT_EQUAL( state.status, GameStatus::GAME_STATUS_RUNNING);    
 }
 
@@ -43,7 +44,7 @@ void test_clear_victory(){
     state.ownership.capture_hits=0;
     state.time.timeExpired=false;
     state.time.overtimeExpired=false;
-    updateFirstToOwnTimeGame(&state,settings);
+    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
     assertEndedWithWinner( Team::RED);    
 }
 
@@ -55,7 +56,7 @@ void test_capture_overtime_time_is_not_up(){
     state.ownership.capture_hits=4;
     state.time.timeExpired=false;
     state.time.overtimeExpired=false;
-    updateFirstToOwnTimeGame(&state,settings);
+    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
     TEST_ASSERT_EQUAL( state.status, GameStatus::GAME_STATUS_OVERTIME);  
 }
 
@@ -67,7 +68,7 @@ void test_overtime_time_is_up(){
     state.ownership.capture_hits=4;
     state.time.timeExpired=true;
     state.time.overtimeExpired=false;
-    updateFirstToOwnTimeGame(&state,settings);
+    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
     TEST_ASSERT_EQUAL( state.status, GameStatus::GAME_STATUS_OVERTIME);  
 }
 
@@ -79,7 +80,7 @@ void test_time_is_up_nbody_capturing(){
     state.ownership.capture_hits=0;
     state.time.timeExpired=true;
     state.time.overtimeExpired=false;
-    updateFirstToOwnTimeGame(&state,settings);
+    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
     assertEndedWithWinner( Team::RED);   
 }
 
@@ -91,7 +92,7 @@ void test_time_is_up_overtime_is_up_too_capturing(){
     state.ownership.capture_hits=0;
     state.time.timeExpired=true;
     state.time.overtimeExpired=true;
-    updateFirstToOwnTimeGame(&state,settings);
+    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
     assertEndedWithWinner( Team::RED);   
 }
 

@@ -190,6 +190,17 @@ void endGameWithMostHits(GameState* current, int red_hits, int blu_hits ){
         endGame(current, Team::TIE);
     }    
 }
+void endGameWithMostOwnership(GameState* current){
+    if ( current->ownership.blu_millis > current->ownership.red_millis){
+        endGame(current, Team::BLU);
+    }
+    else if (current->ownership.blu_millis > current->ownership.red_millis ){
+        endGame(current, Team::RED);
+    }
+    else{
+        endGameWithMostHits(current,current->redHits.hits,current->bluHits.hits);
+    }
+}
 
 void updateFirstToHitsGame(GameState* current,  GameSettings settings){
 
@@ -344,7 +355,7 @@ void updateOwnership(GameState* current,  GameSettings settings, long current_ti
 
 }
 
-void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, Clock* clock){
+void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long current_time_millis){
     /*
         VICTORY
         Capturing the point requires a given number of hits.
@@ -371,24 +382,37 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, Clock*
 
         if the game lasts as long as the maximum overtime limit, then the game ends immediately:
             the team with the most ownership wins
-            if that's tied, the team capturing wins
-            if nobody has ownership or capture progress, the game ends in a TIE
+            if that's tied, the team with most hits wins
+            if hit counts are tied too, the game ends in a TIE
 
 
     */     
     //run for all us already:
     //updateGameTime()
     //updateGameHits()
-    applyHitDecay(current, settings,clock->milliseconds());
-    updateOwnership(current,settings,clock->milliseconds());
+    applyHitDecay(current, settings,current_time_millis);
+    updateOwnership(current,settings,current_time_millis);
 
     long ownership_time_to_win_millis = 1000*settings.timed.ownership_time_seconds;
     bool blue_time_complete = (current->ownership.blu_millis > ownership_time_to_win_millis);
     bool red_time_complete = (current->ownership.red_millis > ownership_time_to_win_millis);
 
     bool isContested  = ( current->ownership.overtime_remaining_millis > 0 );
+    bool isTimeExpired = current->time.timeExpired;
+    bool isOverTimeExpired = current->time.overtimeExpired;
 
-    if ( blue_time_complete ){
+    if ( isOverTimeExpired ){
+        endGameWithMostOwnership(current);
+    }
+    else if ( isTimeExpired ){
+        if ( isContested){
+            current->status = GameStatus::GAME_STATUS_OVERTIME;
+        }
+        else{
+            endGameWithMostOwnership(current);
+        }
+    }
+    else if ( blue_time_complete ){
         if ( isContested ){
             current->status = GameStatus::GAME_STATUS_OVERTIME;
         }
@@ -404,10 +428,12 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, Clock*
             endGame(current,Team::RED);
         }
     }
-    
+    else {
+        current->status = GameStatus::GAME_STATUS_RUNNING;
+    }       
 }
 
-void updateMostOwnInTimeGame(GameState* current,  GameSettings settings,Clock* clock){
+void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis){
     endGame(current, Team::NOBODY);
 }
 
@@ -423,13 +449,13 @@ void updateGame(GameState* current, SensorState sensors, GameSettings settings, 
         updateMostHitsInTimeGame(current,settings);
     }
     else if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_OWN_TIME){
-        updateFirstToOwnTimeGame(current,settings,clock);
+        updateFirstToOwnTimeGame(current,settings,clock->milliseconds());
     }
     else if ( settings.gameType == GameType::GAME_TYPE_ATTACK_DEFEND){
         updateAttackDefendGame(current,settings);
     }
     else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_OWN_IN_TIME){
-        updateMostOwnInTimeGame(current,settings,clock);
+        updateMostOwnInTimeGame(current,settings,clock->milliseconds());
     }
     else{
         Log.errorln("Unknown Game Type: %d", settings.gameType);

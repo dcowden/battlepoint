@@ -129,9 +129,9 @@ void applyHitDecay(GameState* current, GameSettings settings, long current_time_
 void updateGameHits(GameState* current, SensorState sensors, long current_time_millis);
 void updateFirstToHitsGame(GameState* current,  GameSettings settings);
 void updateMostHitsInTimeGame(GameState* current,  GameSettings settings);
-void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings);
+void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateAttackDefendGame(GameState* current,  GameSettings settings);
-void updateMostOwnInTimeGame(GameState* current,  GameSettings settings);
+void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateGame(GameState* game, SensorState sensors, GameSettings settings, Clock* clock);
 
 
