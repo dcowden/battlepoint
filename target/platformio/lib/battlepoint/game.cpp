@@ -314,6 +314,14 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings){
         current->status = GameStatus::GAME_STATUS_RUNNING;
     }   
 }
+void triggerOvertime(GameState* current,  GameSettings settings){
+    current->ownership.overtime_remaining_millis = settings.capture.capture_overtime_seconds;
+}
+void capture(GameState* current,  GameSettings settings){
+    current->ownership.owner = current->ownership.capturing;
+    current->ownership.capturing = Team::NOBODY;        
+    current->ownership.capture_hits = 0;
+}
 
 void updateOwnership(GameState* current,  GameSettings settings, long current_time_millis){
 
@@ -329,11 +337,9 @@ void updateOwnership(GameState* current,  GameSettings settings, long current_ti
     Log.info("Checking for Capture, %d/%d to capture.",current->ownership.capture_hits,settings.capture.hits_to_capture);
     if ( current->ownership.capture_hits >= settings.capture.hits_to_capture ){
         if ( current->ownership.owner != Team::NOBODY){
-            current->ownership.overtime_remaining_millis = settings.capture.capture_overtime_seconds;
+            triggerOvertime(current,settings);
         }
-        current->ownership.owner = current->ownership.capturing;
-        current->ownership.capturing = Team::NOBODY;        
-        current->ownership.capture_hits = 0;
+        capture(current,settings);
     }
 
 }
@@ -397,12 +403,6 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, Clock*
         else{
             endGame(current,Team::RED);
         }
-    }
-        if ( current->ownership.capturing == Team::RED ){
-            //
-        }
-    else if (current->ownership.blu_millis > ownership_time_to_win_millis){
-        //
     }
     
 }

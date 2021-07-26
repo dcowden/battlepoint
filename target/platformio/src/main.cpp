@@ -173,7 +173,6 @@ MENU(ozSubMenu, "OwnZone", loadOwnZoneSettings, Menu::enterEvent, Menu::wrapStyl
     ,FIELD(gameSettings.capture.capture_cooldown_seconds,"Capture Cooldown","s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
     ,FIELD(gameSettings.capture.capture_decay_rate_secs_per_hit,"Capture Decay","/s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.capture.hits_to_capture,"HitsToCapture","",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.capture.capture_offense_to_defense_ratio,"DefenseOffenseRatio","",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.timed.ownership_time_seconds,"OwnTimeToWin","s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
     ,OP("Start",startOwnZoneGame, Menu::enterEvent)
