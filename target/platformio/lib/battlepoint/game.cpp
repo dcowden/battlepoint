@@ -194,7 +194,7 @@ void endGameWithMostOwnership(GameState* current){
     if ( current->ownership.blu_millis > current->ownership.red_millis){
         endGame(current, Team::BLU);
     }
-    else if (current->ownership.blu_millis > current->ownership.red_millis ){
+    else if (current->ownership.red_millis > current->ownership.blu_millis ){
         endGame(current, Team::RED);
     }
     else{
@@ -326,10 +326,13 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings){
     }   
 }
 void triggerOvertime(GameState* current,  GameSettings settings){
+    Log.infoln("Overtime Triggered!");
     current->ownership.overtime_remaining_millis = settings.capture.capture_overtime_seconds;
 }
 void capture(GameState* current,  GameSettings settings){
+    
     current->ownership.owner = current->ownership.capturing;
+    Log.infoln("Control Point has been captured by: %c", teamTextChar(current->ownership.capturing));
     current->ownership.capturing = Team::NOBODY;        
     current->ownership.capture_hits = 0;
 }
@@ -345,7 +348,7 @@ void updateOwnership(GameState* current,  GameSettings settings, long current_ti
     if ( current->ownership.owner== Team::BLU){
         current->ownership.blu_millis += elapsed_since_last_update;
     }
-    Log.info("Checking for Capture, %d/%d to capture.",current->ownership.capture_hits,settings.capture.hits_to_capture);
+    Log.infoln("Checking for Capture, %d/%d to capture.",current->ownership.capture_hits,settings.capture.hits_to_capture);
     if ( current->ownership.capture_hits >= settings.capture.hits_to_capture ){
         if ( current->ownership.owner != Team::NOBODY){
             triggerOvertime(current,settings);
@@ -402,33 +405,41 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
     bool isOverTimeExpired = current->time.overtimeExpired;
 
     if ( isOverTimeExpired ){
+        Log.infoln("Max Overtime Expired. Forcing Game End");
         endGameWithMostOwnership(current);
     }
     else if ( isTimeExpired ){
         if ( isContested){
+            Log.infoln("Time is expired, but point is still contested.");
             current->status = GameStatus::GAME_STATUS_OVERTIME;
         }
         else{
+            Log.infoln("Time is expired, ending with most ownership");
             endGameWithMostOwnership(current);
         }
     }
     else if ( blue_time_complete ){
         if ( isContested ){
+            Log.infoln("Blue is about to win, but we are in overtime");
             current->status = GameStatus::GAME_STATUS_OVERTIME;
         }
         else{
+            Log.infoln("Blue wins");
             endGame(current,Team::BLU);
         }
     }
     else if ( red_time_complete ){
         if ( isContested ){
+            Log.infoln("Red is about to win, but we are in overtime");
             current->status = GameStatus::GAME_STATUS_OVERTIME;
         }
         else{
+            Log.infoln("Red wins");
             endGame(current,Team::RED);
         }
     }
     else {
+        Log.infoln("nothing interesting going on.");
         current->status = GameStatus::GAME_STATUS_RUNNING;
     }       
 }
