@@ -5,7 +5,7 @@
 #include <LedMeter.h>
 #include <target.h>
 #define BP_CURRENT_SETTINGS_VERSION 203
-
+#define STANDARD_METER_MAX_VAL 10
 //important: keep settings separate from 
 //status, so that settings can be saved in eeprom
 
@@ -84,6 +84,7 @@ typedef struct {
     long last_update_millis=0;
     bool timeExpired = false;
     bool overtimeExpired = false;
+    int elapsed_secs = 0;
 } GameTime;
 
 typedef struct {

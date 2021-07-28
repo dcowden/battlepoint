@@ -6,6 +6,7 @@
 #include <LedMeter.h>
 #include <ArduinoLog.h>
 
+
 GameSettings DEFAULT_GAMESETTINGS(){
     GameSettings gs;
     gs.BP_VERSION = BP_CURRENT_SETTINGS_VERSION;
@@ -91,12 +92,12 @@ GameState startGame(GameSettings settings, Clock* clock){
     gs.meters = base_meter_settings();
 
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
-        configureMeter(&gs.meters.center.meter, DEFAULT_MAX_VAL, 0, CRGB::Black, CRGB::Black);   //NOT USED in this mode
+        configureMeter(&gs.meters.center.meter, STANDARD_METER_MAX_VAL, 0, CRGB::Black, CRGB::Black);   //NOT USED in this mode
         configureMeter(&gs.meters.left.meter, settings.hits.to_win, 0, CRGB::Blue, CRGB::Black); //hits scored for blue , count from zero to total required to win
         configureMeter(&gs.meters.right.meter, settings.hits.to_win, 0, CRGB::Red, CRGB::Black); //hits scored for red , count from zero to total required to win
     }
     else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME ){
-        configureMeter(&gs.meters.center.meter, DEFAULT_MAX_VAL, 0, CRGB::Red, CRGB::Blue);                          // ratio of red to total hits.  max_val gets changed once there are non-zero total hits
+        configureMeter(&gs.meters.center.meter, STANDARD_METER_MAX_VAL, 0, CRGB::Red, CRGB::Blue);                          // ratio of red to total hits.  max_val gets changed once there are non-zero total hits
         configureMeter(&gs.meters.left.meter, settings.timed.max_duration_seconds, 0, CRGB::Blue, CRGB::Black);      // game progress, count from zero to total game duration
         configureMeter(&gs.meters.right.meter, settings.timed.max_duration_seconds, 0, CRGB::Red, CRGB::Black);      // game progress, count from zero to total game duration
     }
@@ -131,7 +132,7 @@ void updateGameHits(GameState* current, SensorState sensors, long current_time_m
 }
 
 
-//assumes that captureHits is being updated
+//assumes that captureHits is being updated first
 void applyHitDecay(GameState* current, GameSettings settings, long current_time_millis){
     if ( settings.capture.capture_decay_rate_secs_per_hit > 0 ){
         Log.traceln("Time= %d, Decay Rate Does apply",current_time_millis);
@@ -169,6 +170,7 @@ void updateGameTime(GameState* current,GameSettings settings, long current_time_
             isOvertimeExpired = true;
         }
     }
+    current->time.elapsed_secs = elapsed_since_start / 1000;
     current->time.timeExpired = isExpired;
     current->time.overtimeExpired = isOvertimeExpired;
     
@@ -202,6 +204,62 @@ void endGameWithMostOwnership(GameState* current){
     }
 }
 
+Team getWinnerByHitsWithVictoryMargin(int red_hits, int blu_hits, int hits_to_win, int victory_margin){
+    bool redWins = (red_hits >= hits_to_win ) && (red_hits >= (blu_hits + victory_margin));
+    bool bluWins = (blu_hits >= hits_to_win ) && (blu_hits >= (red_hits + victory_margin));
+    if ( redWins){
+        return Team::RED;
+    }    
+    else if ( bluWins){
+        return Team::BLU;
+    }
+    else{
+        return Team::NOBODY;
+    }
+}
+Team getWinnerByHitsWithoutVictoryMargin(int red_hits, int blu_hits, int hits_to_win){
+    if ( red_hits >= hits_to_win){
+        return Team::RED;
+    }
+    else if ( blu_hits >= hits_to_win){
+        return Team::BLU;
+    }
+    else{
+        return Team::NOBODY;
+    }
+}
+
+void setFlashMeterForTeam(Team t, GameState* current, FlashInterval fi ){
+    if ( t == Team::RED ){
+        current->meters.leftBottom.meter.flash_interval_millis = fi;
+        current->meters.leftTop.meter.flash_interval_millis = fi;        
+    }
+    else  if ( t == Team::BLU ){
+        current->meters.rightBottom.meter.flash_interval_millis = fi;
+        current->meters.rightTop.meter.flash_interval_millis = fi;        
+    }
+    else{
+        Log.warningln("Ignored updating flash on meters for invalid team.");
+    }
+}
+
+void updateMeter (LedMeter* meter, int val, int max_val, CRGB fgColor, CRGB bgColor ){
+    meter->val = val;
+    meter->max_val = max_val;
+    meter->fgColor = fgColor;
+    meter->bgColor = bgColor;
+}
+void standardTeamMeters(GameState* current, bool on, FlashInterval flashing){
+    int meter_val = 0;
+    if ( on ){
+        meter_val = STANDARD_METER_MAX_VAL;
+    }
+    updateMeter( &current->meters.leftTop.meter, meter_val, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
+    updateMeter( &current->meters.leftBottom.meter, meter_val, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
+    updateMeter( &current->meters.rightTop.meter, meter_val, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+    updateMeter( &current->meters.rightBottom.meter, meter_val, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+}
+
 void updateFirstToHitsGame(GameState* current,  GameSettings settings){
 
     /*
@@ -219,37 +277,47 @@ void updateFirstToHitsGame(GameState* current,  GameSettings settings){
 
         
         If the teams are tied after the overtime period, the game ends in a tie
+
+        METERS          val                 max-val                     fgColor     bgColor
+        --------------------------------------------------------------------------------------
+        left            red_hits            hits to win                 red         black   
+        left-top        10,flashing in OT   10                          red         black
+        left-bottom     10,flashing in OT   10                          red         black
+        center          0(OFF)              10                          black       black
+        right-top       10,flashing in OT   10                          blue        black
+        right           blu_hits            hits to win                 blue        black
+        right-bottom    10,flashing in OT   10                          blue        black
         
     */
     int red_hits = current->redHits.hits;
     int blu_hits = current->bluHits.hits;
     Log.traceln("RedHits=%d, BluHits=%d",red_hits,blu_hits);
 
-    //TODO: update meters all in one place?        
-    current->meters.left.meter.val = blu_hits;
-    current->meters.right.meter.val = red_hits;
+    //update meters
+    standardTeamMeters(current,true, FlashInterval::FLASH_NONE);    
+    updateMeter( &current->meters.left.meter, red_hits, settings.hits.to_win, CRGB::Red, CRGB::Black );
+    updateMeter( &current->meters.right.meter, blu_hits, settings.hits.to_win, CRGB::Blue, CRGB::Black );
 
-    //TODO: how to factor out this threshold code? 
-    if ( (blu_hits >= settings.hits.to_win ) && (blu_hits >= (red_hits + settings.hits.victory_margin)  )  ){
-        endGame(current, Team::BLU);
-    }else if ( (red_hits >= settings.hits.to_win ) && (red_hits >= (blu_hits + settings.hits.victory_margin)  )  ){
-        endGame(current, Team::RED);
-    }else if ( (red_hits >= settings.hits.to_win) || (red_hits  >= settings.hits.to_win) ){                
-        //in this game you're in overtime if time is expired OR 
-        //one team has reached the target but has not exceeded victory margin
-        if ( current->time.overtimeExpired ){
-            endGameWithMostHits(current,red_hits, blu_hits);
-        }
-        else{
-            current->status = GameStatus::GAME_STATUS_OVERTIME;
-        }
+    Team winner = getWinnerByHitsWithVictoryMargin(red_hits, blu_hits, settings.hits.to_win, settings.hits.victory_margin );
+    Team closeToWinner = getWinnerByHitsWithoutVictoryMargin(red_hits,blu_hits,settings.hits.to_win);
+
+    if ( winner != Team::NOBODY){
+        endGame(current, winner);
+    }
+    else if ( current->time.overtimeExpired  ){ 
+        endGameWithMostHits(current,red_hits, blu_hits);
+    }
+    else if ( closeToWinner != Team::NOBODY){
+        current->status = GameStatus::GAME_STATUS_OVERTIME;
+        setFlashMeterForTeam(closeToWinner, current,FlashInterval::FLASH_FAST);
     }
     else{
         current->status = GameStatus::GAME_STATUS_RUNNING;    
     }
-    
 
 }
+
+
 
 void updateMostHitsInTimeGame(GameState* current,  GameSettings settings){
     /*
@@ -263,24 +331,39 @@ void updateMostHitsInTimeGame(GameState* current,  GameSettings settings){
         TIMEOUT
         If time up, but neither team is ahead by the victory margin, overtime
         If the teams are tied after overtime, the result is a TIE
+
+        METERS          val                 max-val                     fgColor     bgColor
+        ----------------------------------------------------------------------------------------
+        left            elapsed_secs        game_duration_seconds       red         black   
+        left-top        10,flashing in OT   10                          red         black
+        left-bottom     10,flashing in OT   10                          red         black
+        center          red_hits            red_hits + blu_hits         red         blue           ( black/black when no hits yet)
+        right-top       10,flashing in OT   10                          blue        black
+        right           elapsed_secs        game_duration_seconds       blue        black
+        right-bottom    10,flashing in OT   10                          blue        black
+
         
     */
     int red_hits = current->redHits.hits;
     int blu_hits = current->bluHits.hits;
+    int total_hits = red_hits + blu_hits;
+    int elapsed_secs = current->time.elapsed_secs;
+    int game_durations_secs = settings.timed.max_duration_seconds;
 
-    //TODO: update meters all in one place?        
-    current->meters.left.meter.val = blu_hits;
-    current->meters.right.meter.val = red_hits;
+    Team winner = getWinnerByHitsWithVictoryMargin(red_hits, blu_hits, settings.hits.to_win, settings.hits.victory_margin );
+    Team closeToWinner = getWinnerByHitsWithoutVictoryMargin(red_hits,blu_hits,settings.hits.to_win);
+
     if ( current->time.overtimeExpired ){
         endGameWithMostHits(current,red_hits, blu_hits);
     }
     else if ( current->time.timeExpired ){
-        //TODO: how to factor out this threshold code? 
-        if ( (blu_hits >= settings.hits.to_win ) && (blu_hits >= (red_hits + settings.hits.victory_margin)  )  ){
-            endGame(current, Team::BLU);
-        }else if ( (red_hits >= settings.hits.to_win ) && (red_hits >= (blu_hits + settings.hits.victory_margin)  )  ){
-            endGame(current, Team::RED);
+        if ( winner != Team::NOBODY){
+            endGame(current, winner);
         }
+        else if ( closeToWinner != Team::NOBODY){
+            current->status = GameStatus::GAME_STATUS_OVERTIME;
+            setFlashMeterForTeam(closeToWinner, current,FlashInterval::FLASH_FAST);
+        }        
         else{
             current->status = GameStatus::GAME_STATUS_OVERTIME;    
         }
@@ -289,6 +372,21 @@ void updateMostHitsInTimeGame(GameState* current,  GameSettings settings){
         current->status = GameStatus::GAME_STATUS_RUNNING;
     }
 
+    //update meters
+    standardTeamMeters(current,true,FlashInterval::FLASH_NONE);
+    updateMeter( &current->meters.left.meter, elapsed_secs, game_durations_secs, CRGB::Red, CRGB::Black );
+    updateMeter( &current->meters.right.meter, elapsed_secs, game_durations_secs, CRGB::Blue, CRGB::Black );
+
+    if ( total_hits  > 0 ){
+        updateMeter(&current->meters.center.meter, red_hits, total_hits, CRGB::Red, CRGB::Blue);
+    }
+    else{
+        updateMeter(&current->meters.center.meter, red_hits, total_hits, CRGB::Red, CRGB::Blue);
+        current->meters.center.meter.max_val = 1;
+        current->meters.center.meter.val = 0;
+        current->meters.center.meter.bgColor = CRGB::Black;
+        current->meters.center.meter.fgColor = CRGB::Black;        
+    }
 }
 
 void updateAttackDefendGame(GameState* current,  GameSettings settings){
@@ -304,17 +402,29 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings){
         Overtime is triggered if time is expired, but the attacking team
          is within victory margin of getting the desired number of hits.
         If time and overtime expires, the defending team (red) wins 
+
+        METERS          val                 max-val             fgColor     bgColor
+        ----------------------------------------------------------------------------
+        left            blue_hits           hits_to_capture     blue         black
+        left-top        10,flashing in OT   10                  blue         black
+        left-bottom     10,flashing in OT   10                  blue         black
+        center          blue_hits           hits_to_capture     blue         black
+        right-top       10,flashing in OT   10                  blue         black
+        right           blue_hits           hits_to_capture     blue         black
+        right-bottom    10,flashing in OT   10                  blue         black
+
     */    
     int blu_hits = current->bluHits.hits;
+    int hits_to_capture = settings.capture.hits_to_capture;
 
-    if ( blu_hits >= settings.capture.hits_to_capture){
+    if ( blu_hits >= hits_to_capture){
         endGame(current, Team::BLU);
     }
     else if ( current->time.overtimeExpired){
         endGame(current, Team::RED);
     }
     else if ( current->time.timeExpired ){
-        if ( blu_hits >= (settings.capture.hits_to_capture - settings.hits.victory_margin)){
+        if ( blu_hits >= (hits_to_capture - settings.hits.victory_margin)){
              current->status = GameStatus::GAME_STATUS_OVERTIME;
         }
         else{
@@ -324,6 +434,16 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings){
     else {
         current->status = GameStatus::GAME_STATUS_RUNNING;
     }   
+
+    //update meters. can't use standard meters since all are blue for AD
+    updateMeter( &current->meters.leftTop.meter, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+    updateMeter( &current->meters.leftBottom.meter, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+    updateMeter( &current->meters.rightTop.meter, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+    updateMeter( &current->meters.rightBottom.meter, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+    updateMeter( &current->meters.right.meter, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
+    updateMeter( &current->meters.left.meter, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
+    updateMeter( &current->meters.center.meter, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
+
 }
 void triggerOvertime(GameState* current,  GameSettings settings){
     Log.infoln("Overtime Triggered!");
@@ -388,11 +508,19 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
             if that's tied, the team with most hits wins
             if hit counts are tied too, the game ends in a TIE
 
+        METERS          val                 max-val             fgColor     bgColor
+        ----------------------------------------------------------------------------
+        left            red_own_time        own_time_to_win     red         black
+        left-top        10,flashing in OT   10                  red         black
+        left-bottom     10,flashing in OT   10                  red         black
+        center          capture_hits        hits_to_capture     capturing   owner(black if no owner)
+        right-top       10,flashing in OT   10                  blue         black
+        right           blu_own_time        own_time_to_win     blue         black
+        right-bottom    10,flashing in OT   10                  blue         black
+
 
     */     
-    //run for all us already:
-    //updateGameTime()
-    //updateGameHits()
+
     applyHitDecay(current, settings,current_time_millis);
     updateOwnership(current,settings,current_time_millis);
 
@@ -441,7 +569,24 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
     else {
         Log.infoln("nothing interesting going on.");
         current->status = GameStatus::GAME_STATUS_RUNNING;
-    }       
+    }   
+
+    //update meters
+    int secs_to_win = settings.timed.ownership_time_seconds;
+    int red_own_secs = current->ownership.red_millis/1000;
+    int blue_own_secs = current->ownership.blu_millis/1000;
+
+    standardTeamMeters(current,true,FlashInterval::FLASH_NONE);
+    updateMeter( &current->meters.left.meter, red_own_secs, secs_to_win, CRGB::Red, CRGB::Black );
+    updateMeter( &current->meters.right.meter, blue_own_secs, secs_to_win, CRGB::Blue, CRGB::Black ); 
+
+    //the center meter is the capture meter
+    CRGB captureMeterBackgroundColor;
+    CRGB captureMeterForegroundColor;
+    captureMeterForegroundColor = getTeamColor(current->ownership.capturing);
+    captureMeterBackgroundColor = getTeamColor(current->ownership.owner);
+    
+    updateMeter( &current->meters.center.meter, blue_own_secs, secs_to_win, captureMeterForegroundColor, captureMeterBackgroundColor );       
 }
 
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis){
