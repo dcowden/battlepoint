@@ -57,6 +57,7 @@ const char* getCharForGameType(GameType t){
     }
 }
 
+/**
 void updateLeds(GameState* current, long current_time_millis ){
   MeterSettings ms = current->meters;
   updateController(leftLeds, ms.left, current_time_millis);
@@ -66,7 +67,7 @@ void updateLeds(GameState* current, long current_time_millis ){
   updateController(topLeds, ms.rightTop, current_time_millis);
   updateController(bottomLeds, ms.leftBottom, current_time_millis);
   updateController(bottomLeds, ms.rightBottom , current_time_millis);    
-}
+}**/
 
 MeterSettings base_meter_settings(){
 

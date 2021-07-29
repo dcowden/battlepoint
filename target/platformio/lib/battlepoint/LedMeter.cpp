@@ -43,14 +43,15 @@ bool isOn ( LedFlashState* state, long flash_interval_millis, long current_time_
 
 //blank is different than value=0: the background color for blank is always 
 //black (off)
-void blankLedMeter( CRGB* leds, LedMeter meter ){
+
+void blankLedMeter( LedMeter meter ){
   //note: use non pointer here so our changes do not take affect
   meter.fgColor = CRGB::Black;
   meter.bgColor = CRGB::Black;
-  updateLedMeter(leds, meter);
+  updateLedMeter(meter);
 }
 
-void updateLedMeter(CRGB* leds, LedMeter meter ){
+void updateLedMeter(LedMeter meter ){
 
   int indexIncrement =0;
   int total_lights = 0;
@@ -69,20 +70,20 @@ void updateLedMeter(CRGB* leds, LedMeter meter ){
 
   for(int i=0;i<total_lights;i++){
     if ( i < num_lights_on ){
-      leds[currentIndex] = meter.fgColor;
+      meter.leds[currentIndex] = meter.fgColor;
     }
     else{
-      leds[currentIndex] = meter.bgColor;
+      meter.leds[currentIndex] = meter.bgColor;
     }
     currentIndex += indexIncrement;
   }
 } 
 
-void updateController(CRGB* leds, LedController controller, long current_time_millis){
+void updateController(LedController controller, long current_time_millis){
    if ( isOn( &controller.flashState, controller.meter.flash_interval_millis, current_time_millis)){
-     updateLedMeter(leds, controller.meter);
+     updateLedMeter(controller.meter);
    }
    else{
-     blankLedMeter( leds, controller.meter);
+     blankLedMeter( controller.meter);
    }
 }

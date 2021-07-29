@@ -2,9 +2,11 @@
 #include <LedMeter.h>
 #include <unity.h>
 #include <FastLED.h>
-//#define BP_DEBUG 1
+#include <ArduinoLog.h>
 #define LED_COUNT 8
-CRGB leds[LED_COUNT];
+
+
+CRGB testLeds[LED_COUNT];
 
 CRGB ALL_BLUE[LED_COUNT] = {CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue,
                             CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue };
@@ -14,13 +16,14 @@ CRGB ALL_BLACK[LED_COUNT] = {CRGB::Black, CRGB::Black,CRGB::Black, CRGB::Black,
 
 void resetLEDS(){    
     for ( int i=0;i<LED_COUNT;i++){
-        leds[i] = CRGB::Black;
+        testLeds[i] = CRGB::Black;
     }
 }
 
 LedMeter simpleMeter { 
     .startIndex=0, 
     .endIndex=7, 
+    .leds = testLeds,    
     .max_val=100, 
     .val=0, 
     .flash_interval_millis=FlashInterval::FLASH_NONE, 
@@ -30,6 +33,7 @@ LedMeter simpleMeter {
 LedMeter reversedMeter { 
     .startIndex=7, 
     .endIndex=0, 
+    .leds = testLeds,     
     .max_val=100,
     .val=0,
     .flash_interval_millis=FlashInterval::FLASH_NONE, 
@@ -39,28 +43,30 @@ LedMeter reversedMeter {
 LedMeter subsetMeter { 
     .startIndex=0, 
     .endIndex=3, 
+    .leds = testLeds,     
     .max_val=100,
     .val=0, 
     .flash_interval_millis=FlashInterval::FLASH_NONE,      
     .fgColor=CRGB::Blue, 
     .bgColor=CRGB::Black }; //4 lights, first half
 
-void assert_leds_equal(CRGB* expected, int debug){
+void assert_leds_equal(CRGB* expected){
     for (int i=0;i<LED_COUNT;i++,expected++){
-        TEST_ASSERT_EQUAL(*expected,leds[i]);
+        //Serial.print("LED ");Serial.print(i);Serial.print(": ");Serial.print(*expected);Serial.print("--");Serial.println(testLeds[i]);
+        TEST_ASSERT_EQUAL(*expected,testLeds[i]);
     }
 }
 
 void meterAssertVal(LedMeter meter, int val, CRGB* expectedVals){
     resetLEDS();
     meter.val = val;
-    updateLedMeter(leds,meter);
-    assert_leds_equal(expectedVals,0);
+    updateLedMeter(meter);
+    assert_leds_equal(expectedVals);
 }
 
 void test_meter_initially_all_black(void) {
     resetLEDS();
-    assert_leds_equal(ALL_BLACK,0);
+    assert_leds_equal(ALL_BLACK);
 }
 
 void test_basic_meter_zero(void){
@@ -72,6 +78,7 @@ void test_basic_meter_max_value(void){
 }
 
 void test_basic_meter_mid_value(void){
+
     CRGB expected[LED_COUNT] = {CRGB::Blue, CRGB::Blue,CRGB::Blue,CRGB::Blue,
                                 CRGB::Black,CRGB::Black, CRGB::Black, CRGB::Black };
     meterAssertVal(simpleMeter,50,expected);
@@ -127,10 +134,13 @@ void test_subset_meter_mid_value(void){
     meterAssertVal(subsetMeter,50,expected);
 }
 
+
+//TODO: add tests for updateController
 void setup() {
     
     delay(1000);
     Serial.begin(115200);
+    Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
     UNITY_BEGIN();
 
     //simple meter tests
@@ -152,6 +162,7 @@ void setup() {
     RUN_TEST(test_subset_meter_min_value);
     RUN_TEST(test_subset_meter_max_value);
     RUN_TEST(test_subset_meter_mid_value);
+  
 
     UNITY_END();
 
