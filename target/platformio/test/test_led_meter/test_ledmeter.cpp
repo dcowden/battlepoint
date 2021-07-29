@@ -30,6 +30,16 @@ LedMeter simpleMeter {
     .fgColor=CRGB::Blue, 
     .bgColor=CRGB::Black };  //8 lights
 
+LedMeter oneForOneMeter { 
+    .startIndex=0, 
+    .endIndex=7, 
+    .leds = testLeds,    
+    .max_val=8, 
+    .val=0, 
+    .flash_interval_millis=FlashInterval::FLASH_NONE, 
+    .fgColor=CRGB::Blue, 
+    .bgColor=CRGB::Black };  //8 lights
+
 LedMeter reversedMeter { 
     .startIndex=7, 
     .endIndex=0, 
@@ -57,9 +67,9 @@ void assert_leds_equal(CRGB* expected){
     }
 }
 
-void meterAssertVal(LedMeter meter, int val, CRGB* expectedVals){
+void meterAssertVal(LedMeter* meter, int val, CRGB* expectedVals){
     resetLEDS();
-    meter.val = val;
+    meter->val = val;
     updateLedMeter(meter);
     assert_leds_equal(expectedVals);
 }
@@ -70,68 +80,74 @@ void test_meter_initially_all_black(void) {
 }
 
 void test_basic_meter_zero(void){
-    meterAssertVal(simpleMeter,0,ALL_BLACK);
+    meterAssertVal(&simpleMeter,0,ALL_BLACK);
 }
 
 void test_basic_meter_max_value(void){
-    meterAssertVal(simpleMeter,100,ALL_BLUE);
+    meterAssertVal(&simpleMeter,100,ALL_BLUE);
 }
 
 void test_basic_meter_mid_value(void){
 
     CRGB expected[LED_COUNT] = {CRGB::Blue, CRGB::Blue,CRGB::Blue,CRGB::Blue,
                                 CRGB::Black,CRGB::Black, CRGB::Black, CRGB::Black };
-    meterAssertVal(simpleMeter,50,expected);
+    meterAssertVal(&simpleMeter,50,expected);
 }
 
 void test_basic_meter_nearly_full_value_still_isnt_full(void){
     CRGB expected[LED_COUNT] = {CRGB::Blue, CRGB::Blue,CRGB::Blue, CRGB::Blue,
                                 CRGB::Blue,CRGB::Blue,CRGB::Blue, CRGB::Black };
-    meterAssertVal(simpleMeter,97,expected);
+    meterAssertVal(&simpleMeter,97,expected);
 }
 
 void test_basic_meter_tiny_value_still_isnt_lit(void){
-    meterAssertVal(simpleMeter,5,ALL_BLACK);
+    meterAssertVal(&simpleMeter,5,ALL_BLACK);
+}
+
+void test_one_for_one_meter(void){
+    CRGB expected[LED_COUNT] = {CRGB::Blue, CRGB::Black,CRGB::Black, CRGB::Black,
+                                CRGB::Black,CRGB::Black,CRGB::Black, CRGB::Black };
+    meterAssertVal(&oneForOneMeter,1,expected);    
 }
 
 void test_reversed_meter_zero(void){
-    meterAssertVal(reversedMeter,0,ALL_BLACK);   
+    meterAssertVal(&reversedMeter,0,ALL_BLACK);   
 }
 
 void test_reversed_meter_max_value(void){
-    meterAssertVal(reversedMeter,100,ALL_BLUE);
+    meterAssertVal(&reversedMeter,100,ALL_BLUE);
 }
 
 void test_reversed_meter_nearly_full_value_still_isnt_full(void){
     CRGB expected[LED_COUNT] = {CRGB::Black, CRGB::Blue,CRGB::Blue, CRGB::Blue,
                                 CRGB::Blue,CRGB::Blue,CRGB::Blue, CRGB::Blue };
-    meterAssertVal(reversedMeter,97,expected);
+    meterAssertVal(&reversedMeter,97,expected);
 }
 
 void test_reversed_meter_tiny_value_still_isnt_lit(void){
-    meterAssertVal(reversedMeter,5,ALL_BLACK);
+    meterAssertVal(&reversedMeter,5,ALL_BLACK);
 }
 
 void test_reversed_meter_mid_value(void){
     CRGB expected[LED_COUNT] = { CRGB::Black,CRGB::Black, CRGB::Black, CRGB::Black, 
                                 CRGB::Blue,CRGB::Blue,CRGB::Blue,CRGB::Blue };
-    meterAssertVal(reversedMeter,50,expected);
+    meterAssertVal(&reversedMeter,50,expected);
 }
 
 void test_subset_meter_min_value(void){  
-    meterAssertVal(subsetMeter,0,ALL_BLACK);
+    meterAssertVal(&subsetMeter,0,ALL_BLACK);
 }
 
 void test_subset_meter_max_value(void){
     CRGB expected[LED_COUNT] = { CRGB::Blue,CRGB::Blue, CRGB::Blue, CRGB::Blue, 
                                 CRGB::Black,CRGB::Black,CRGB::Black,CRGB::Black };    
-    meterAssertVal(subsetMeter,100,expected);
+    meterAssertVal(&subsetMeter,100,expected);
 }
 
 void test_subset_meter_mid_value(void){
     CRGB expected[LED_COUNT] = { CRGB::Blue,CRGB::Blue, CRGB::Black, CRGB::Black, 
                                 CRGB::Black,CRGB::Black,CRGB::Black,CRGB::Black };    
-    meterAssertVal(subsetMeter,50,expected);
+    meterAssertVal(&subsetMeter,50,expected);
 }
 
 
@@ -150,6 +166,9 @@ void setup() {
     RUN_TEST(test_basic_meter_mid_value);
     RUN_TEST(test_basic_meter_nearly_full_value_still_isnt_full);
     RUN_TEST(test_basic_meter_tiny_value_still_isnt_lit);
+
+    //one for one meter test
+    RUN_TEST(test_one_for_one_meter);
 
     //reversed meter tests    
     RUN_TEST(test_reversed_meter_zero);

@@ -45,46 +45,58 @@ bool isOn ( LedFlashState* state, long flash_interval_millis, long current_time_
 //blank is different than value=0: the background color for blank is always 
 //black (off)
 
-void blankLedMeter( LedMeter meter ){
+void blankLedMeter( LedMeter* meter ){
   //note: use non pointer here so our changes do not take affect
-  meter.fgColor = CRGB::Black;
-  meter.bgColor = CRGB::Black;
+  meter->fgColor = CRGB::Black;
+  meter->bgColor = CRGB::Black;
   updateLedMeter(meter);
 }
 
-void updateLedMeter(LedMeter meter ){
-
+void updateLedMeter(LedMeter* meter ){
+  
   int indexIncrement =0;
   int total_lights = 0;
-  if ( meter.startIndex < meter.endIndex ){
-    total_lights = meter.endIndex - meter.startIndex + 1;
+  int startIndex = meter->startIndex;
+  int endIndex = meter->endIndex;
+
+  //TODO annoying! after all this work trying NOT to go to OO, 
+  //the log framwork really pushes us to implemetning printable
+  //https://arduino.stackexchange.com/questions/53732/is-it-possible-to-print-a-custom-object-by-passing-it-to-serial-print
+  Log.traceln("Update Meter: %d/%d [%d:%d]",meter->val,meter->max_val,startIndex,endIndex );
+  //Serial.print(meter->val);Serial.print("/");Serial.print(meter->max_val);
+  //Serial.print(" [");Serial.print(startIndex);Serial.print(":");Serial.print(endIndex);Serial.print("]: ");
+
+  if ( startIndex < endIndex ){
+    total_lights = endIndex - startIndex + 1;
     indexIncrement = 1;    
   }
   else{
     //reversed
-    total_lights = meter.startIndex - meter.endIndex + 1;
+    total_lights = startIndex - endIndex + 1;
     indexIncrement = -1;
   }
 
-  int num_lights_on = proportionalValue( meter.val, meter.max_val, total_lights); 
-  int currentIndex = meter.startIndex;
+  int num_lights_on = proportionalValue( meter->val, meter->max_val, total_lights); 
+  int currentIndex = startIndex;
 
   for(int i=0;i<total_lights;i++){
     if ( i < num_lights_on ){
-      meter.leds[currentIndex] = meter.fgColor;
+      Serial.print("1");
+      meter->leds[currentIndex] = meter->fgColor;
     }
     else{
-      meter.leds[currentIndex] = meter.bgColor;
+      Serial.print("0");
+      meter->leds[currentIndex] = meter->bgColor;
     }
     currentIndex += indexIncrement;
   }
+  //Serial.println("");
 } 
-
 void updateController(LedController controller, long current_time_millis){
    if ( isOn( &controller.flashState, controller.meter.flash_interval_millis, current_time_millis)){
-     updateLedMeter(controller.meter);
+    updateLedMeter(&controller.meter);
    }
    else{
-     blankLedMeter( controller.meter);
+    blankLedMeter( &controller.meter);
    }
 }

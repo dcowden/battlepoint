@@ -60,12 +60,25 @@ const char* getCharForGameType(GameType t){
 
 void updateLeds(GameState* current, long current_time_millis ){
   MeterSettings ms = current->meters;
+  Serial.print("Left ");
   updateController( ms.left, current_time_millis);
+
+  Serial.print("Center ");
   updateController( ms.center, current_time_millis);
+
+  Serial.print("Right ");
   updateController( ms.right, current_time_millis);
+
+  Serial.print("leftTop ");
   updateController( ms.leftTop, current_time_millis);
+
+  Serial.print("rightTop ");
   updateController( ms.rightTop, current_time_millis);
+
+  Serial.print("leftBottom ");
   updateController( ms.leftBottom, current_time_millis);
+
+  Serial.print("rightBottom ");
   updateController( ms.rightBottom , current_time_millis);    
 }
 
@@ -117,12 +130,12 @@ GameState startGame(GameSettings settings, Clock* clock, MeterSettings base_mete
 
 //TODO: refactor, it's nearly all duplicated!
 void updateGameHits(GameState* current, SensorState sensors, long current_time_millis){
-    if ( sensors.rightScan.was_hit ){
+    if ( sensors.leftScan.was_hit ){
        current->redHits.hits++;
        current->redHits.last_hit_millis = current_time_millis;
     } 
 
-    if ( sensors.leftScan.was_hit ){
+    if ( sensors.rightScan.was_hit ){
        current->bluHits.hits++;
        current->bluHits.last_hit_millis = current_time_millis;    
     } 
@@ -241,6 +254,7 @@ void setFlashMeterForTeam(Team t, GameState* current, FlashInterval fi ){
 }
 
 void updateMeter (LedMeter* meter, int val, int max_val, CRGB fgColor, CRGB bgColor ){
+    Log.traceln("Updating Meter, %d/%d", val, max_val);
     meter->val = val;
     meter->max_val = max_val;
     meter->fgColor = fgColor;
