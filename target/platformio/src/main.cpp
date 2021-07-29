@@ -229,9 +229,22 @@ MENU_OUTPUTS(out,MENU_MAX_DEPTH
 
 NAVROOT(nav,mainMenu,MENU_MAX_DEPTH,thingy_buttons,out);
 
+
+MeterSettings get_base_meters(){
+    MeterSettings s;        
+    initMeter(&s.leftTop.meter,0,9);
+    initMeter(&s.leftBottom.meter,0,9);
+    initMeter(&s.rightTop.meter,10,19);
+    initMeter(&s.rightBottom.meter,10,19);
+    initMeter(&s.center.meter,0,15);
+    initMeter(&s.left.meter,0,15);
+    initMeter(&s.right.meter,0,15);
+    return s;
+}
+
 void startGame(){  
   Log.noticeln("Starting Game. Type= %d", gameSettings.gameType);
-  gameState = startGame(gameSettings, &gameClock);
+  gameState = startGame(gameSettings, &gameClock,get_base_meters());
   oled.clear();
   nav.idleOn();
 }

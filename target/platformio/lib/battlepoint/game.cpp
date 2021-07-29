@@ -57,6 +57,17 @@ const char* getCharForGameType(GameType t){
     }
 }
 
+void updateLeds(GameState* current, long current_time_millis ){
+  MeterSettings ms = current->meters;
+  updateController(leftLeds, ms.left, current_time_millis);
+  updateController(centerLeds, ms.center, current_time_millis);
+  updateController(rightLeds, ms.right, current_time_millis);
+  updateController(topLeds, ms.leftTop, current_time_millis);
+  updateController(topLeds, ms.rightTop, current_time_millis);
+  updateController(bottomLeds, ms.leftBottom, current_time_millis);
+  updateController(bottomLeds, ms.rightBottom , current_time_millis);    
+}
+
 MeterSettings base_meter_settings(){
 
     //TODO: set up the indexes right once we know the hardware
@@ -72,7 +83,7 @@ MeterSettings base_meter_settings(){
 }
 
 
-GameState startGame(GameSettings settings, Clock* clock){
+GameState startGame(GameSettings settings, Clock* clock, MeterSettings base_meters){
     GameState gs;
     
     gs.time.start_time_millis = clock->milliseconds();
@@ -89,7 +100,7 @@ GameState startGame(GameSettings settings, Clock* clock){
     gs.ownership.owner = Team::NOBODY;
     gs.ownership.capturing = Team::NOBODY;
     gs.ownership.capture_hits = 0;
-    gs.meters = base_meter_settings();
+    gs.meters = base_meters;
 
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
         configureMeter(&gs.meters.center.meter, STANDARD_METER_MAX_VAL, 0, CRGB::Black, CRGB::Black);   //NOT USED in this mode
@@ -585,7 +596,7 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
     CRGB captureMeterForegroundColor;
     captureMeterForegroundColor = getTeamColor(current->ownership.capturing);
     captureMeterBackgroundColor = getTeamColor(current->ownership.owner);
-    
+
     updateMeter( &current->meters.center.meter, blue_own_secs, secs_to_win, captureMeterForegroundColor, captureMeterBackgroundColor );       
 }
 

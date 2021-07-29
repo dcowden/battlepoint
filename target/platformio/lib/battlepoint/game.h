@@ -121,7 +121,7 @@ typedef struct {
 } GameState;
 
 GameSettings DEFAULT_GAMESETTINGS();
-GameState startGame(GameSettings settings, Clock* clock);
+GameState startGame(GameSettings settings, Clock* clock,MeterSettings base_meters);
 
 //exposed for testing
 void updateGameTime(GameState* current,GameSettings settings, long current_time_millis);
@@ -134,7 +134,7 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
 void updateAttackDefendGame(GameState* current,  GameSettings settings);
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateGame(GameState* game, SensorState sensors, GameSettings settings, Clock* clock);
-
+void updateLeds(long current_time_millis );
 
 
 const char* getCharForGameType(GameType t);

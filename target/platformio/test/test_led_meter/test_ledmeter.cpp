@@ -46,17 +46,6 @@ LedMeter subsetMeter {
     .bgColor=CRGB::Black }; //4 lights, first half
 
 void assert_leds_equal(CRGB* expected, int debug){
-    CRGB* debug_ptr = expected;
-    #ifdef BP_DEBUG
-        for (int i=0;i<LED_COUNT;i++,debug_ptr++){        
-            Serial.print("[expected=");
-            Serial.print(*debug_ptr);
-            Serial.print(",actual=");
-            Serial.print(leds[i]);
-            Serial.println("]");
-        }
-    }
-    #endif
     for (int i=0;i<LED_COUNT;i++,expected++){
         TEST_ASSERT_EQUAL(*expected,leds[i]);
     }
