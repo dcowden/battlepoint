@@ -60,25 +60,12 @@ const char* getCharForGameType(GameType t){
 
 void updateLeds(GameState* current, long current_time_millis ){
   MeterSettings ms = current->meters;
-  Serial.print("Left ");
   updateController( ms.left, current_time_millis);
-
-  Serial.print("Center ");
   updateController( ms.center, current_time_millis);
-
-  Serial.print("Right ");
   updateController( ms.right, current_time_millis);
-
-  Serial.print("leftTop ");
   updateController( ms.leftTop, current_time_millis);
-
-  Serial.print("rightTop ");
   updateController( ms.rightTop, current_time_millis);
-
-  Serial.print("leftBottom ");
   updateController( ms.leftBottom, current_time_millis);
-
-  Serial.print("rightBottom ");
   updateController( ms.rightBottom , current_time_millis);    
 }
 

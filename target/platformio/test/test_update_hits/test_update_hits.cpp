@@ -10,8 +10,8 @@ GameState currentState;
 
 void test_red_hit(){
     SensorState sensorState;
-    sensorState.rightScan.was_hit=true;
-    sensorState.leftScan.was_hit=false;    
+    sensorState.rightScan.was_hit=false;
+    sensorState.leftScan.was_hit=true;    
     currentState.redHits.hits=1;
     currentState.redHits.last_hit_millis=BOGUS_INITIAL_TIME;
     updateGameHits(&currentState,sensorState,BOGUS_UPDATED_TIME);

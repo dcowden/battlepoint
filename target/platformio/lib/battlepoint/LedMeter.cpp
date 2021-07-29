@@ -2,7 +2,8 @@
 #include <FastLED.h>
 #include <Teams.h>
 
-void initMeter ( LedMeter* meter, CRGB* leds, int startIndex, int endIndex ){
+void initMeter ( LedMeter* meter, const char* name, CRGB* leds, int startIndex, int endIndex ){
+    meter->name = name;
     meter->startIndex = startIndex;
     meter->endIndex = endIndex;
     meter->leds = leds;
@@ -62,9 +63,7 @@ void updateLedMeter(LedMeter* meter ){
   //TODO annoying! after all this work trying NOT to go to OO, 
   //the log framwork really pushes us to implemetning printable
   //https://arduino.stackexchange.com/questions/53732/is-it-possible-to-print-a-custom-object-by-passing-it-to-serial-print
-  Log.traceln("Update Meter: %d/%d [%d:%d]",meter->val,meter->max_val,startIndex,endIndex );
-  //Serial.print(meter->val);Serial.print("/");Serial.print(meter->max_val);
-  //Serial.print(" [");Serial.print(startIndex);Serial.print(":");Serial.print(endIndex);Serial.print("]: ");
+  Log.traceln("Meter '%s': %d/%d [%d:%d]",meter->name, meter->val,meter->max_val,startIndex,endIndex );
 
   if ( startIndex < endIndex ){
     total_lights = endIndex - startIndex + 1;
@@ -81,16 +80,14 @@ void updateLedMeter(LedMeter* meter ){
 
   for(int i=0;i<total_lights;i++){
     if ( i < num_lights_on ){
-      Serial.print("1");
       meter->leds[currentIndex] = meter->fgColor;
     }
     else{
-      Serial.print("0");
       meter->leds[currentIndex] = meter->bgColor;
     }
     currentIndex += indexIncrement;
   }
-  //Serial.println("");
+
 } 
 void updateController(LedController controller, long current_time_millis){
    if ( isOn( &controller.flashState, controller.meter.flash_interval_millis, current_time_millis)){

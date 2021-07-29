@@ -42,17 +42,17 @@ CRGB bottomLeds[2* HORIONTAL_LED_SIZE];
 
 MeterSettings base_meters(){
     MeterSettings s;        
-    initMeter(&s.leftTop.meter,topLeds,0,3);
-    initMeter(&s.leftBottom.meter,bottomLeds,0,3);
-    initMeter(&s.rightTop.meter,topLeds,4,7);
-    initMeter(&s.rightBottom.meter,bottomLeds,4,7);
-    initMeter(&s.center.meter,centerLeds,0,7);
-    initMeter(&s.left.meter,leftLeds,0,7);
-    initMeter(&s.right.meter,rightLeds,0,7);
+    initMeter(&s.leftTop.meter,"topLeds",topLeds,0,3);
+    initMeter(&s.leftBottom.meter,"bottomLeds",bottomLeds,0,3);
+    initMeter(&s.rightTop.meter,"rightTop",topLeds,4,7);
+    initMeter(&s.rightBottom.meter,"rightBottom",bottomLeds,4,7);
+    initMeter(&s.center.meter,"center",centerLeds,0,7);
+    initMeter(&s.left.meter,"left",leftLeds,0,7);
+    initMeter(&s.right.meter,"right",rightLeds,0,7);
     return s;
 }
 
-void ASSERT_LEDS_EQUAL(CRGB* expected, CRGB* actual, int num_leds, char* message){
+void ASSERT_LEDS_EQUAL(CRGB* expected, CRGB* actual, int num_leds, const char* message){
     CRGB* actual_ptr = actual;
     Log.infoln("Led Check: %s",message);
     Serial.println("LED E A");

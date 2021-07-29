@@ -28,7 +28,8 @@ LedMeter simpleMeter {
     .val=0, 
     .flash_interval_millis=FlashInterval::FLASH_NONE, 
     .fgColor=CRGB::Blue, 
-    .bgColor=CRGB::Black };  //8 lights
+    .bgColor=CRGB::Black,
+    .name = "simpleMeter" };  //8 lights
 
 LedMeter oneForOneMeter { 
     .startIndex=0, 
@@ -38,7 +39,8 @@ LedMeter oneForOneMeter {
     .val=0, 
     .flash_interval_millis=FlashInterval::FLASH_NONE, 
     .fgColor=CRGB::Blue, 
-    .bgColor=CRGB::Black };  //8 lights
+    .bgColor=CRGB::Black,
+    .name="oneForOneMeter" };  //8 lights
 
 LedMeter reversedMeter { 
     .startIndex=7, 
@@ -48,7 +50,8 @@ LedMeter reversedMeter {
     .val=0,
     .flash_interval_millis=FlashInterval::FLASH_NONE, 
     .fgColor=CRGB::Blue, 
-    .bgColor=CRGB::Black }; //8 lights
+    .bgColor=CRGB::Black,
+    .name="reversedMeter" }; //8 lights
 
 LedMeter subsetMeter { 
     .startIndex=0, 
@@ -58,7 +61,8 @@ LedMeter subsetMeter {
     .val=0, 
     .flash_interval_millis=FlashInterval::FLASH_NONE,      
     .fgColor=CRGB::Blue, 
-    .bgColor=CRGB::Black }; //4 lights, first half
+    .bgColor=CRGB::Black,
+    .name="subsetMeter" }; //4 lights, first half
 
 void assert_leds_equal(CRGB* expected){
     for (int i=0;i<LED_COUNT;i++,expected++){

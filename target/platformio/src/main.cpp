@@ -232,13 +232,13 @@ NAVROOT(nav,mainMenu,MENU_MAX_DEPTH,thingy_buttons,out);
 
 MeterSettings get_base_meters(){
     MeterSettings s;        
-    initMeter(&s.leftTop.meter,topLeds,0,9);
-    initMeter(&s.leftBottom.meter,bottomLeds,0,9);
-    initMeter(&s.rightTop.meter,topLeds,10,19);
-    initMeter(&s.rightBottom.meter,bottomLeds,10,19);
-    initMeter(&s.center.meter,centerLeds,0,15);
-    initMeter(&s.left.meter,leftLeds,0,15);
-    initMeter(&s.right.meter,rightLeds,0,15);
+    initMeter(&s.leftTop.meter,"leftTop",topLeds,0,9);
+    initMeter(&s.leftBottom.meter,"leftBottom",bottomLeds,0,9);
+    initMeter(&s.rightTop.meter,"rightTop",topLeds,10,19);
+    initMeter(&s.rightBottom.meter,"rightBottom",bottomLeds,10,19);
+    initMeter(&s.center.meter,"center",centerLeds,0,15);
+    initMeter(&s.left.meter,"left",leftLeds,0,15);
+    initMeter(&s.right.meter,"right",rightLeds,0,15);
     return s;
 }
 
