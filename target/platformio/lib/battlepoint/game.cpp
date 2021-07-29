@@ -57,32 +57,17 @@ const char* getCharForGameType(GameType t){
     }
 }
 
-/**
+
 void updateLeds(GameState* current, long current_time_millis ){
   MeterSettings ms = current->meters;
-  updateController(leftLeds, ms.left, current_time_millis);
-  updateController(centerLeds, ms.center, current_time_millis);
-  updateController(rightLeds, ms.right, current_time_millis);
-  updateController(topLeds, ms.leftTop, current_time_millis);
-  updateController(topLeds, ms.rightTop, current_time_millis);
-  updateController(bottomLeds, ms.leftBottom, current_time_millis);
-  updateController(bottomLeds, ms.rightBottom , current_time_millis);    
-}**/
-
-MeterSettings base_meter_settings(){
-
-    //TODO: set up the indexes right once we know the hardware
-    MeterSettings s;        
-    initMeter(&s.leftTop.meter,0,9);
-    initMeter(&s.leftBottom.meter,0,9);
-    initMeter(&s.rightTop.meter,10,19);
-    initMeter(&s.rightBottom.meter,10,19);
-    initMeter(&s.center.meter,0,15);
-    initMeter(&s.left.meter,0,15);
-    initMeter(&s.right.meter,0,15);
-    return s;
+  updateController( ms.left, current_time_millis);
+  updateController( ms.center, current_time_millis);
+  updateController( ms.right, current_time_millis);
+  updateController( ms.leftTop, current_time_millis);
+  updateController( ms.rightTop, current_time_millis);
+  updateController( ms.leftBottom, current_time_millis);
+  updateController( ms.rightBottom , current_time_millis);    
 }
-
 
 GameState startGame(GameSettings settings, Clock* clock, MeterSettings base_meters){
     GameState gs;

@@ -2,9 +2,10 @@
 #include <FastLED.h>
 #include <Teams.h>
 
-void initMeter ( LedMeter* meter, int startIndex, int endIndex ){
+void initMeter ( LedMeter* meter, CRGB* leds, int startIndex, int endIndex ){
     meter->startIndex = startIndex;
     meter->endIndex = endIndex;
+    meter->leds = leds;
     meter->val = 0;
     meter->max_val = DEFAULT_MAX_VAL;
     meter->fgColor = CRGB::White;

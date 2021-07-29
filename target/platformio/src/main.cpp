@@ -232,13 +232,13 @@ NAVROOT(nav,mainMenu,MENU_MAX_DEPTH,thingy_buttons,out);
 
 MeterSettings get_base_meters(){
     MeterSettings s;        
-    initMeter(&s.leftTop.meter,0,9);
-    initMeter(&s.leftBottom.meter,0,9);
-    initMeter(&s.rightTop.meter,10,19);
-    initMeter(&s.rightBottom.meter,10,19);
-    initMeter(&s.center.meter,0,15);
-    initMeter(&s.left.meter,0,15);
-    initMeter(&s.right.meter,0,15);
+    initMeter(&s.leftTop.meter,topLeds,0,9);
+    initMeter(&s.leftBottom.meter,bottomLeds,0,9);
+    initMeter(&s.rightTop.meter,topLeds,10,19);
+    initMeter(&s.rightBottom.meter,bottomLeds,10,19);
+    initMeter(&s.center.meter,centerLeds,0,15);
+    initMeter(&s.left.meter,leftLeds,0,15);
+    initMeter(&s.right.meter,rightLeds,0,15);
     return s;
 }
 
@@ -280,17 +280,8 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
   return proceed;
 }
 void updateLEDs(){
-
-  MeterSettings ms = gameState.meters;
-  updateController(leftLeds, ms.left, gameClock.milliseconds());
-  updateController(centerLeds, ms.center, gameClock.milliseconds());
-  updateController(rightLeds, ms.right, gameClock.milliseconds());
-  updateController(topLeds, ms.leftTop, gameClock.milliseconds());
-  updateController(topLeds, ms.rightTop, gameClock.milliseconds());
-  updateController(bottomLeds, ms.leftBottom, gameClock.milliseconds());
-  updateController(bottomLeds, ms.rightBottom , gameClock.milliseconds());
+  updateLeds(&gameState, gameClock.milliseconds());
   FastLED.show();
-
 }
 
 void displayWelcomeBanner( ){

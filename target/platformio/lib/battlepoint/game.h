@@ -134,7 +134,7 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
 void updateAttackDefendGame(GameState* current,  GameSettings settings);
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateGame(GameState* game, SensorState sensors, GameSettings settings, Clock* clock);
-void updateLeds(long current_time_millis );
+void updateLeds(GameState* current, long current_time_millis );
 
 
 const char* getCharForGameType(GameType t);
