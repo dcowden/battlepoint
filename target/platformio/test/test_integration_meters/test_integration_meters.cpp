@@ -107,25 +107,72 @@ void test_one_team_wins_no_ot(){
     setup_game(GameType::GAME_TYPE_KOTH_FIRST_TO_HITS);
     Log.traceln("Setup Complete");
 
-    //red two hits.
     add_seconds(5);
     red_hit();
     update();
+    add_seconds(5);
+    red_hit();
+    blue_hit();
+    update();
 
-    CRGB ONE_RED_HITS [VERTICAL_LED_SIZE] = {CRGB::Red, CRGB::Black,CRGB::Black,CRGB::Black,
+    CRGB TWO_RED_HITS [VERTICAL_LED_SIZE] = {CRGB::Red, CRGB::Red,CRGB::Black,CRGB::Black,
                                         CRGB::Black,CRGB::Black, CRGB::Black, CRGB::Black };
 
+    CRGB ONE_BLUE_HIT [VERTICAL_LED_SIZE] = {CRGB::Blue, CRGB::Black,CRGB::Black,CRGB::Black,
+                                        CRGB::Black,CRGB::Black, CRGB::Black, CRGB::Black };
+                                   
     Log.infoln("Check Red Hits Meter");
-    ASSERT_LEDS_EQUAL(ONE_RED_HITS,leftLeds,VERTICAL_LED_SIZE,"One Red Hit");
+    ASSERT_LEDS_EQUAL(TWO_RED_HITS,leftLeds,VERTICAL_LED_SIZE,"Two Red Hits");
 
     Log.infoln("Check Blue Hits.");
-    ASSERT_LEDS_EQUAL(ALL_BLACK,rightLeds,VERTICAL_LED_SIZE,"No Blue Hits");
+    ASSERT_LEDS_EQUAL(ONE_BLUE_HIT,rightLeds,VERTICAL_LED_SIZE,"One Blue Hit");
 
     Log.infoln("Check Team Meters");
     ASSERT_LEDS_EQUAL(ALL_BLACK,centerLeds,VERTICAL_LED_SIZE,"Center All Black");
     ASSERT_LEDS_EQUAL(TEAM_COLORS,topLeds,VERTICAL_LED_SIZE,"top Team Colors");
     ASSERT_LEDS_EQUAL(TEAM_COLORS,bottomLeds,VERTICAL_LED_SIZE,"bottom team colors");
 
+    TEST_ASSERT_EQUAL_MESSAGE(gameState.meters.rightBottom.meter.flash_interval_millis, FLASH_NONE,"rightBottom should not flash");
+    TEST_ASSERT_EQUAL_MESSAGE(gameState.meters.rightTop.meter.flash_interval_millis, FLASH_NONE,"rightTop should not flash");
+    TEST_ASSERT_EQUAL_MESSAGE(gameState.meters.leftBottom.meter.flash_interval_millis, FLASH_NONE,"leftBottom should not flash ");
+    TEST_ASSERT_EQUAL_MESSAGE(gameState.meters.leftTop.meter.flash_interval_millis, FLASH_NONE,"leftTop should not flash");     
+
+}
+
+void test_one_team_overtime(){
+    setup_game(GameType::GAME_TYPE_KOTH_FIRST_TO_HITS);
+    Log.traceln("Setup Complete");
+
+    for(int i=0;i<7;i++){
+        add_seconds(5);
+        red_hit();
+        add_seconds(5);
+        blue_hit();
+        update();
+    }
+
+    add_seconds(5);
+    red_hit();
+    update();
+
+    CRGB BLUE_HITS [VERTICAL_LED_SIZE] = {CRGB::Blue, CRGB::Blue,CRGB::Blue,CRGB::Blue,
+                                        CRGB::Blue,CRGB::Blue, CRGB::Blue, CRGB::Black };
+
+    Log.infoln("Check Red Hits Meter");
+    ASSERT_LEDS_EQUAL(ALL_RED,leftLeds,VERTICAL_LED_SIZE,"8 Red Hits");
+
+    Log.infoln("Check Blue Hits.");
+    ASSERT_LEDS_EQUAL(BLUE_HITS,rightLeds,VERTICAL_LED_SIZE,"7 Blue Hits");
+
+    Log.infoln("Check Team Meters");
+    ASSERT_LEDS_EQUAL(ALL_BLACK,centerLeds,VERTICAL_LED_SIZE,"Center All Black");
+    //ASSERT_LEDS_EQUAL(TEAM_COLORS,topLeds,VERTICAL_LED_SIZE,"top Team Colors");
+    //ASSERT_LEDS_EQUAL(TEAM_COLORS,bottomLeds,VERTICAL_LED_SIZE,"bottom team colors");
+
+    TEST_ASSERT_EQUAL_MESSAGE(gameState.meters.rightBottom.meter.flash_interval_millis, FLASH_FAST,"rightBottom should flash slow");
+    TEST_ASSERT_EQUAL_MESSAGE(gameState.meters.rightTop.meter.flash_interval_millis, FLASH_FAST,"rightTop should flash");
+    TEST_ASSERT_EQUAL_MESSAGE(gameState.meters.leftBottom.meter.flash_interval_millis, FLASH_SLOW,"leftBottom should flash fast");
+    TEST_ASSERT_EQUAL_MESSAGE(gameState.meters.leftTop.meter.flash_interval_millis, FLASH_SLOW,"leftTop should flash fast");    
 }
 
 void setup() {
@@ -138,7 +185,7 @@ void setup() {
     //simple meter tests
     //RUN_TEST(test_game_setup);
     RUN_TEST(test_one_team_wins_no_ot);
-
+    RUN_TEST(test_one_team_overtime);
 
     UNITY_END();
 

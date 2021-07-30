@@ -306,8 +306,10 @@ void updateFirstToHitsGame(GameState* current,  GameSettings settings){
         endGameWithMostHits(current,red_hits, blu_hits);
     }
     else if ( closeToWinner != Team::NOBODY){
+        Team aboutToLose = oppositeTeam(closeToWinner);
         current->status = GameStatus::GAME_STATUS_OVERTIME;
-        setFlashMeterForTeam(closeToWinner, current,FlashInterval::FLASH_FAST);
+        setFlashMeterForTeam(closeToWinner, current,FlashInterval::FLASH_SLOW);
+        setFlashMeterForTeam(aboutToLose, current,FlashInterval::FLASH_FAST);
     }
     else{
         current->status = GameStatus::GAME_STATUS_RUNNING;    

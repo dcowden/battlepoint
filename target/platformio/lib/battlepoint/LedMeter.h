@@ -9,7 +9,7 @@
 
 typedef enum {
     FLASH_SLOW = 2000,
-    FLASH_FAST = 200,
+    FLASH_FAST = 500,
     FLASH_NONE = 0
 } FlashInterval;
 
