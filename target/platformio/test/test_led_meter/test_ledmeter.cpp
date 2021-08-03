@@ -3,6 +3,8 @@
 #include <unity.h>
 #include <FastLED.h>
 #include <ArduinoLog.h>
+#include <Clock.h>
+
 #define LED_COUNT 8
 
 
@@ -154,6 +156,28 @@ void test_subset_meter_mid_value(void){
     meterAssertVal(&subsetMeter,50,expected);
 }
 
+void test_controller_slow_flash(){
+    //note: 
+    //this method is sensitive to the call frequency.
+    //we can't act when the interval passes 
+    //but we weren't able to inspect the state,
+    //so we'll assume this is running pretty frequently, 
+    //like every 10 ms
+
+    LedController c;
+    c.meter = simpleMeter;
+    c.meter.max_val=10;
+    c.meter.val = 10;
+    c.meter.flash_interval_millis = 500;
+    //should be on 0-500, off 500-1000, on 1000-1500, etc
+    updateController(&c,0);
+    assert_leds_equal(ALL_BLUE);
+    updateController(&c,700);
+    assert_leds_equal(ALL_BLACK);
+    updateController(&c,700+510);
+    assert_leds_equal(ALL_BLUE);
+
+}
 
 //TODO: add tests for updateController
 void setup() {
@@ -163,18 +187,16 @@ void setup() {
     Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
     UNITY_BEGIN();
 
+    RUN_TEST(test_controller_slow_flash);
     //simple meter tests
+    
     RUN_TEST(test_meter_initially_all_black);
     RUN_TEST(test_basic_meter_zero);
     RUN_TEST(test_basic_meter_max_value);
     RUN_TEST(test_basic_meter_mid_value);
     RUN_TEST(test_basic_meter_nearly_full_value_still_isnt_full);
     RUN_TEST(test_basic_meter_tiny_value_still_isnt_lit);
-
-    //one for one meter test
     RUN_TEST(test_one_for_one_meter);
-
-    //reversed meter tests    
     RUN_TEST(test_reversed_meter_zero);
     RUN_TEST(test_reversed_meter_max_value);
     RUN_TEST(test_reversed_meter_mid_value);
@@ -185,7 +207,7 @@ void setup() {
     RUN_TEST(test_subset_meter_min_value);
     RUN_TEST(test_subset_meter_max_value);
     RUN_TEST(test_subset_meter_mid_value);
-  
+    
 
     UNITY_END();
 

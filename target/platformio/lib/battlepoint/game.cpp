@@ -60,13 +60,13 @@ const char* getCharForGameType(GameType t){
 
 void updateLeds(GameState* current, long current_time_millis ){
   MeterSettings ms = current->meters;
-  updateController( ms.left, current_time_millis);
-  updateController( ms.center, current_time_millis);
-  updateController( ms.right, current_time_millis);
-  updateController( ms.leftTop, current_time_millis);
-  updateController( ms.rightTop, current_time_millis);
-  updateController( ms.leftBottom, current_time_millis);
-  updateController( ms.rightBottom , current_time_millis);    
+  updateController( &ms.left, current_time_millis);
+  updateController( &ms.center, current_time_millis);
+  updateController( &ms.right, current_time_millis);
+  updateController( &ms.leftTop, current_time_millis);
+  updateController( &ms.rightTop, current_time_millis);
+  updateController( &ms.leftBottom, current_time_millis);
+  updateController( &ms.rightBottom , current_time_millis);    
 }
 
 GameState startGame(GameSettings settings, Clock* clock, MeterSettings base_meters){

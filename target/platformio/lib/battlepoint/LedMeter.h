@@ -44,5 +44,5 @@ int proportionalValue(int in_val, int in_max, int out_max );
 void initMeter ( LedMeter* meter, const char* name, CRGB* leds, int startIndex, int endIndex );
 void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg);
 void updateLedMeter(LedMeter* meter );
-void updateController(LedController controller, long current_time_millis);
+void updateController(LedController* controller, long current_time_millis);
 #endif
