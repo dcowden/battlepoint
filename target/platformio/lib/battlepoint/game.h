@@ -4,7 +4,7 @@
 #include <Clock.h>
 #include <LedMeter.h>
 #include <target.h>
-#define BP_CURRENT_SETTINGS_VERSION 203
+
 #define STANDARD_METER_MAX_VAL 10
 //important: keep settings separate from 
 //status, so that settings can be saved in eeprom
