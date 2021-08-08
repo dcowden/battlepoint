@@ -211,6 +211,7 @@ MeterSettings get_base_meters(){
 
 void startSelectedGame(){  
   Log.noticeln("Starting Game. Type= %d", gameSettings.gameType);
+  saveSettingsForSelectedGameType();
   gameState = startGame(gameSettings, &gameClock,get_base_meters());
   oled.clear();
   nav.idleOn();

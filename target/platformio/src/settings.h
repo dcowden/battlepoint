@@ -52,6 +52,9 @@ GameSettingSlot getSlotForGameType(GameType gameType){
   else if (gameType == GameType::GAME_TYPE_ATTACK_DEFEND){
     return GameSettingSlot::SLOT_4;
   }
+  else if (gameType == GameType::GAME_TYPE_TARGET_TEST){
+    return GameSettingSlot::SLOT_5;
+  }  
   else{
     return GameSettingSlot::SLOT_1;
   }
