@@ -1,4 +1,5 @@
-
+#ifndef __INC_PINS_H
+#define __INC_PINS_H
 #define I2C_ADDRESS 0x3C
 
 typedef enum {
@@ -15,3 +16,4 @@ typedef enum {
     I2C_SDA = 21,
     I2C_SCL = 22
 } Pins;
+#endif

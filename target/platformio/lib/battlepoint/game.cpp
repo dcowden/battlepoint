@@ -9,7 +9,6 @@
 
 GameSettings DEFAULT_GAMESETTINGS(){
     GameSettings gs;
-    gs.BP_VERSION = BP_CURRENT_SETTINGS_VERSION;
     gs.hits.to_win = 10;
     gs.hits.victory_margin=1;
     gs.gameType = GameType::GAME_TYPE_UNSELECTED;
@@ -589,6 +588,33 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
     updateMeter( &current->meters.center.meter, blue_own_secs, secs_to_win, captureMeterForegroundColor, captureMeterBackgroundColor );       
 }
 
+void updateTargetTestMode(GameState* current,  GameSettings settings, long current_time_millis){
+    /* 
+      This is a special game mode that's for tuning the targets.
+      It never ends unless ended manually.
+
+      It counts hits constantly, resetting the meter when necessary
+      */
+    int red_hits = current->redHits.hits;
+    int blu_hits = current->bluHits.hits;
+    Log.traceln("RedHits=%d, BluHits=%d",red_hits,blu_hits);
+
+    //update meters
+    standardTeamMeters(current,true, FlashInterval::FLASH_NONE);    
+
+    if ( red_hits == settings.hits.to_win ){
+        current->redHits.hits = 0;
+    }
+    if ( blu_hits == settings.hits.to_win ){
+        current->bluHits.hits = 0;
+    }    
+    updateMeter( &current->meters.left.meter, red_hits, settings.hits.to_win, CRGB::Red, CRGB::Black );
+    updateMeter( &current->meters.right.meter, blu_hits, settings.hits.to_win, CRGB::Blue, CRGB::Black );
+
+    //never ends except manually
+    current->status = GameStatus::GAME_STATUS_RUNNING;    
+
+}
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis){
     endGame(current, Team::NOBODY);
 }
@@ -612,6 +638,9 @@ void updateGame(GameState* current, SensorState sensors, GameSettings settings, 
     }
     else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_OWN_IN_TIME){
         updateMostOwnInTimeGame(current,settings,clock->milliseconds());
+    }
+    else if ( settings.gameType == GameType::GAME_TYPE_TARGET_TEST){
+        updateTargetTestMode(current,settings,clock->milliseconds());
     }
     else{
         Log.errorln("Unknown Game Type: %d", settings.gameType);

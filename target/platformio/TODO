@@ -20,7 +20,3 @@ wire in encoder. i hate the button. can use the same pins the buttons were on si
 
 # testing
 really need to add tests for game updates
-add tests for meter flashing
-
-# functions
-add code for meter flashing

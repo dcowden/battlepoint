@@ -34,7 +34,9 @@ typedef enum {
     GAME_TYPE_KOTH_FIRST_TO_OWN_TIME=2,
     GAME_TYPE_KOTH_MOST_OWN_IN_TIME=3,
     GAME_TYPE_ATTACK_DEFEND=4,
-    GAME_TYPE_UNSELECTED=5
+    GAME_TYPE_TARGET_TEST=5,
+    GAME_TYPE_UNSELECTED=6,
+
 } GameType;
 
 typedef struct {
@@ -69,7 +71,6 @@ typedef enum {
 } GameStatus;
 
 typedef struct{
-    //TODO: should these be composed?
     LedController leftTop;
     LedController leftBottom;
     LedController rightTop;
@@ -119,6 +120,13 @@ typedef struct {
     Ownership ownership;
     MeterSettings meters;
 } GameState;
+
+typedef struct {
+    HitTracker redHits; 
+    HitTracker bluHits;
+    MeterSettings meters;
+    TargetSettings target;
+} TargetTestMode;
 
 GameSettings DEFAULT_GAMESETTINGS();
 GameState startGame(GameSettings settings, Clock* clock,MeterSettings base_meters);
