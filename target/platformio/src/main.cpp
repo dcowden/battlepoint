@@ -30,14 +30,41 @@
 #define HORIONTAL_LED_SIZE 10
 #define GAME_UPDATE_INTERVAL_MS 50
 
+
+#define TRIGGER_MIN 100
+#define TRIGGER_MAX 1000
+#define TRIGGER_BIG_STEP_SIZE 100
+#define TRIGGER_LITTLE_STEP_SIZE 10
+
+#define HIT_MIN 2000
+#define HIT_MAX 25000
+#define HIT_BIG_STEP_SIZE 2000
+#define HIT_LITTLE_STEP_SIZE 500
+
+#define TIME_LIMIT_MIN 10
+#define TIME_LIMIT_MAX 1000
+#define TIME_LIMIT_BIG_STEP_SIZE 10
+#define TIME_LIMIT_LITTLE_STEP_SIZE 1
+
+#define VICTORY_MARGIN_MIN 0
+#define VICTORY_MARGIN_MAX 20
+#define VICTORY_MARGIN_BIG_STEP_SIZE 5
+#define VICTORY_MARGIN_LITTLE_STEP_SIZE 1
+
+#define VICTORY_HITS_MIN 1
+#define VICTORY_HITS_MAX 100
+#define VICTORY_HITS_BIG_STEP_SIZE 5
+#define VICTORY_HITS_LITTLE_STEP_SIZE 1
+
+
+
+
+
 RealClock gameClock = RealClock();
 
 //the different types of games we can play
 GameState gameState;
 GameSettings gameSettings;
-
-//the currently selected game
-GameType selectedGameType = GameType::GAME_TYPE_UNSELECTED;
 
 CRGB leftLeds[VERTICAL_LED_SIZE];
 CRGB centerLeds[VERTICAL_LED_SIZE];
@@ -74,11 +101,11 @@ void setupLEDs(){
 }
 
 void loadSettingsForSelectedGameType(){
-    loadSettingSlot(&gameSettings, getSlotForGameType(selectedGameType));
+    loadSettingSlot(&gameSettings, getSlotForGameType(gameSettings.gameType));
 }
 
 void saveSettingsForSelectedGameType(){
-   saveSettingSlot(&gameSettings, getSlotForGameType(selectedGameType));
+   saveSettingSlot(&gameSettings, getSlotForGameType(gameSettings.gameType));
 }
 
 void setupTargets(){
@@ -113,22 +140,22 @@ Menu::result loadTargetTestSettings(){
   gameSettings.timed.max_duration_seconds=999;
   return Menu::proceed;
 }
+//FIELD(var.name, title, units, min., max., step size,fine step size, action, events mask, styles)
 
 MENU(mostHitsSubMenu, "MostHits", loadMostHitsSettings, Menu::enterEvent, Menu::wrapStyle
-    ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",0,10,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
-    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
+    ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)            ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
 
 MENU(firstToHitsSubMenu, "FirstToHits", loadFirstToHitsSettings, Menu::enterEvent, Menu::wrapStyle
-    ,FIELD(gameSettings.hits.to_win,"Hits","",0,100,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",0,10,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle)         
+    ,FIELD(gameSettings.hits.to_win,"Hits","",VICTORY_HITS_MIN,VICTORY_HITS_MAX,VICTORY_HITS_BIG_STEP_SIZE,VICTORY_HITS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)            ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
@@ -138,30 +165,31 @@ MENU(ozSubMenu, "OwnZone", loadOwnZoneSettings, Menu::enterEvent, Menu::wrapStyl
     ,FIELD(gameSettings.capture.capture_decay_rate_secs_per_hit,"Capture Decay","/s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.capture.hits_to_capture,"HitsToCapture","",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.timed.ownership_time_seconds,"OwnTimeToWin","s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
-    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)        
+    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
 
 MENU(adSubMenu, "Capture", loadCPSettings, Menu::enterEvent, Menu::wrapStyle
-    ,FIELD(gameSettings.hits.to_win,"Hits","",0,100,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,FIELD(gameSettings.hits.to_win,"Hits","",VICTORY_HITS_MIN,VICTORY_HITS_MAX,VICTORY_HITS_BIG_STEP_SIZE,VICTORY_HITS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)\
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)        
+    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+ 
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
 
 MENU(testTargetMenu, "TargetTest",  loadTargetTestSettings, Menu::enterEvent, Menu::wrapStyle    
-    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
 
-MENU(mainMenu, "BP Target v0.4", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
+MENU(mainMenu, "BP Target v0.5", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
   ,SUBMENU(mostHitsSubMenu)
   ,SUBMENU(ozSubMenu)
   ,SUBMENU(firstToHitsSubMenu)
@@ -263,7 +291,7 @@ void setup() {
   Serial.begin(115200);
   Serial.setTimeout(500);
   initSettings();
-  Log.begin(LOG_LEVEL_WARNING, &Serial, true);
+  Log.begin(LOG_LEVEL_INFO, &Serial, true);
   Log.warning("Starting...");
   initDisplay();
   Log.notice("OLED [OK]");

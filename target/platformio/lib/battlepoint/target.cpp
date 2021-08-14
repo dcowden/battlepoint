@@ -49,8 +49,8 @@ TargetHitScanResult check_target(int pinReader(void), TargetSettings target,Cloc
 
     TargetHitScanResult result;
     int targetValue = pinReader();
-
-    if (targetValue >  target.trigger_threshold ){
+    Log.traceln("Pin Value: %d/%l", targetValue, target.trigger_threshold);
+    if (targetValue > target.trigger_threshold ){
         for(int i=0;i<FFT_SAMPLES;i++){
             fft_data.vReal[i] = pinReader();
             fft_data.vImag[i] = 0;
@@ -63,7 +63,7 @@ TargetHitScanResult check_target(int pinReader(void), TargetSettings target,Cloc
         FFT.ComplexToMagnitude(fft_data.vReal, fft_data.vImag, FFT_SAMPLES);
         double last_hit_energy = fft_data.vReal[ENERGY_FREQ_INDEX_1] + fft_data.vReal[ENERGY_FREQ_INDEX_2];
         double peak = FFT.MajorPeak(fft_data.vReal, FFT_SAMPLES, SAMPLING_FREQUENCY);
-        Log.warningln("TargetScan: e=%d, peak=%d, thresh=%d", last_hit_energy, peak,target.hit_energy_threshold);
+        Log.infoln("TargetScan: energy=%F, peak=%F, thresh=%l", last_hit_energy, peak,target.hit_energy_threshold);
         //Serial.println("Computed magnitudes:");
         //PrintVector(fft_data.vReal,(FFT_SAMPLES>>1),SCL_FREQUENCY);
         //Serial.println("Peak Frequency:");
@@ -75,6 +75,7 @@ TargetHitScanResult check_target(int pinReader(void), TargetSettings target,Cloc
             result.hit_millis = clock->milliseconds();
             result.last_hit_energy = last_hit_energy;
             result.peak_frequency = peak;
+            Log.warningln("HIT! %F > %l", last_hit_energy, target.hit_energy_threshold);
         }        
 
     }

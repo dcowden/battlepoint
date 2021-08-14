@@ -22,9 +22,9 @@ GameSettings DEFAULT_GAMESETTINGS(){
     gs.timed.ownership_time_seconds=120;
     gs.timed.max_overtime_seconds=120;
 
-    gs.target.hit_energy_threshold = 100;
+    gs.target.hit_energy_threshold = 5000;
     gs.target.last_hit_millis=0;
-    gs.target.trigger_threshold=1000;
+    gs.target.trigger_threshold=100;
     return gs;
 }
 
