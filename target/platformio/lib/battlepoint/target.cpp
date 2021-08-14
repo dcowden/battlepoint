@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <arduinoFFT.h>
 #include <target.h>
+#include <ArduinoLog.h>
 
 #define FFT_SAMPLES 128
 #define ENERGY_FREQ_INDEX_1 4
@@ -62,7 +63,7 @@ TargetHitScanResult check_target(int pinReader(void), TargetSettings target,Cloc
         FFT.ComplexToMagnitude(fft_data.vReal, fft_data.vImag, FFT_SAMPLES);
         double last_hit_energy = fft_data.vReal[ENERGY_FREQ_INDEX_1] + fft_data.vReal[ENERGY_FREQ_INDEX_2];
         double peak = FFT.MajorPeak(fft_data.vReal, FFT_SAMPLES, SAMPLING_FREQUENCY);
-
+        Log.warningln("TargetScan: e=%d, peak=%d, thresh=%d", last_hit_energy, peak,target.hit_energy_threshold);
         //Serial.println("Computed magnitudes:");
         //PrintVector(fft_data.vReal,(FFT_SAMPLES>>1),SCL_FREQUENCY);
         //Serial.println("Peak Frequency:");

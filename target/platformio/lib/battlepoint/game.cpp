@@ -7,6 +7,7 @@
 #include <ArduinoLog.h>
 
 
+
 GameSettings DEFAULT_GAMESETTINGS(){
     GameSettings gs;
     gs.hits.to_win = 10;
@@ -106,6 +107,11 @@ GameState startGame(GameSettings settings, Clock* clock, MeterSettings base_mete
         configureMeter(&gs.meters.center.meter, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);   //hit progress: count from zero to hits required to win
         configureMeter(&gs.meters.left.meter, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
         configureMeter(&gs.meters.right.meter, settings.capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
+    }
+    else if ( settings.gameType == GameType::GAME_TYPE_TARGET_TEST ){
+        configureMeter(&gs.meters.center.meter, STANDARD_METER_MAX_VAL, 0, CRGB::Black, CRGB::Black);   //NOT USED in this mode
+        configureMeter(&gs.meters.left.meter, settings.hits.to_win, 0, CRGB::Blue, CRGB::Black); //hits scored for blue , count from zero to total required to win
+        configureMeter(&gs.meters.right.meter, settings.hits.to_win, 0, CRGB::Red, CRGB::Black); //hits scored for red , count from zero to total required to win
     }    
     else{
        Log.errorln("UNKNOWN GAME TYPE");

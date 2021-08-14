@@ -116,6 +116,8 @@ Menu::result loadTargetTestSettings(){
 MENU(mostHitsSubMenu, "MostHits", loadMostHitsSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",0,10,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
@@ -123,7 +125,9 @@ MENU(mostHitsSubMenu, "MostHits", loadMostHitsSettings, Menu::enterEvent, Menu::
 MENU(firstToHitsSubMenu, "FirstToHits", loadFirstToHitsSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(gameSettings.hits.to_win,"Hits","",0,100,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",0,10,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle)         
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
@@ -134,20 +138,24 @@ MENU(ozSubMenu, "OwnZone", loadOwnZoneSettings, Menu::enterEvent, Menu::wrapStyl
     ,FIELD(gameSettings.capture.hits_to_capture,"HitsToCapture","",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.timed.ownership_time_seconds,"OwnTimeToWin","s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
 
 MENU(adSubMenu, "Capture", loadCPSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(gameSettings.hits.to_win,"Hits","",0,100,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",10,1000,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
 
 MENU(testTargetMenu, "TargetTest",  loadTargetTestSettings, Menu::enterEvent, Menu::wrapStyle    
     ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.target.trigger_threshold,"Trigger Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",100,5000,1000,100,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
@@ -254,7 +262,7 @@ void setup() {
   Serial.begin(115200);
   Serial.setTimeout(500);
   initSettings();
-  Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
+  Log.begin(LOG_LEVEL_WARNING, &Serial, true);
   Log.warning("Starting...");
   initDisplay();
   Log.notice("OLED [OK]");
