@@ -1,7 +1,7 @@
 #ifndef __INC_SETTINGS_H
 #define __INC_SETTINGS_H
 #include <EEPROM.h>
-#define BP_VERSION 101
+#define BP_VERSION 102
 #define CONFIG_START 0
 
 //esp32 flash is 512 bytes

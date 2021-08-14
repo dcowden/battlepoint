@@ -15,8 +15,8 @@
 
 typedef struct {
     long last_hit_millis;
-    double trigger_threshold;
-    double hit_energy_threshold;
+    long trigger_threshold;
+    long hit_energy_threshold;
 } TargetSettings;
 
 typedef struct {

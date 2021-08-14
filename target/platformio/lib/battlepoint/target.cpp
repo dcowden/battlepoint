@@ -69,7 +69,7 @@ TargetHitScanResult check_target(int pinReader(void), TargetSettings target,Cloc
         //Serial.println("Peak Frequency:");
         //
         //Serial.println(x, 6);
-        if ( last_hit_energy > target.hit_energy_threshold){
+        if ( last_hit_energy > ((double)target.hit_energy_threshold)){
             result.was_sampled = 1;
             result.was_hit = 1;
             result.hit_millis = clock->milliseconds();

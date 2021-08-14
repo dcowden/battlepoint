@@ -110,6 +110,7 @@ Menu::result loadTargetTestSettings(){
   gameSettings.gameType = GameType::GAME_TYPE_TARGET_TEST;
   loadSettingsForSelectedGameType();
   gameSettings.hits.to_win = 10;
+  gameSettings.timed.max_duration_seconds=999;
   return Menu::proceed;
 }
 
