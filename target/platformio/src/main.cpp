@@ -80,7 +80,6 @@ void updateGame();
 void startSelectedGame();
 
 
-
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
 ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
 ClickEncoderStream encStream(clickEncoder, 1); 
@@ -123,15 +122,20 @@ void setupEncoder(){
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, 1000, true);
   timerAlarmEnable(timer);
+  
     
 }
 
 void loadSettingsForSelectedGameType(){
+    timerAlarmDisable(timer);
     loadSettingSlot(&gameSettings, getSlotForGameType(gameSettings.gameType));
+    timerAlarmEnable(timer);
 }
 
 void saveSettingsForSelectedGameType(){
+  timerAlarmDisable(timer);
    saveSettingSlot(&gameSettings, getSlotForGameType(gameSettings.gameType));
+   timerAlarmEnable(timer);
 }
 
 void setupTargets(){
@@ -243,6 +247,7 @@ Menu::navNode* nodes[sizeof(panels) / sizeof(Menu::panel)]; //navNodes to store 
 Menu::panelsList pList(panels, nodes, 1); //a list of panels and nodes
 Menu::idx_t tops[MENU_MAX_DEPTH] = {0,0}; //store cursor positions for each level
 
+
 MENU_INPUTS(in,&encStream);
 
 MENU_OUTPUTS(out,MENU_MAX_DEPTH
@@ -265,6 +270,7 @@ MeterSettings get_base_meters(){
 }
 
 void startSelectedGame(){  
+
   Log.noticeln("Starting Game. Type= %d", gameSettings.gameType);
   saveSettingsForSelectedGameType();
   gameState = startGame(gameSettings, &gameClock,get_base_meters());
@@ -293,7 +299,11 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
     } 
     case idleEnd:{
        Log.notice("resuming menu.");
-       stopGameAndReturnToMenu();       
+
+       //would it be nicer to just take control of the encoder?
+       if ( clickEncoder.Clicked ){
+          stopGameAndReturnToMenu();       
+       }       
        break;
     }
   }
@@ -321,7 +331,7 @@ void setup() {
   updateDisplayTimer.start();
   gameUpdateTimer.start();
   //nav.idleTask = menuIdleEvent;
-  options->invertFieldKeys = true;
+  Menu::options->invertFieldKeys = false;
   Log.warningln("Complete.");
   oled.setFont(u8g2_font_7x13_mf);
   setupEncoder();
@@ -333,7 +343,9 @@ void stopTimers(){
 }
 
 int readLeftTarget(){
-   return analogRead(Pins::TARGET_LEFT);
+  //TODO: re-enable when we have multiple targets
+  // return analogRead(Pins::TARGET_LEFT);
+  return 0;
 }
 
 int readRightTarget(){
@@ -343,6 +355,7 @@ int readRightTarget(){
 SensorState readTargets(TargetSettings targetSettings){
   SensorState sensorState;
   sensorState.rightScan = check_target(readRightTarget,targetSettings,(Clock*)(&gameClock));
+
   sensorState.leftScan = check_target(readLeftTarget,targetSettings,(Clock*)(&gameClock));  
   return sensorState;
 }
@@ -350,6 +363,12 @@ SensorState readTargets(TargetSettings targetSettings){
 void updateGame(){
   SensorState s = readTargets(gameSettings.target);
   updateGame(&gameState, s, gameSettings, (Clock*)(&gameClock));
+
+  //TODO: move this, but for now lets see if it works
+  if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
+     gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;
+  }
+
   if ( gameState.status == GameStatus::GAME_STATUS_ENDED ){
     Log.warning("Game Over!");
     Log.warning("Winner=");

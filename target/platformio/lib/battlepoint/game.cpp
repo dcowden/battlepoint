@@ -120,20 +120,21 @@ GameState startGame(GameSettings settings, Clock* clock, MeterSettings base_mete
 
 }
 
-//TODO: refactor, it's nearly all duplicated!
-void updateGameHits(GameState* current, SensorState sensors, long current_time_millis){
-    if ( sensors.leftScan.was_hit ){
-       current->redHits.hits++;
-       current->redHits.last_hit_millis = current_time_millis;
-    } 
 
-    if ( sensors.rightScan.was_hit ){
-       current->bluHits.hits++;
-       current->bluHits.last_hit_millis = current_time_millis;    
-    } 
+
+void updateGameHitsSingleSensor(HitTracker* tracker, TargetHitScanResult scanResult, long current_time_millis){
+    if ( scanResult.was_sampled){
+        if ( scanResult.was_hit ){
+            tracker->hits++;
+            tracker->last_hit_millis = current_time_millis;    
+            tracker->last_hit_energy = scanResult.last_hit_energy;
+        } 
+    }    
 }
-
-
+void updateGameHits(GameState* current, SensorState sensors, long current_time_millis){
+    updateGameHitsSingleSensor(&current->bluHits,sensors.rightScan,current_time_millis);
+    updateGameHitsSingleSensor(&current->redHits,sensors.leftScan,current_time_millis);
+}
 //assumes that captureHits is being updated first
 void applyHitDecay(GameState* current, GameSettings settings, long current_time_millis){
     if ( settings.capture.capture_decay_rate_secs_per_hit > 0 ){

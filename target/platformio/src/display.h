@@ -53,17 +53,30 @@ void gameOverDisplay(GameState gameState){
 
 void updateDisplay(GameState gameState, GameSettings gameSettings){
   oled.clearBuffer();
-  oled.setCursor(5,15);
-  oled.print("HT: R="); oled.print(gameState.redHits.hits); oled.print( "  B="); oled.print(gameState.bluHits.hits);
+  if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
+    oled.setCursor(5,15);
+    oled.print("HT: R="); oled.print(gameState.redHits.hits); oled.print( "  B="); oled.print(gameState.bluHits.hits);
+    oled.setCursor(5,27);
+    oled.print("TRIGGER LVL: "); oled.print(gameSettings.target.hit_energy_threshold); 
+    oled.setCursor(5,39);
+    oled.print("LAST RED: "); oled.print(gameState.redHits.last_hit_energy);
+    oled.setCursor(5,52);
+    oled.print("LAST BLU: "); oled.print(gameState.bluHits.last_hit_energy);
+  }
+  else{
+    oled.setCursor(5,15);
+    oled.print("HT: R="); oled.print(gameState.redHits.hits); oled.print( "  B="); oled.print(gameState.bluHits.hits);
 
-  long elapsed_millis = millis() - gameState.time.start_time_millis;
-  int elapsed_sec = elapsed_millis/1000;
-  oled.setCursor(5,27);
-  oled.print("T: "); oled.print(elapsed_sec); oled.print("/"); oled.print(gameSettings.timed.max_duration_seconds); 
-  oled.print(" ["); oled.print(getCharForStatus(gameState.status)); oled.print("]");
-  oled.setCursor(5,39);
-  oled.print("CAP: "); oled.print(gameState.ownership.capture_hits); oled.print("/"); oled.print(gameSettings.capture.hits_to_capture);
-  oled.setCursor(5,52);
-  oled.print("OWN: B=");oled.print(gameState.ownership.blu_millis/1000);oled.print("  R="); oled.print(gameState.ownership.red_millis/1000);
+    long elapsed_millis = millis() - gameState.time.start_time_millis;
+    int elapsed_sec = elapsed_millis/1000;
+    oled.setCursor(5,27);
+    oled.print("T: "); oled.print(elapsed_sec); oled.print("/"); oled.print(gameSettings.timed.max_duration_seconds); 
+    oled.print(" ["); oled.print(getCharForStatus(gameState.status)); oled.print("]");
+    oled.setCursor(5,39);
+    oled.print("CAP: "); oled.print(gameState.ownership.capture_hits); oled.print("/"); oled.print(gameSettings.capture.hits_to_capture);
+    oled.setCursor(5,52);
+    oled.print("OWN: B=");oled.print(gameState.ownership.blu_millis/1000);oled.print("  R="); oled.print(gameState.ownership.red_millis/1000);
+  }
   oled.sendBuffer();
+  
 }

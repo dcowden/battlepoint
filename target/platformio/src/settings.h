@@ -3,7 +3,7 @@
 #include <ArduinoLog.h>
 #include <game.h>
 
-#define BP_CURRENT_SETTINGS_VERSION 205
+#define BP_CURRENT_SETTINGS_VERSION 206
 #define EEPROM_SIZE 320
 
 void initSettings(){
@@ -14,7 +14,8 @@ int getSlotAddress(int slot_num){
   return slot_num*sizeof(GameSettings);
 }
 
-void saveSettingSlot (GameSettings* gameSettings, int slot_num){    
+void saveSettingSlot (GameSettings* gameSettings, int slot_num){   
+
   int addr = getSlotAddress(slot_num);
   gameSettings->BP_VERSION = BP_CURRENT_SETTINGS_VERSION;
   GameSettings toSave = *gameSettings;
@@ -23,6 +24,7 @@ void saveSettingSlot (GameSettings* gameSettings, int slot_num){
       EEPROM.write(addr + t, *((char*)&toSave + t));  
   }
   EEPROM.commit();
+
 }
 
 void loadSettingSlot(GameSettings* gameSettings,int slot_num){
@@ -40,6 +42,7 @@ void loadSettingSlot(GameSettings* gameSettings,int slot_num){
   else{
     Log.warningln("Ingoring Invalid Settings Version %d in slot %d.",s.BP_VERSION, slot_num);
   }
+
 }
 
 GameSettingSlot getSlotForGameType(GameType gameType){

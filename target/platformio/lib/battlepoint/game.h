@@ -99,6 +99,7 @@ typedef struct {
     int hits=0;
     long last_hit_millis=0;
     long last_decay_millis=0;
+    long last_hit_energy=0;
 } HitTracker;
 
 typedef struct {
@@ -121,13 +122,6 @@ typedef struct {
     Ownership ownership;
     MeterSettings meters;
 } GameState;
-
-typedef struct {
-    HitTracker redHits; 
-    HitTracker bluHits;
-    MeterSettings meters;
-    TargetSettings target;
-} TargetTestMode;
 
 GameSettings DEFAULT_GAMESETTINGS();
 GameState startGame(GameSettings settings, Clock* clock,MeterSettings base_meters);
