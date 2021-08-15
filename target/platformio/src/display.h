@@ -33,6 +33,7 @@ void initDisplay(){
   oled.begin();
   displayWelcomeBanner();
   oled.clear();
+  oled.setFlipMode(1);
   oled.setFont(u8g2_font_6x13_tf);
 }
 

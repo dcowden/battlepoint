@@ -6,13 +6,17 @@
 #include <Clock.h>
 #include <LedMeter.h>
 #include <game.h>
+#include "OneButton.h"
+#include <ESP32Encoder.h>
+#include "EncoderMenuDriver.h"
+
 #include <display.h>
 #include <util.h>
 #include <pins.h>
 #include <math.h>
 #include <ArduinoLog.h>
 #include <settings.h>
-
+#include <ClickEncoder.h>
 //Menu Includes
 #include <menu.h>
 #include <menuIO/keyIn.h>
@@ -20,6 +24,7 @@
 #include <menuIO/serialOut.h>
 #include <menuIO/serialIO.h>
 #include <menuIO/chainStream.h>
+#include <menuIO/clickEncoderIn.h>
 #include <menuIO/serialIn.h>
 
 #define MENU_MAX_DEPTH 4
@@ -56,10 +61,6 @@
 #define VICTORY_HITS_BIG_STEP_SIZE 5
 #define VICTORY_HITS_LITTLE_STEP_SIZE 1
 
-
-
-
-
 RealClock gameClock = RealClock();
 
 //the different types of games we can play
@@ -79,12 +80,25 @@ void updateGame();
 void startSelectedGame();
 
 
+
+//from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
+ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
+ClickEncoderStream encStream(clickEncoder, 1); 
+
+
 void updateDisplayLocal(){
   updateDisplay(gameState,gameSettings);
 }
 
 Ticker updateDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
 Ticker gameUpdateTimer(updateGame, GAME_UPDATE_INTERVAL_MS );
+
+
+// ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
+// and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
+hw_timer_t *timer = NULL;
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+void IRAM_ATTR onTimer();
 
 void setupLEDs(){
   pinMode(Pins::LED_TOP,OUTPUT);
@@ -98,6 +112,18 @@ void setupLEDs(){
   FastLED.addLeds<NEOPIXEL, Pins::LED_LEFT_EDGE>(leftLeds, VERTICAL_LED_SIZE);
   FastLED.addLeds<NEOPIXEL, Pins::LED_CENTER_VERTICAL>(centerLeds, VERTICAL_LED_SIZE);
   FastLED.addLeds<NEOPIXEL, Pins::LED_RIGHT_EDGE>(rightLeds, VERTICAL_LED_SIZE);
+}
+
+void setupEncoder(){
+  clickEncoder.setAccelerationEnabled(true);
+  clickEncoder.setDoubleClickEnabled(true); // Disable doubleclicks makes the response faster.  See: https://github.com/soligen2010/encoder/issues/6
+
+  //ESP32 timer
+  timer = timerBegin(0, 80, true);
+  timerAttachInterrupt(timer, &onTimer, true);
+  timerAlarmWrite(timer, 1000, true);
+  timerAlarmEnable(timer);
+    
 }
 
 void loadSettingsForSelectedGameType(){
@@ -217,22 +243,14 @@ Menu::navNode* nodes[sizeof(panels) / sizeof(Menu::panel)]; //navNodes to store 
 Menu::panelsList pList(panels, nodes, 1); //a list of panels and nodes
 Menu::idx_t tops[MENU_MAX_DEPTH] = {0,0}; //store cursor positions for each level
 
-Menu::keyMap btn_map[] = {
-  { -39, Menu::options->getCmdChar(enterCmd) }, 
-  { -34, Menu::options->getCmdChar(downCmd) } ,
-  { -36, Menu::options->getCmdChar(upCmd) }
-};
+MENU_INPUTS(in,&encStream);
 
-Menu::keyIn<4> thingy_buttons(btn_map);
-
-MENU_INPUTS(in,&thingy_buttons);
 MENU_OUTPUTS(out,MENU_MAX_DEPTH
   ,U8G2_OUT(oled,colors,fontW,fontH,OFFSET_X,OFFSET_Y,{0,0,charWidth,lineHeight})
   ,SERIAL_OUT(Serial)
 );
 
-NAVROOT(nav,mainMenu,MENU_MAX_DEPTH,thingy_buttons,out);
-
+NAVROOT(nav, mainMenu, MENU_MAX_DEPTH, in, out);
 
 MeterSettings get_base_meters(){
     MeterSettings s;        
@@ -299,7 +317,6 @@ void setup() {
   Log.notice("LEDS [OK]");  
   setupTargets();
   Log.notice("TARGETS [OK]");
-  thingy_buttons.begin();
   // hardwareOutputTimer.start();
   updateDisplayTimer.start();
   gameUpdateTimer.start();
@@ -307,7 +324,7 @@ void setup() {
   options->invertFieldKeys = true;
   Log.warningln("Complete.");
   oled.setFont(u8g2_font_7x13_mf);
-
+  setupEncoder();
   gameSettings = DEFAULT_GAMESETTINGS();
 }
 
@@ -355,4 +372,10 @@ void loop() {
       do nav.doOutput(); while (oled.nextPage() );
     }
   }
+}
+
+// ESP32 timer
+void IRAM_ATTR onTimer()
+{
+  clickEncoder.service();
 }
