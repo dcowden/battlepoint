@@ -10,6 +10,7 @@ how to avoid duplicate menu handler functions for each game type? ie,
    loadFirstToHitsSettings
    loadOwnZoneSettings
 
+# move to 
 
 # expansions/generalizations
 how to provide more slots? 
