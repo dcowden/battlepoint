@@ -6,10 +6,10 @@
 #include <Clock.h>
 #include <LedMeter.h>
 #include <game.h>
-#include "OneButton.h"
-#include <ESP32Encoder.h>
+//#include "OneButton.h"
+//#include <ESP32Encoder.h>
 #include "EncoderMenuDriver.h"
-
+#include "trigger.h"
 #include <display.h>
 #include <util.h>
 #include <pins.h>
@@ -24,7 +24,7 @@
 #include <menuIO/serialOut.h>
 #include <menuIO/serialIO.h>
 #include <menuIO/chainStream.h>
-#include <menuIO/clickEncoderIn.h>
+//#include <menuIO/clickEncoderIn.h>
 #include <menuIO/serialIn.h>
 
 #define MENU_MAX_DEPTH 4
@@ -33,8 +33,8 @@
 #define DISPLAY_UPDATE_INTERVAL_MS 500
 #define VERTICAL_LED_SIZE 16
 #define HORIONTAL_LED_SIZE 10
-#define GAME_UPDATE_INTERVAL_MS 50
-
+#define GAME_UPDATE_INTERVAL_MS 20
+#define TARGET_TRIGGER_WINDOW_MS 50  //after we trigger for a hit, how long till we're allowed to start again? practically limited by FFT sample time, about 20ms. dont want to re-trigger till that's finished
 
 #define TRIGGER_MIN 100
 #define TRIGGER_MAX 1000
@@ -66,12 +66,16 @@ RealClock gameClock = RealClock();
 //the different types of games we can play
 GameState gameState;
 GameSettings gameSettings;
+SensorState sensorState;
 
 CRGB leftLeds[VERTICAL_LED_SIZE];
 CRGB centerLeds[VERTICAL_LED_SIZE];
 CRGB rightLeds[VERTICAL_LED_SIZE];
 CRGB topLeds[2* HORIONTAL_LED_SIZE];
 CRGB bottomLeds[2* HORIONTAL_LED_SIZE];
+
+Trigger rightTargetTrigger = Trigger(&gameClock,TARGET_TRIGGER_WINDOW_MS);
+Trigger leftTargetTrigger = Trigger(&gameClock,TARGET_TRIGGER_WINDOW_MS);
 
 //prototypes
 //void updateDisplay();
@@ -82,7 +86,8 @@ void startSelectedGame();
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
 ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
-ClickEncoderStream encStream(clickEncoder, 1); 
+//ClickEncoderStream encStream(clickEncoder, 1); 
+
 
 
 void updateDisplayLocal(){
@@ -96,7 +101,7 @@ Ticker gameUpdateTimer(updateGame, GAME_UPDATE_INTERVAL_MS );
 // ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
 // and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
 hw_timer_t *timer = NULL;
-portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+//portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 void IRAM_ATTR onTimer();
 
 void setupLEDs(){
@@ -122,20 +127,19 @@ void setupEncoder(){
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, 1000, true);
   timerAlarmEnable(timer);
-  
     
 }
 
 void loadSettingsForSelectedGameType(){
-    timerAlarmDisable(timer);
-    loadSettingSlot(&gameSettings, getSlotForGameType(gameSettings.gameType));
-    timerAlarmEnable(timer);
+  timerAlarmDisable(timer);
+  loadSettingSlot(&gameSettings, getSlotForGameType(gameSettings.gameType));
+  timerAlarmEnable(timer);
 }
 
 void saveSettingsForSelectedGameType(){
   timerAlarmDisable(timer);
-   saveSettingSlot(&gameSettings, getSlotForGameType(gameSettings.gameType));
-   timerAlarmEnable(timer);
+  saveSettingSlot(&gameSettings, getSlotForGameType(gameSettings.gameType));
+  timerAlarmEnable(timer);
 }
 
 void setupTargets(){
@@ -248,7 +252,8 @@ Menu::panelsList pList(panels, nodes, 1); //a list of panels and nodes
 Menu::idx_t tops[MENU_MAX_DEPTH] = {0,0}; //store cursor positions for each level
 
 
-MENU_INPUTS(in,&encStream);
+//MENU_INPUTS(in,&encStream);
+MENU_INPUTS(in);
 
 MENU_OUTPUTS(out,MENU_MAX_DEPTH
   ,U8G2_OUT(oled,colors,fontW,fontH,OFFSET_X,OFFSET_Y,{0,0,charWidth,lineHeight})
@@ -256,6 +261,8 @@ MENU_OUTPUTS(out,MENU_MAX_DEPTH
 );
 
 NAVROOT(nav, mainMenu, MENU_MAX_DEPTH, in, out);
+
+EncoderMenuDriver menuDriver = EncoderMenuDriver(&nav, &clickEncoder);
 
 MeterSettings get_base_meters(){
     MeterSettings s;        
@@ -272,6 +279,7 @@ MeterSettings get_base_meters(){
 void startSelectedGame(){  
 
   Log.noticeln("Starting Game. Type= %d", gameSettings.gameType);
+  Log.warningln("Target Threshold= %l", gameSettings.target.trigger_threshold);
   saveSettingsForSelectedGameType();
   gameState = startGame(gameSettings, &gameClock,get_base_meters());
   oled.clear();
@@ -300,8 +308,8 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
     case idleEnd:{
        Log.notice("resuming menu.");
 
-       //would it be nicer to just take control of the encoder?
-       if ( clickEncoder.Clicked ){
+       int buttonState = clickEncoder.getButton();
+       if ( buttonState == ClickEncoder::DoubleClicked ){
           stopGameAndReturnToMenu();       
        }       
        break;
@@ -352,21 +360,21 @@ int readRightTarget(){
   return analogRead(Pins::TARGET_RIGHT);
 }
 
-SensorState readTargets(TargetSettings targetSettings){
-  SensorState sensorState;
-  sensorState.rightScan = check_target(readRightTarget,targetSettings,(Clock*)(&gameClock));
 
-  sensorState.leftScan = check_target(readLeftTarget,targetSettings,(Clock*)(&gameClock));  
-  return sensorState;
+void readTargets(){  
+  if ( rightTargetTrigger.isTriggered() ){
+    sensorState.rightScan = check_target(readRightTarget,gameSettings.target,(Clock*)(&gameClock));
+  }
+  if ( leftTargetTrigger.isTriggered() ){
+    sensorState.leftScan = check_target(readLeftTarget,gameSettings.target,(Clock*)(&gameClock));  
+  }  
 }
 
-void updateGame(){
-  SensorState s = readTargets(gameSettings.target);
-  updateGame(&gameState, s, gameSettings, (Clock*)(&gameClock));
+void updateGame(){  
+  updateGame(&gameState, sensorState, gameSettings, (Clock*)(&gameClock));
 
-  //TODO: move this, but for now lets see if it works
   if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
-     gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;
+      gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;
   }
 
   if ( gameState.status == GameStatus::GAME_STATUS_ENDED ){
@@ -375,26 +383,39 @@ void updateGame(){
     gameOverDisplay(gameState);
     stopGameAndReturnToMenu();
   }
+
   updateLEDs();
 }
 
 void loop() {  
-  nav.doInput();
+  readTargets();
   if ( nav.sleepTask){
     gameUpdateTimer.update();
     updateDisplayTimer.update();
+    int b = clickEncoder.getButton();
+    if ( b == ClickEncoder::DoubleClicked){
+       stopGameAndReturnToMenu();
+    }
   }
   else{
-    if ( nav.changed(0) ){
+      menuDriver.update();
+      nav.doInput();
       oled.setFont(u8g2_font_7x13_mf);
       oled.firstPage();
       do nav.doOutput(); while (oled.nextPage() );
-    }
   }
 }
 
 // ESP32 timer
 void IRAM_ATTR onTimer()
 {
+  int left_target_val = readLeftTarget();
+  int right_target_val = readRightTarget();
+  if ( left_target_val > gameSettings.target.trigger_threshold){
+    leftTargetTrigger.trigger();
+  }
+  if ( right_target_val > gameSettings.target.trigger_threshold){
+    rightTargetTrigger.trigger();
+  }  
   clickEncoder.service();
 }

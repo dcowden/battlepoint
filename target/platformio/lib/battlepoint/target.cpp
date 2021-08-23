@@ -49,8 +49,10 @@ TargetHitScanResult check_target(int pinReader(void), TargetSettings target,Cloc
 
     TargetHitScanResult result;
     int targetValue = pinReader();
-    Log.infoln("Pin Value: %d/%l", targetValue, target.trigger_threshold);
-    if (targetValue > target.trigger_threshold ){
+
+    //Log.infoln("Pin Value: %d/%l", targetValue, target.trigger_threshold);
+    //if (targetValue > target.trigger_threshold ){
+    if (true ){
         for(int i=0;i<FFT_SAMPLES;i++){
             fft_data.vReal[i] = pinReader();
             fft_data.vImag[i] = 0;

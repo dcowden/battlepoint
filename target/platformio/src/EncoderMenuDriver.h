@@ -1,22 +1,15 @@
 #ifndef ENCODER_DRIVER_H
 #define ENCODER_DRIVER_H
-#include "OneButton.h"
+#include "ClickEncoder.h"
 #include <menu.h>
 #include <ESP32Encoder.h>
 class EncoderMenuDriver{
     public:
-       EncoderMenuDriver(Menu::navRoot* _nav, ESP32Encoder* _encoder, OneButton* _btn); 
+       EncoderMenuDriver(Menu::navRoot* _nav, ClickEncoder* _encoder); 
        void update();
-       void button_clicked();
-       void button_dbl_clicked();       
     private:
-        OneButton* button;
-        ESP32Encoder* encoder;
+        ClickEncoder* encoder;
         Menu::navRoot* nav;
-        long lastEncoderCount;
-        boolean clicked;
-        boolean dbl_clicked;
-
         void reset();
 };
 
