@@ -123,17 +123,17 @@ GameState startGame(GameSettings settings, Clock* clock, MeterSettings base_mete
 
 
 void updateGameHitsSingleSensor(HitTracker* tracker, TargetHitScanResult scanResult, long current_time_millis){
-    if ( scanResult.was_sampled){
-        if ( scanResult.was_hit ){
-            tracker->hits++;
-            tracker->last_hit_millis = current_time_millis;    
-            tracker->last_hit_energy = scanResult.last_hit_energy;
-        } 
-    }    
+    if ( scanResult.was_hit == 1 ){
+        Log.warningln("Adding One Hit");
+        tracker->hits+= 1;
+        tracker->last_hit_millis = current_time_millis;    
+        tracker->last_hit_energy = scanResult.last_hit_energy;
+    } 
+ 
 }
-void updateGameHits(GameState* current, SensorState sensors, long current_time_millis){
-    updateGameHitsSingleSensor(&current->bluHits,sensors.rightScan,current_time_millis);
-    updateGameHitsSingleSensor(&current->redHits,sensors.leftScan,current_time_millis);
+void updateGameHits(GameState* current, SensorState* sensors, long current_time_millis){
+    updateGameHitsSingleSensor(&current->bluHits,sensors->rightScan,current_time_millis);
+    updateGameHitsSingleSensor(&current->redHits,sensors->leftScan,current_time_millis);
 }
 //assumes that captureHits is being updated first
 void applyHitDecay(GameState* current, GameSettings settings, long current_time_millis){
@@ -609,10 +609,10 @@ void updateTargetTestMode(GameState* current,  GameSettings settings, long curre
     //update meters
     standardTeamMeters(current,true, FlashInterval::FLASH_NONE);    
 
-    if ( red_hits == settings.hits.to_win ){
+    if ( red_hits > settings.hits.to_win ){
         current->redHits.hits = 0;
     }
-    if ( blu_hits == settings.hits.to_win ){
+    if ( blu_hits > settings.hits.to_win ){
         current->bluHits.hits = 0;
     }    
     updateMeter( &current->meters.left.meter, red_hits, settings.hits.to_win, CRGB::Red, CRGB::Black );
@@ -626,11 +626,16 @@ void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long cu
     endGame(current, Team::NOBODY);
 }
 
-void updateGame(GameState* current, SensorState sensors, GameSettings settings, Clock* clock){
-   
+void updateGame(GameState* current, SensorState* sensors, GameSettings settings, Clock* clock){
+    if ( sensors->leftScan.was_hit ==1){
+        Log.warningln("updateGAme: leftHit");
+    }
+    if ( sensors->rightScan.was_hit ==1){
+        Log.warningln("updateGAme: rightHit");
+    }    
     updateGameTime(current, settings, clock->milliseconds());
     updateGameHits(current,sensors,clock->milliseconds());
-
+    Log.traceln("After Update, Hits:B=%d,R=%d",current->bluHits.hits, current->redHits.hits);
     if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
         updateFirstToHitsGame(current,settings);
     }
