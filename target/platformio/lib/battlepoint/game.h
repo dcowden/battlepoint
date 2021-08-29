@@ -123,20 +123,20 @@ typedef struct {
     MeterSettings meters;
 } GameState;
 
-GameSettings DEFAULT_GAMESETTINGS();
-GameState startGame(GameSettings settings, Clock* clock,MeterSettings base_meters);
+void setDefaultGameSettings(GameSettings* settings  );
+void startGame(GameState* gs, GameSettings* settings, Clock* clock);
 
 //exposed for testing
 void updateGameTime(GameState* current,GameSettings settings, long current_time_millis);
 void updateOwnership(GameState* current,  GameSettings settings, long current_time_millis);
 void applyHitDecay(GameState* current, GameSettings settings, long current_time_millis);
-void updateGameHits(GameState* current, SensorState sensors, long current_time_millis);
+void updateGameHits(GameState* current, SensorState* sensors, long current_time_millis);
 void updateFirstToHitsGame(GameState* current,  GameSettings settings);
 void updateMostHitsInTimeGame(GameState* current,  GameSettings settings);
 void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateAttackDefendGame(GameState* current,  GameSettings settings);
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
-void updateGame(GameState* game, SensorState sensors, GameSettings settings, Clock* clock);
+void updateGame(GameState* game, SensorState* sensors, GameSettings settings, Clock* clock);
 void updateLeds(GameState* current, long current_time_millis );
 
 
