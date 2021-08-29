@@ -10,9 +10,12 @@ void initMeter ( LedMeter* meter, const char* name, CRGB* leds, int startIndex, 
     meter->leds = leds;
     meter->val = 0;
     meter->max_val = DEFAULT_MAX_VAL;
-    meter->fgColor = CRGB::White;
-    meter->fgColor = CRGB::Black;
+    meter->fgColor = CRGB::Blue;
+    meter->bgColor = CRGB::Black;
     meter->flash_interval_millis=FlashInterval::FLASH_NONE;    
+}
+void debugLedController (LedController* controller){
+  Log.traceln("Meter '%s': %d/%d [%d:%d] <%d>",controller->meter->name, controller->meter->val,controller->meter->max_val,controller->meter->startIndex,controller->meter->endIndex ,controller->flashState);
 }
 
 void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg){
@@ -63,7 +66,6 @@ void blankLedMeter( LedMeter* meter ){
   updateLedMeter(meter);
   meter->fgColor = originalFgColor;
   meter->bgColor = originalBgColor;
-
 }
 
 void updateLedMeter(LedMeter* meter ){
@@ -76,7 +78,7 @@ void updateLedMeter(LedMeter* meter ){
   //TODO annoying! after all this work trying NOT to go to OO, 
   //the log framwork really pushes us to implemetning printable
   //https://arduino.stackexchange.com/questions/53732/is-it-possible-to-print-a-custom-object-by-passing-it-to-serial-print
-  Log.traceln("Meter '%s': %d/%d [%d:%d]",meter->name, meter->val,meter->max_val,startIndex,endIndex );
+  Log.infoln("UpdateMeter '%s': %d/%d [%d:%d]",meter->name, meter->val,meter->max_val,startIndex,endIndex );
 
   if ( startIndex < endIndex ){
     total_lights = endIndex - startIndex + 1;
@@ -103,12 +105,14 @@ void updateLedMeter(LedMeter* meter ){
 
 } 
 void updateController(LedController* controller, long current_time_millis){
-   if ( isOn( &(controller->flashState), controller->meter.flash_interval_millis, current_time_millis)){
+   //updateLedMeter(controller->meter);
+   
+   if ( isOn( &(controller->flashState), controller->meter->flash_interval_millis, current_time_millis)){
     Log.traceln("LED Strip is ON, updating meter");
-    updateLedMeter(&(controller->meter));
+    updateLedMeter(controller->meter);
    }
    else{
     Log.traceln("LED Strip is OFF, blanking meter");
-    blankLedMeter( &(controller->meter));
+    blankLedMeter( controller->meter);
    }
 }

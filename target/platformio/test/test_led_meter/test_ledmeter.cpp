@@ -68,7 +68,7 @@ LedMeter subsetMeter {
 
 void assert_leds_equal(CRGB* expected){
     for (int i=0;i<LED_COUNT;i++,expected++){
-        //Serial.print("LED ");Serial.print(i);Serial.print(": ");Serial.print(*expected);Serial.print("--");Serial.println(testLeds[i]);
+        Serial.print("LED ");Serial.print(i);Serial.print(": ");Serial.print(*expected);Serial.print("--");Serial.println(testLeds[i]);
         TEST_ASSERT_EQUAL(*expected,testLeds[i]);
     }
 }
@@ -165,10 +165,10 @@ void test_controller_slow_flash(){
     //like every 10 ms
 
     LedController c;
-    c.meter = simpleMeter;
-    c.meter.max_val=10;
-    c.meter.val = 10;
-    c.meter.flash_interval_millis = 500;
+    c.meter = &simpleMeter;
+    c.meter->max_val=10;
+    c.meter->val = 10;
+    c.meter->flash_interval_millis = 500;
     //should be on 0-500, off 500-1000, on 1000-1500, etc
     updateController(&c,0);
     assert_leds_equal(ALL_BLUE);
@@ -187,8 +187,6 @@ void setup() {
     Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
     UNITY_BEGIN();
 
-    RUN_TEST(test_controller_slow_flash);
-    //simple meter tests
     
     RUN_TEST(test_meter_initially_all_black);
     RUN_TEST(test_basic_meter_zero);
@@ -208,6 +206,8 @@ void setup() {
     RUN_TEST(test_subset_meter_max_value);
     RUN_TEST(test_subset_meter_mid_value);
     
+    //flash tests
+    RUN_TEST(test_controller_slow_flash);
 
     UNITY_END();
 

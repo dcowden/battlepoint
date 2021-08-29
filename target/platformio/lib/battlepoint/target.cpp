@@ -42,13 +42,20 @@ void PrintVector(double *vData, uint16_t bufferSize, uint8_t scaleType)
   Serial.println();
 }
 
+TargetHitScanResult empty_target_scan(){
+  TargetHitScanResult r;
+  r.was_sampled = 0;
+  r.was_hit = 0;
+  r.hit_millis = 0;
+  r.last_hit_energy = 0;
+  r.peak_frequency = 0;   
+  return r;
+
+}
 //more sophisticated code could check the two targets
 //in parallel, but I dont think that'll be necessary.
 //and if it is, we maybe want to use a separate ADC
-TargetHitScanResult check_target(int pinReader(void), TargetSettings target,Clock* clock){
-
-    TargetHitScanResult result;
-    int targetValue = pinReader();
+void check_target(int pinReader(void), TargetHitScanResult* result, TargetSettings target,Clock* clock){
 
     //Log.infoln("Pin Value: %d/%l", targetValue, target.trigger_threshold);
     //if (targetValue > target.trigger_threshold ){
@@ -72,29 +79,14 @@ TargetHitScanResult check_target(int pinReader(void), TargetSettings target,Cloc
         //
         //Serial.println(x, 6);
         if ( last_hit_energy > ((double)target.hit_energy_threshold)){
-            result.was_sampled = 1;
-            result.was_hit = 1;
-            result.hit_millis = clock->milliseconds();
-            result.last_hit_energy = last_hit_energy;
-            result.peak_frequency = peak;
+            result->was_sampled = 1;
+            result->was_hit = 1;
+            result->hit_millis = clock->milliseconds();
+            result->last_hit_energy = last_hit_energy;
+            result->peak_frequency = peak;
             Log.warningln("HIT! %F > %l", last_hit_energy, target.hit_energy_threshold);
-        }
-        else{
-          result.was_sampled = 0;
-          result.was_hit = 0;
-          result.hit_millis = 0;
-          result.last_hit_energy = 0;
-          result.peak_frequency = 0;          
-        }        
-
+        }  
     }
-    else{
-        result.was_sampled = 0;
-        result.was_hit = 0;
-        result.hit_millis = 0;
-        result.last_hit_energy = 0;
-        result.peak_frequency = 0;
-    }
-    return result;
+    Log.traceln("Result Was Hit=%d",result->was_hit);
 
 }

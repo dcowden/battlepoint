@@ -3,8 +3,8 @@
 #define I2C_ADDRESS 0x3C
 
 typedef enum {
-    TARGET_LEFT = 26,
-    TARGET_RIGHT = 25,
+    TARGET_LEFT = 25,
+    TARGET_RIGHT = 26,
     LED_LEFT_EDGE = 12,
     LED_RIGHT_EDGE = 14,
     LED_CENTER_VERTICAL = 15,

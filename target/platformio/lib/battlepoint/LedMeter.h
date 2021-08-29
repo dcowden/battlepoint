@@ -34,13 +34,13 @@ typedef struct {
 
 
 typedef struct {
-    LedMeter meter;
+    LedMeter* meter;
     LedFlashState flashState;
-
 } LedController;
 
 CRGB getFastLEDColor(TeamColor tc);
 int proportionalValue(int in_val, int in_max, int out_max );
+void debugLedController (LedController* controller);
 void initMeter ( LedMeter* meter, const char* name, CRGB* leds, int startIndex, int endIndex );
 void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg);
 void updateLedMeter(LedMeter* meter );

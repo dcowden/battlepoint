@@ -37,5 +37,6 @@ typedef struct {
     double vImag[TARGET_FFT_SAMPLES];
 } FFTData;
 
-TargetHitScanResult check_target(int pinReader(void),  TargetSettings target, Clock* clock);
+TargetHitScanResult empty_target_scan();
+void check_target(int pinReader(void), TargetHitScanResult* result, TargetSettings target, Clock* clock);
 #endif

@@ -41,9 +41,9 @@
 #define TRIGGER_BIG_STEP_SIZE 100
 #define TRIGGER_LITTLE_STEP_SIZE 10
 
-#define HIT_MIN 2000
+#define HIT_MIN 1000
 #define HIT_MAX 25000
-#define HIT_BIG_STEP_SIZE 2000
+#define HIT_BIG_STEP_SIZE 1000
 #define HIT_LITTLE_STEP_SIZE 500
 
 #define TIME_LIMIT_MIN 10
@@ -61,6 +61,8 @@
 #define VICTORY_HITS_BIG_STEP_SIZE 5
 #define VICTORY_HITS_LITTLE_STEP_SIZE 1
 
+#define POST_INTERVAL_MS 300
+
 RealClock gameClock = RealClock();
 
 //the different types of games we can play
@@ -74,8 +76,21 @@ CRGB rightLeds[VERTICAL_LED_SIZE];
 CRGB topLeds[2* HORIONTAL_LED_SIZE];
 CRGB bottomLeds[2* HORIONTAL_LED_SIZE];
 
+
+LedMeter leftTopMeter;
+LedMeter leftBottomMeter;
+LedMeter rightTopMeter;
+LedMeter rightBottomMeter;
+LedMeter centerMeter;
+LedMeter leftMeter;
+LedMeter rightMeter;
+
+
 Trigger rightTargetTrigger = Trigger(&gameClock,TARGET_TRIGGER_WINDOW_MS);
 Trigger leftTargetTrigger = Trigger(&gameClock,TARGET_TRIGGER_WINDOW_MS);
+volatile bool rightTargetTriggered = false;
+volatile bool leftTargetTriggered = false;
+long updateCounter = 0;
 
 //prototypes
 //void updateDisplay();
@@ -83,12 +98,9 @@ void menuIdleEvent();
 void updateGame();
 void startSelectedGame();
 
-
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
 ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
 //ClickEncoderStream encStream(clickEncoder, 1); 
-
-
 
 void updateDisplayLocal(){
   updateDisplay(gameState,gameSettings);
@@ -105,11 +117,11 @@ hw_timer_t *timer = NULL;
 void IRAM_ATTR onTimer();
 
 void setupLEDs(){
-  pinMode(Pins::LED_TOP,OUTPUT);
-  pinMode(Pins::LED_BOTTOM,OUTPUT);
-  pinMode(Pins::LED_LEFT_EDGE,OUTPUT);
-  pinMode(Pins::LED_CENTER_VERTICAL,OUTPUT);
-  pinMode(Pins::LED_RIGHT_EDGE,OUTPUT);
+  //pinMode(Pins::LED_TOP,OUTPUT);
+  //pinMode(Pins::LED_BOTTOM,OUTPUT);
+  //pinMode(Pins::LED_LEFT_EDGE,OUTPUT);
+  //pinMode(Pins::LED_CENTER_VERTICAL,OUTPUT);
+  //pinMode(Pins::LED_RIGHT_EDGE,OUTPUT);
 
   FastLED.addLeds<NEOPIXEL, Pins::LED_TOP>(topLeds, 2* HORIONTAL_LED_SIZE);
   FastLED.addLeds<NEOPIXEL, Pins::LED_BOTTOM>(bottomLeds, 2* HORIONTAL_LED_SIZE);
@@ -170,7 +182,7 @@ Menu::result loadCPSettings(){
 Menu::result loadTargetTestSettings(){
   gameSettings.gameType = GameType::GAME_TYPE_TARGET_TEST;
   loadSettingsForSelectedGameType();
-  gameSettings.hits.to_win = 10;
+  gameSettings.hits.to_win = 16;
   gameSettings.timed.max_duration_seconds=999;
   return Menu::proceed;
 }
@@ -264,16 +276,23 @@ NAVROOT(nav, mainMenu, MENU_MAX_DEPTH, in, out);
 
 EncoderMenuDriver menuDriver = EncoderMenuDriver(&nav, &clickEncoder);
 
-MeterSettings get_base_meters(){
-    MeterSettings s;        
-    initMeter(&s.leftTop.meter,"leftTop",topLeds,0,9);
-    initMeter(&s.leftBottom.meter,"leftBottom",bottomLeds,0,9);
-    initMeter(&s.rightTop.meter,"rightTop",topLeds,10,19);
-    initMeter(&s.rightBottom.meter,"rightBottom",bottomLeds,10,19);
-    initMeter(&s.center.meter,"center",centerLeds,0,15);
-    initMeter(&s.left.meter,"left",leftLeds,0,15);
-    initMeter(&s.right.meter,"right",rightLeds,0,15);
-    return s;
+
+void setupMeters(){
+  gameState.meters.leftTop.meter = &leftTopMeter;
+  gameState.meters.leftBottom.meter = &leftBottomMeter;
+  gameState.meters.rightTop.meter = &rightTopMeter;
+  gameState.meters.rightBottom.meter = &rightBottomMeter;
+  gameState.meters.center.meter = &centerMeter;
+  gameState.meters.left.meter  = &leftMeter;
+  gameState.meters.right.meter = &rightMeter;
+
+  initMeter(gameState.meters.leftTop.meter,"leftTop",topLeds,0,9);
+  initMeter(gameState.meters.leftBottom.meter,"leftBottom",bottomLeds,0,9);
+  initMeter(gameState.meters.rightTop.meter,"rightTop",topLeds,10,19);
+  initMeter(gameState.meters.rightBottom.meter,"rightBottom",bottomLeds,10,19);
+  initMeter(gameState.meters.center.meter,"center",centerLeds,0,15);
+  initMeter(gameState.meters.left.meter,"left",leftLeds,0,15);
+  initMeter(gameState.meters.right.meter,"right",rightLeds,0,15);
 }
 
 void startSelectedGame(){  
@@ -281,7 +300,11 @@ void startSelectedGame(){
   Log.noticeln("Starting Game. Type= %d", gameSettings.gameType);
   Log.warningln("Target Threshold= %l", gameSettings.target.trigger_threshold);
   saveSettingsForSelectedGameType();
-  gameState = startGame(gameSettings, &gameClock,get_base_meters());
+  startGame(&gameState, &gameSettings, &gameClock);
+
+  Log.warningln("Meter States:");
+  debugLedController(&gameState.meters.left);
+  debugLedController(&gameState.meters.right);
   oled.clear();
   nav.idleOn();
 }
@@ -323,6 +346,33 @@ void updateLEDs(){
   FastLED.show();
 }
 
+void setMeterValue(LedMeter* meter, int val ){
+  meter->val = val;
+  updateLedMeter(meter);
+}
+
+void setAllMetersToValue(int v ){
+  setMeterValue(&leftTopMeter,v);
+  setMeterValue(&leftBottomMeter,v);      
+  setMeterValue(&leftMeter,v);      
+  setMeterValue(&rightTopMeter,v);      
+  setMeterValue(&rightBottomMeter,v);      
+  setMeterValue(&rightMeter,v);
+  FastLED.show();       
+}
+
+void POST(){
+   Log.noticeln("POST...");
+   //all default meters are at their default max values, of 10
+   for ( int i = 0;i<=DEFAULT_MAX_VAL;i++){
+      setAllMetersToValue(i);
+      FastLED.delay(POST_INTERVAL_MS);                                
+   }
+   setAllMetersToValue(0);
+   Log.notice("POST COMPLETE");
+}
+
+
 void setup() {
   Serial.begin(115200);
   Serial.setTimeout(500);
@@ -335,15 +385,17 @@ void setup() {
   Log.notice("LEDS [OK]");  
   setupTargets();
   Log.notice("TARGETS [OK]");
-  // hardwareOutputTimer.start();
-  updateDisplayTimer.start();
-  gameUpdateTimer.start();
-  //nav.idleTask = menuIdleEvent;
+
   Menu::options->invertFieldKeys = false;
   Log.warningln("Complete.");
   oled.setFont(u8g2_font_7x13_mf);
   setupEncoder();
-  gameSettings = DEFAULT_GAMESETTINGS();
+  setupMeters();  
+  POST();
+  // hardwareOutputTimer.start();
+  //nav.idleTask = menuIdleEvent;  
+  updateDisplayTimer.start();
+  gameUpdateTimer.start();
 }
 
 void stopTimers(){
@@ -351,27 +403,46 @@ void stopTimers(){
 }
 
 int readLeftTarget(){
-  //TODO: re-enable when we have multiple targets
-  // return analogRead(Pins::TARGET_LEFT);
-  return 0;
+  return analogRead(Pins::TARGET_LEFT);
 }
 
 int readRightTarget(){
-  return analogRead(Pins::TARGET_RIGHT);
+  //TODO: re-enable when we have multiple targets
+  //return analogRead(Pins::TARGET_RIGHT);
+  return 0;
 }
 
 
 void readTargets(){  
-  if ( rightTargetTrigger.isTriggered() ){
-    sensorState.rightScan = check_target(readRightTarget,gameSettings.target,(Clock*)(&gameClock));
+  
+  if ( rightTargetTriggered ){
+    rightTargetTrigger.trigger();
+    rightTargetTriggered = false;
   }
+
+  if ( leftTargetTriggered ){
+    leftTargetTrigger.trigger();
+    leftTargetTriggered = false;
+  }
+
+  if ( rightTargetTrigger.isTriggered() ){
+    check_target(readRightTarget,&sensorState.rightScan, gameSettings.target,(Clock*)(&gameClock));
+  }
+
   if ( leftTargetTrigger.isTriggered() ){
-    sensorState.leftScan = check_target(readLeftTarget,gameSettings.target,(Clock*)(&gameClock));  
-  }  
+    check_target(readLeftTarget,&sensorState.leftScan,gameSettings.target,(Clock*)(&gameClock));  
+  } 
+
 }
 
 void updateGame(){  
-  updateGame(&gameState, sensorState, gameSettings, (Clock*)(&gameClock));
+  updateCounter++;
+  updateGame(&gameState, &sensorState, gameSettings, (Clock*)(&gameClock));
+  
+  if ( (updateCounter % 200) == 0 ){
+    debugLedController(&gameState.meters.left);
+    debugLedController(&gameState.meters.right);    
+  }
 
   if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
       gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;
@@ -384,26 +455,33 @@ void updateGame(){
     stopGameAndReturnToMenu();
   }
 
-  updateLEDs();
+  //updateLEDs();
+  sensorState.rightScan.was_hit=0;
+  sensorState.leftScan.was_hit=0;
 }
 
 void loop() {  
-  readTargets();
+
   if ( nav.sleepTask){
+    readTargets();
     gameUpdateTimer.update();
     updateDisplayTimer.update();
+    updateLEDs();
+    
     int b = clickEncoder.getButton();
     if ( b == ClickEncoder::DoubleClicked){
        stopGameAndReturnToMenu();
     }
   }
   else{
+
       menuDriver.update();
       nav.doInput();
       oled.setFont(u8g2_font_7x13_mf);
       oled.firstPage();
       do nav.doOutput(); while (oled.nextPage() );
   }
+ 
 }
 
 // ESP32 timer
@@ -412,10 +490,10 @@ void IRAM_ATTR onTimer()
   int left_target_val = readLeftTarget();
   int right_target_val = readRightTarget();
   if ( left_target_val > gameSettings.target.trigger_threshold){
-    leftTargetTrigger.trigger();
+    leftTargetTriggered = true;
   }
   if ( right_target_val > gameSettings.target.trigger_threshold){
-    rightTargetTrigger.trigger();
+    rightTargetTriggered = true;
   }  
   clickEncoder.service();
 }
