@@ -10,7 +10,7 @@
 //ESP32 ADC : 6k samples/sec. 128 samples -> 21.3333 ms
 //noisy part of the signal was 700hz, about 7 peaks in 20ms
 //smooth part was about 116hz
-#define TARGET_FFT_SAMPLES 128
+#define TARGET_FFT_SAMPLES 512
 #define BP_DEBUG 1
 
 typedef struct {
@@ -39,4 +39,5 @@ typedef struct {
 
 TargetHitScanResult empty_target_scan();
 void check_target(int pinReader(void), TargetHitScanResult* result, TargetSettings target, Clock* clock);
+
 #endif
