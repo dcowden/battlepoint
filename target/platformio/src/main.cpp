@@ -33,8 +33,8 @@
 #define DISPLAY_UPDATE_INTERVAL_MS 500
 #define VERTICAL_LED_SIZE 16
 #define HORIONTAL_LED_SIZE 10
-#define GAME_UPDATE_INTERVAL_MS 20
-#define TARGET_TRIGGER_WINDOW_MS 50  //after we trigger for a hit, how long till we're allowed to start again? practically limited by FFT sample time, about 20ms. dont want to re-trigger till that's finished
+#define GAME_UPDATE_INTERVAL_MS 200
+#define TARGET_TRIGGER_WINDOW_MS 60  //after we trigger for a hit, how long till we're allowed to start again? practically limited by FFT sample time, about 20ms. dont want to re-trigger till that's finished
 
 #define TRIGGER_MIN 100
 #define TRIGGER_MAX 1000
@@ -86,6 +86,7 @@ LedMeter leftMeter;
 LedMeter rightMeter;
 
 
+
 Trigger rightTargetTrigger = Trigger(&gameClock,TARGET_TRIGGER_WINDOW_MS);
 Trigger leftTargetTrigger = Trigger(&gameClock,TARGET_TRIGGER_WINDOW_MS);
 volatile bool rightTargetTriggered = false;
@@ -113,7 +114,7 @@ Ticker gameUpdateTimer(updateGame, GAME_UPDATE_INTERVAL_MS );
 // ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
 // and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
 hw_timer_t *timer = NULL;
-//portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 void IRAM_ATTR onTimer();
 
 void setupLEDs(){
@@ -134,10 +135,12 @@ void setupEncoder(){
   clickEncoder.setAccelerationEnabled(true);
   clickEncoder.setDoubleClickEnabled(true); // Disable doubleclicks makes the response faster.  See: https://github.com/soligen2010/encoder/issues/6
 
+  //portENTER_CRITICAL_ISR(&timerMux);
+  //portEXIT_CRITICAL_ISR(&timerMux);
   //ESP32 timer
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
-  timerAlarmWrite(timer, 1000, true);
+  timerAlarmWrite(timer, 500, true); //run every 0.5ms
   timerAlarmEnable(timer);
     
 }
@@ -374,10 +377,11 @@ void POST(){
 
 
 void setup() {
+  setCpuFrequencyMhz(240);
   Serial.begin(115200);
   Serial.setTimeout(500);
   initSettings();
-  Log.begin(LOG_LEVEL_INFO, &Serial, true);
+  Log.begin(LOG_LEVEL_WARNING, &Serial, true);
   Log.warning("Starting...");
   initDisplay();
   Log.notice("OLED [OK]");
@@ -396,6 +400,9 @@ void setup() {
   //nav.idleTask = menuIdleEvent;  
   updateDisplayTimer.start();
   gameUpdateTimer.start();
+
+  loadTargetTestSettings();
+  startSelectedGame();
 }
 
 void stopTimers(){
@@ -412,26 +419,34 @@ int readRightTarget(){
   return 0;
 }
 
+void disableTargetTriggers(){
+  timerAlarmDisable(timer);
+}
+
+void enableTargetTriggers(){
+  portENTER_CRITICAL(&timerMux);
+  rightTargetTriggered = false;
+  leftTargetTriggered = false;
+  portEXIT_CRITICAL(&timerMux);
+  timerAlarmEnable(timer);
+}
 
 void readTargets(){  
   
-  if ( rightTargetTriggered ){
-    rightTargetTrigger.trigger();
-    rightTargetTriggered = false;
-  }
-
-  if ( leftTargetTriggered ){
-    leftTargetTrigger.trigger();
-    leftTargetTriggered = false;
-  }
-
-  if ( rightTargetTrigger.isTriggered() ){
-    check_target(readRightTarget,&sensorState.rightScan, gameSettings.target,(Clock*)(&gameClock));
-  }
-
-  if ( leftTargetTrigger.isTriggered() ){
+  if (leftTargetTriggered  ){
+    disableTargetTriggers();
     check_target(readLeftTarget,&sensorState.leftScan,gameSettings.target,(Clock*)(&gameClock));  
-  } 
+    enableTargetTriggers();
+  }
+
+  //TODO:put back!
+  //if ( rightTargetTrigger.isTriggered() ){
+  //  check_target(readRightTarget,&sensorState.rightScan, gameSettings.target,(Clock*)(&gameClock));
+  //}
+
+  //TODO: looks like trigger threshold should be > 1500
+  // need to make sure the existing hit is done before starting a new one. how to do that? 
+  // right now, looks like wait/sample for 120ms will get trigger levels below 1000. 50ms gets you below 2000
 
 }
 
