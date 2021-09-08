@@ -310,6 +310,21 @@ void startSelectedGame(){
   debugLedController(&gameState.meters.right);
   oled.clear();
   nav.idleOn();
+
+  Serial.print("sample_no");Serial.print(",");
+  Serial.print("FFT_PEAK");Serial.print(",");
+  Serial.print("yin_peak");Serial.print(",");
+  Serial.print("energy");Serial.print(",");
+  Serial.print("avg_energy");Serial.print(",");
+  Serial.print("avg_middle");Serial.print(",");
+  Serial.print("avg_middle2");Serial.print(",");
+  Serial.print("avg_middle3");Serial.print(",");
+  Serial.print("avg_middle4");Serial.print(",");
+  Serial.print("peak_0");Serial.print(",");
+  Serial.print("peak_1000");Serial.print(",");
+  Serial.print("peak_2000");Serial.print(",");
+  Serial.print("peak_3000");Serial.print(",");
+  Serial.print("peak_4000");Serial.println("");  
 }
 
 void stopGameAndReturnToMenu(){
