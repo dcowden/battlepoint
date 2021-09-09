@@ -68,6 +68,14 @@ void blankLedMeter( LedMeter* meter ){
   meter->bgColor = originalBgColor;
 }
 
+void updateMeter (LedMeter* meter, int val, int max_val, CRGB fgColor, CRGB bgColor ){
+    Log.traceln("Updating Meter, %d/%d", val, max_val);
+    meter->val = val;
+    meter->max_val = max_val;
+    meter->fgColor = fgColor;
+    meter->bgColor = bgColor;
+}
+
 void updateLedMeter(LedMeter* meter ){
   
   int indexIncrement =0;

@@ -120,7 +120,7 @@ typedef struct {
     HitTracker redHits; 
     HitTracker bluHits;
     Ownership ownership;
-    MeterSettings meters;
+    //MeterSettings meters;
 } GameState;
 
 void setDefaultGameSettings(GameSettings* settings  );
@@ -137,8 +137,8 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
 void updateAttackDefendGame(GameState* current,  GameSettings settings);
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateGame(GameState* game, SensorState* sensors, GameSettings settings, Clock* clock);
-void updateLeds(GameState* current, long current_time_millis );
-
+void updateLeds(MeterSettings* meters, long current_time_millis );
+void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters);
 
 const char* getCharForGameType(GameType t);
 const char* getCharForStatus(GameStatus s);

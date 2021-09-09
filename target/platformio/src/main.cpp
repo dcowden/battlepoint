@@ -85,7 +85,7 @@ LedMeter centerMeter;
 LedMeter leftMeter;
 LedMeter rightMeter;
 
-
+MeterSettings meters;
 
 Trigger rightTargetTrigger = Trigger(&gameClock,TARGET_TRIGGER_WINDOW_MS);
 Trigger leftTargetTrigger = Trigger(&gameClock,TARGET_TRIGGER_WINDOW_MS);
@@ -118,12 +118,6 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 void IRAM_ATTR onTimer();
 
 void setupLEDs(){
-  //pinMode(Pins::LED_TOP,OUTPUT);
-  //pinMode(Pins::LED_BOTTOM,OUTPUT);
-  //pinMode(Pins::LED_LEFT_EDGE,OUTPUT);
-  //pinMode(Pins::LED_CENTER_VERTICAL,OUTPUT);
-  //pinMode(Pins::LED_RIGHT_EDGE,OUTPUT);
-
   FastLED.addLeds<NEOPIXEL, Pins::LED_TOP>(topLeds, 2* HORIONTAL_LED_SIZE);
   FastLED.addLeds<NEOPIXEL, Pins::LED_BOTTOM>(bottomLeds, 2* HORIONTAL_LED_SIZE);
   FastLED.addLeds<NEOPIXEL, Pins::LED_LEFT_EDGE>(leftLeds, VERTICAL_LED_SIZE);
@@ -281,21 +275,21 @@ EncoderMenuDriver menuDriver = EncoderMenuDriver(&nav, &clickEncoder);
 
 
 void setupMeters(){
-  gameState.meters.leftTop.meter = &leftTopMeter;
-  gameState.meters.leftBottom.meter = &leftBottomMeter;
-  gameState.meters.rightTop.meter = &rightTopMeter;
-  gameState.meters.rightBottom.meter = &rightBottomMeter;
-  gameState.meters.center.meter = &centerMeter;
-  gameState.meters.left.meter  = &leftMeter;
-  gameState.meters.right.meter = &rightMeter;
+  meters.leftTop.meter = &leftTopMeter;
+  meters.leftBottom.meter = &leftBottomMeter;
+  meters.rightTop.meter = &rightTopMeter;
+  meters.rightBottom.meter = &rightBottomMeter;
+  meters.center.meter = &centerMeter;
+  meters.left.meter  = &leftMeter;
+  meters.right.meter = &rightMeter;
 
-  initMeter(gameState.meters.leftTop.meter,"leftTop",topLeds,0,9);
-  initMeter(gameState.meters.leftBottom.meter,"leftBottom",bottomLeds,0,9);
-  initMeter(gameState.meters.rightTop.meter,"rightTop",topLeds,10,19);
-  initMeter(gameState.meters.rightBottom.meter,"rightBottom",bottomLeds,10,19);
-  initMeter(gameState.meters.center.meter,"center",centerLeds,0,15);
-  initMeter(gameState.meters.left.meter,"left",leftLeds,0,15);
-  initMeter(gameState.meters.right.meter,"right",rightLeds,0,15);
+  initMeter(meters.leftTop.meter,"leftTop",topLeds,0,9);
+  initMeter(meters.leftBottom.meter,"leftBottom",bottomLeds,0,9);
+  initMeter(meters.rightTop.meter,"rightTop",topLeds,10,19);
+  initMeter(meters.rightBottom.meter,"rightBottom",bottomLeds,10,19);
+  initMeter(meters.center.meter,"center",centerLeds,0,15);
+  initMeter(meters.left.meter,"left",leftLeds,0,15);
+  initMeter(meters.right.meter,"right",rightLeds,0,15);
 }
 
 void startSelectedGame(){  
@@ -306,8 +300,8 @@ void startSelectedGame(){
   startGame(&gameState, &gameSettings, &gameClock);
 
   Log.warningln("Meter States:");
-  debugLedController(&gameState.meters.left);
-  debugLedController(&gameState.meters.right);
+  //debugLedController(&gameState.meters.left);
+  //debugLedController(&gameState.meters.right);
   oled.clear();
   nav.idleOn();
 
@@ -360,7 +354,7 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
 }
 
 void updateLEDs(){
-  updateLeds(&gameState, gameClock.milliseconds());
+  updateLeds(&meters, gameClock.milliseconds());
   FastLED.show();
 }
 
@@ -469,10 +463,10 @@ void updateGame(){
   updateCounter++;
   updateGame(&gameState, &sensorState, gameSettings, (Clock*)(&gameClock));
   
-  if ( (updateCounter % 200) == 0 ){
-    debugLedController(&gameState.meters.left);
-    debugLedController(&gameState.meters.right);    
-  }
+  //if ( (updateCounter % 200) == 0 ){
+  //  debugLedController(&gameState.meters.left);
+  //  debugLedController(&gameState.meters.right);    
+  // }
 
   if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
       gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;

@@ -44,5 +44,6 @@ void debugLedController (LedController* controller);
 void initMeter ( LedMeter* meter, const char* name, CRGB* leds, int startIndex, int endIndex );
 void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg);
 void updateLedMeter(LedMeter* meter );
+void updateMeter (LedMeter* meter, int val, int max_val, CRGB fgColor, CRGB bgColor );
 void updateController(LedController* controller, long current_time_millis);
 #endif
