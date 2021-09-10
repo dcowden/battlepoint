@@ -14,9 +14,7 @@ void initMeter ( LedMeter* meter, const char* name, CRGB* leds, int startIndex, 
     meter->bgColor = CRGB::Black;
     meter->flash_interval_millis=FlashInterval::FLASH_NONE;    
 }
-void debugLedController (LedController* controller){
-  Log.traceln("Meter '%s': %d/%d [%d:%d] <%d>",controller->meter->name, controller->meter->val,controller->meter->max_val,controller->meter->startIndex,controller->meter->endIndex ,controller->flashState);
-}
+
 
 void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg){
     meter->max_val = max_val;
@@ -29,18 +27,21 @@ int proportionalValue(int in_val, int in_max, int out_max ){
   return in_val * out_max / in_max;
 }
 
-bool isOn ( LedFlashState* state, long flash_interval_millis, long current_time_millis){
+bool isOn ( LedMeter* meter, long current_time_millis){
+
+  long flash_interval_millis = meter->flash_interval_millis;
+
   if ( flash_interval_millis > 0){
-     long elapsed = current_time_millis - state->last_flash_millis;
+     long elapsed = current_time_millis - meter->last_flash_millis;
      Log.traceln("Flash Interval=%d, elapsed=%d, current_time=%d", flash_interval_millis,elapsed,current_time_millis);
      if ( elapsed >= flash_interval_millis){
-       int old_state = state->flash_state;
-       int new_state = ! state->flash_state;
+       int old_state = meter->flash_state;
+       int new_state = ! meter->flash_state;
        Log.infoln("Toggling Controller State, %d->%d",old_state,new_state);
-       state->flash_state = ! state->flash_state;
+       meter->flash_state = ! meter->flash_state;
 
-       state->last_flash_millis = current_time_millis;
-       if ( state->flash_state == 0 ){
+       meter->last_flash_millis = current_time_millis;
+       if ( meter->flash_state == 0 ){
          Log.infoln("Flash:on=true");
          return true;
        }
@@ -112,15 +113,14 @@ void updateLedMeter(LedMeter* meter ){
   }
 
 } 
-void updateController(LedController* controller, long current_time_millis){
-   //updateLedMeter(controller->meter);
+void updateLedMeter(LedMeter* meter, long current_time_millis){
    
-   if ( isOn( &(controller->flashState), controller->meter->flash_interval_millis, current_time_millis)){
+   if ( isOn( meter, current_time_millis)){
     Log.traceln("LED Strip is ON, updating meter");
-    updateLedMeter(controller->meter);
+    updateLedMeter(meter);
    }
    else{
     Log.traceln("LED Strip is OFF, blanking meter");
-    blankLedMeter( controller->meter);
+    blankLedMeter( meter);
    }
 }

@@ -83,21 +83,21 @@ void update(){
 
 void setupMeters(){
   //probably this should be factored, since is necessary for both the tests and any reasonable user
-  meters.leftTop.meter = &leftTopMeter;
-  meters.leftBottom.meter = &leftBottomMeter;
-  meters.rightTop.meter = &rightTopMeter;
-  meters.rightBottom.meter = &rightBottomMeter;
-  meters.center.meter = &centerMeter;
-  meters.left.meter  = &leftMeter;
-  meters.right.meter = &rightMeter;
+  meters.leftTop = &leftTopMeter;
+  meters.leftBottom = &leftBottomMeter;
+  meters.rightTop = &rightTopMeter;
+  meters.rightBottom = &rightBottomMeter;
+  meters.center = &centerMeter;
+  meters.left  = &leftMeter;
+  meters.right = &rightMeter;
 
-  initMeter(meters.leftTop.meter,"leftTop",topLeds,0,3);
-  initMeter(meters.leftBottom.meter,"leftBottom",bottomLeds,0,3);
-  initMeter(meters.rightTop.meter,"rightTop",topLeds,4,7);
-  initMeter(meters.rightBottom.meter,"rightBottom",bottomLeds,4,7);
-  initMeter(meters.center.meter,"center",centerLeds,0,7);
-  initMeter(meters.left.meter,"left",leftLeds,0,7);
-  initMeter(meters.right.meter,"right",rightLeds,0,7);
+  initMeter(meters.leftTop,"leftTop",topLeds,0,3);
+  initMeter(meters.leftBottom,"leftBottom",bottomLeds,0,3);
+  initMeter(meters.rightTop,"rightTop",topLeds,4,7);
+  initMeter(meters.rightBottom,"rightBottom",bottomLeds,4,7);
+  initMeter(meters.center,"center",centerLeds,0,7);
+  initMeter(meters.left,"left",leftLeds,0,7);
+  initMeter(meters.right,"right",rightLeds,0,7);
 }
 void setup_game(GameType gt){
 
@@ -150,10 +150,10 @@ void test_one_team_wins_no_ot(){
     ASSERT_LEDS_EQUAL(TEAM_COLORS,topLeds,VERTICAL_LED_SIZE,"top Team Colors");
     ASSERT_LEDS_EQUAL(TEAM_COLORS,bottomLeds,VERTICAL_LED_SIZE,"bottom team colors");
 
-    TEST_ASSERT_EQUAL_MESSAGE(meters.rightBottom.meter->flash_interval_millis, FLASH_NONE,"rightBottom should not flash");
-    TEST_ASSERT_EQUAL_MESSAGE(meters.rightTop.meter->flash_interval_millis, FLASH_NONE,"rightTop should not flash");
-    TEST_ASSERT_EQUAL_MESSAGE(meters.leftBottom.meter->flash_interval_millis, FLASH_NONE,"leftBottom should not flash ");
-    TEST_ASSERT_EQUAL_MESSAGE(meters.leftTop.meter->flash_interval_millis, FLASH_NONE,"leftTop should not flash");     
+    TEST_ASSERT_EQUAL_MESSAGE(meters.rightBottom->flash_interval_millis, FLASH_NONE,"rightBottom should not flash");
+    TEST_ASSERT_EQUAL_MESSAGE(meters.rightTop->flash_interval_millis, FLASH_NONE,"rightTop should not flash");
+    TEST_ASSERT_EQUAL_MESSAGE(meters.leftBottom->flash_interval_millis, FLASH_NONE,"leftBottom should not flash ");
+    TEST_ASSERT_EQUAL_MESSAGE(meters.leftTop->flash_interval_millis, FLASH_NONE,"leftTop should not flash");     
 
 }
 
@@ -188,10 +188,10 @@ void test_one_team_overtime(){
     //ASSERT_LEDS_EQUAL(TEAM_COLORS,topLeds,VERTICAL_LED_SIZE,"top Team Colors");
     //ASSERT_LEDS_EQUAL(TEAM_COLORS,bottomLeds,VERTICAL_LED_SIZE,"bottom team colors");
 
-    TEST_ASSERT_EQUAL_MESSAGE(meters.rightBottom.meter->flash_interval_millis, FLASH_FAST,"rightBottom should flash slow");
-    TEST_ASSERT_EQUAL_MESSAGE(meters.rightTop.meter->flash_interval_millis, FLASH_FAST,"rightTop should flash");
-    TEST_ASSERT_EQUAL_MESSAGE(meters.leftBottom.meter->flash_interval_millis, FLASH_SLOW,"leftBottom should flash fast");
-    TEST_ASSERT_EQUAL_MESSAGE(meters.leftTop.meter->flash_interval_millis, FLASH_SLOW,"leftTop should flash fast");    
+    TEST_ASSERT_EQUAL_MESSAGE(meters.rightBottom->flash_interval_millis, FLASH_FAST,"rightBottom should flash slow");
+    TEST_ASSERT_EQUAL_MESSAGE(meters.rightTop->flash_interval_millis, FLASH_FAST,"rightTop should flash");
+    TEST_ASSERT_EQUAL_MESSAGE(meters.leftBottom->flash_interval_millis, FLASH_SLOW,"leftBottom should flash fast");
+    TEST_ASSERT_EQUAL_MESSAGE(meters.leftTop->flash_interval_millis, FLASH_SLOW,"leftTop should flash fast");    
 }
 
 void setup() {

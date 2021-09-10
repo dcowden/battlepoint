@@ -22,6 +22,8 @@ void resetLEDS(){
     }
 }
 
+
+
 LedMeter simpleMeter { 
     .startIndex=0, 
     .endIndex=7, 
@@ -31,7 +33,9 @@ LedMeter simpleMeter {
     .flash_interval_millis=FlashInterval::FLASH_NONE, 
     .fgColor=CRGB::Blue, 
     .bgColor=CRGB::Black,
-    .name = "simpleMeter" };  //8 lights
+    .name = "simpleMeter",
+    .flash_state = 0,
+    .last_flash_millis=0 };  //8 lights
 
 LedMeter oneForOneMeter { 
     .startIndex=0, 
@@ -42,7 +46,9 @@ LedMeter oneForOneMeter {
     .flash_interval_millis=FlashInterval::FLASH_NONE, 
     .fgColor=CRGB::Blue, 
     .bgColor=CRGB::Black,
-    .name="oneForOneMeter" };  //8 lights
+    .name="oneForOneMeter",
+    .flash_state = 0,
+    .last_flash_millis=0     };  //8 lights
 
 LedMeter reversedMeter { 
     .startIndex=7, 
@@ -53,7 +59,9 @@ LedMeter reversedMeter {
     .flash_interval_millis=FlashInterval::FLASH_NONE, 
     .fgColor=CRGB::Blue, 
     .bgColor=CRGB::Black,
-    .name="reversedMeter" }; //8 lights
+    .name="reversedMeter",
+    .flash_state = 0,
+    .last_flash_millis=0     }; //8 lights
 
 LedMeter subsetMeter { 
     .startIndex=0, 
@@ -64,7 +72,9 @@ LedMeter subsetMeter {
     .flash_interval_millis=FlashInterval::FLASH_NONE,      
     .fgColor=CRGB::Blue, 
     .bgColor=CRGB::Black,
-    .name="subsetMeter" }; //4 lights, first half
+    .name="subsetMeter",
+    .flash_state = 0,
+    .last_flash_millis=0     }; //4 lights, first half
 
 void assert_leds_equal(CRGB* expected){
     for (int i=0;i<LED_COUNT;i++,expected++){
@@ -163,18 +173,14 @@ void test_controller_slow_flash(){
     //but we weren't able to inspect the state,
     //so we'll assume this is running pretty frequently, 
     //like every 10 ms
-
-    LedController c;
-    c.meter = &simpleMeter;
-    c.meter->max_val=10;
-    c.meter->val = 10;
-    c.meter->flash_interval_millis = 500;
+    simpleMeter.val = simpleMeter.max_val;
+    simpleMeter.flash_interval_millis = 500;
     //should be on 0-500, off 500-1000, on 1000-1500, etc
-    updateController(&c,0);
+    updateLedMeter(&simpleMeter,0);
     assert_leds_equal(ALL_BLUE);
-    updateController(&c,700);
+    updateLedMeter(&simpleMeter,700);
     assert_leds_equal(ALL_BLACK);
-    updateController(&c,700+510);
+    updateLedMeter(&simpleMeter,700+510);
     assert_leds_equal(ALL_BLUE);
 
 }

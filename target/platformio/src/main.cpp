@@ -275,21 +275,21 @@ EncoderMenuDriver menuDriver = EncoderMenuDriver(&nav, &clickEncoder);
 
 
 void setupMeters(){
-  meters.leftTop.meter = &leftTopMeter;
-  meters.leftBottom.meter = &leftBottomMeter;
-  meters.rightTop.meter = &rightTopMeter;
-  meters.rightBottom.meter = &rightBottomMeter;
-  meters.center.meter = &centerMeter;
-  meters.left.meter  = &leftMeter;
-  meters.right.meter = &rightMeter;
+  meters.leftTop = &leftTopMeter;
+  meters.leftBottom = &leftBottomMeter;
+  meters.rightTop = &rightTopMeter;
+  meters.rightBottom = &rightBottomMeter;
+  meters.center = &centerMeter;
+  meters.left  = &leftMeter;
+  meters.right = &rightMeter;
 
-  initMeter(meters.leftTop.meter,"leftTop",topLeds,0,9);
-  initMeter(meters.leftBottom.meter,"leftBottom",bottomLeds,0,9);
-  initMeter(meters.rightTop.meter,"rightTop",topLeds,10,19);
-  initMeter(meters.rightBottom.meter,"rightBottom",bottomLeds,10,19);
-  initMeter(meters.center.meter,"center",centerLeds,0,15);
-  initMeter(meters.left.meter,"left",leftLeds,0,15);
-  initMeter(meters.right.meter,"right",rightLeds,0,15);
+  initMeter(meters.leftTop,"leftTop",topLeds,0,9);
+  initMeter(meters.leftBottom,"leftBottom",bottomLeds,0,9);
+  initMeter(meters.rightTop,"rightTop",topLeds,10,19);
+  initMeter(meters.rightBottom,"rightBottom",bottomLeds,10,19);
+  initMeter(meters.center,"center",centerLeds,0,15);
+  initMeter(meters.left,"left",leftLeds,0,15);
+  initMeter(meters.right,"right",rightLeds,0,15);
 }
 
 void startSelectedGame(){  
