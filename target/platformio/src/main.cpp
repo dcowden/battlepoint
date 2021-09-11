@@ -6,8 +6,6 @@
 #include <Clock.h>
 #include <LedMeter.h>
 #include <game.h>
-//#include "OneButton.h"
-//#include <ESP32Encoder.h>
 #include "EncoderMenuDriver.h"
 #include "trigger.h"
 #include <display.h>
@@ -17,24 +15,23 @@
 #include <ArduinoLog.h>
 #include <settings.h>
 #include <ClickEncoder.h>
-//Menu Includes
 #include <menu.h>
 #include <menuIO/keyIn.h>
 #include <menuIO/u8g2Out.h>
 #include <menuIO/serialOut.h>
 #include <menuIO/serialIO.h>
 #include <menuIO/chainStream.h>
-//#include <menuIO/clickEncoderIn.h>
 #include <menuIO/serialIn.h>
+#include <targetscan.h>
+#include <target.h>
 
 #define MENU_MAX_DEPTH 4
 #define OFFSET_X 0
 #define OFFSET_Y 0
-#define DISPLAY_UPDATE_INTERVAL_MS 500
+#define DISPLAY_UPDATE_INTERVAL_MS 100
 #define VERTICAL_LED_SIZE 16
 #define HORIONTAL_LED_SIZE 10
-#define GAME_UPDATE_INTERVAL_MS 200
-#define TARGET_TRIGGER_WINDOW_MS 60  //after we trigger for a hit, how long till we're allowed to start again? practically limited by FFT sample time, about 20ms. dont want to re-trigger till that's finished
+#define GAME_UPDATE_INTERVAL_MS 50
 
 #define TRIGGER_MIN 100
 #define TRIGGER_MAX 1000
@@ -68,14 +65,12 @@ RealClock gameClock = RealClock();
 //the different types of games we can play
 GameState gameState;
 GameSettings gameSettings;
-SensorState sensorState;
 
 CRGB leftLeds[VERTICAL_LED_SIZE];
 CRGB centerLeds[VERTICAL_LED_SIZE];
 CRGB rightLeds[VERTICAL_LED_SIZE];
 CRGB topLeds[2* HORIONTAL_LED_SIZE];
 CRGB bottomLeds[2* HORIONTAL_LED_SIZE];
-
 
 LedMeter leftTopMeter;
 LedMeter leftBottomMeter;
@@ -87,10 +82,9 @@ LedMeter rightMeter;
 
 MeterSettings meters;
 
-Trigger rightTargetTrigger = Trigger(&gameClock,TARGET_TRIGGER_WINDOW_MS);
-Trigger leftTargetTrigger = Trigger(&gameClock,TARGET_TRIGGER_WINDOW_MS);
-volatile bool rightTargetTriggered = false;
-volatile bool leftTargetTriggered = false;
+volatile TargetScanner leftScanner;
+volatile TargetScanner rightScanner;
+
 long updateCounter = 0;
 
 //prototypes
@@ -273,7 +267,6 @@ NAVROOT(nav, mainMenu, MENU_MAX_DEPTH, in, out);
 
 EncoderMenuDriver menuDriver = EncoderMenuDriver(&nav, &clickEncoder);
 
-
 void setupMeters(){
   meters.leftTop = &leftTopMeter;
   meters.leftBottom = &leftBottomMeter;
@@ -297,11 +290,17 @@ void startSelectedGame(){
   Log.noticeln("Starting Game. Type= %d", gameSettings.gameType);
   Log.warningln("Target Threshold= %l", gameSettings.target.trigger_threshold);
   saveSettingsForSelectedGameType();
+
+
+  leftScanner.triggerLevel = gameSettings.target.trigger_threshold;
+  rightScanner.triggerLevel = gameSettings.target.trigger_threshold;
+
+  enable(&leftScanner);
+  enable(&rightScanner);
+
   startGame(&gameState, &gameSettings, &gameClock);
 
   Log.warningln("Meter States:");
-  //debugLedController(&gameState.meters.left);
-  //debugLedController(&gameState.meters.right);
   oled.clear();
   nav.idleOn();
 
@@ -358,6 +357,16 @@ void updateLEDs(){
   FastLED.show();
 }
 
+int readLeftTarget(){
+  return analogRead(Pins::TARGET_LEFT);
+}
+
+int readRightTarget(){
+  //TODO: re-enable when we have multiple targets
+  //return analogRead(Pins::TARGET_RIGHT);
+  return 0;
+}
+
 void setMeterValue(LedMeter* meter, int val ){
   meter->val = val;
   updateLedMeter(meter);
@@ -371,6 +380,17 @@ void setAllMetersToValue(int v ){
   setMeterValue(&rightBottomMeter,v);      
   setMeterValue(&rightMeter,v);
   FastLED.show();       
+}
+
+void setupTargetScanners(){
+  leftScanner.sampler = &readLeftTarget;
+  leftScanner.idleSampleInterval=10;
+  leftScanner.numSamples = 500;
+
+  rightScanner.sampler = &readRightTarget;
+  rightScanner.idleSampleInterval=10;
+  rightScanner.numSamples = 500;
+  
 }
 
 void POST(){
@@ -403,7 +423,8 @@ void setup() {
   Log.warningln("Complete.");
   oled.setFont(u8g2_font_7x13_mf);
   setupEncoder();
-  setupMeters();  
+  setupMeters();
+  setupTargetScanners();  
   POST();
   // hardwareOutputTimer.start();
   //nav.idleTask = menuIdleEvent;  
@@ -418,56 +439,41 @@ void stopTimers(){
   updateDisplayTimer.stop();
 }
 
-int readLeftTarget(){
-  return analogRead(Pins::TARGET_LEFT);
-}
-
-int readRightTarget(){
-  //TODO: re-enable when we have multiple targets
-  //return analogRead(Pins::TARGET_RIGHT);
-  return 0;
-}
-
 void disableTargetTriggers(){
   timerAlarmDisable(timer);
 }
 
 void enableTargetTriggers(){
   portENTER_CRITICAL(&timerMux);
-  rightTargetTriggered = false;
-  leftTargetTriggered = false;
   portEXIT_CRITICAL(&timerMux);
   timerAlarmEnable(timer);
 }
 
 void readTargets(){  
-  
-  if (leftTargetTriggered  ){
-    disableTargetTriggers();
-    check_target(readLeftTarget,&sensorState.leftScan,gameSettings.target,(Clock*)(&gameClock));  
-    enableTargetTriggers();
+
+  //disableTargetTriggers();
+  //enableTargetTriggers();
+  //TODO: how to get rid of this dupcliation?
+
+  int current_time_millis = gameClock.milliseconds();
+  if ( isReady(&leftScanner)){
+      TargetHitData hd = analyze_impact(&leftScanner, gameSettings.target.hit_energy_threshold);
+      applyLeftHits(&gameState, hd, current_time_millis );    
+      reset(&leftScanner);
   }
 
-  //TODO:put back!
-  //if ( rightTargetTrigger.isTriggered() ){
-  //  check_target(readRightTarget,&sensorState.rightScan, gameSettings.target,(Clock*)(&gameClock));
-  //}
-
-  //TODO: looks like trigger threshold should be > 1500
-  // need to make sure the existing hit is done before starting a new one. how to do that? 
-  // right now, looks like wait/sample for 120ms will get trigger levels below 1000. 50ms gets you below 2000
+  if ( isReady(&rightScanner)){
+      TargetHitData hd = analyze_impact(&rightScanner, gameSettings.target.hit_energy_threshold);
+      applyLeftHits(&gameState, hd, current_time_millis );    
+      reset(&rightScanner);
+  }
 
 }
 
 void updateGame(){  
   updateCounter++;
-  updateGame(&gameState, &sensorState, gameSettings, (Clock*)(&gameClock));
+  updateGame(&gameState, gameSettings, (Clock*)(&gameClock));
   
-  //if ( (updateCounter % 200) == 0 ){
-  //  debugLedController(&gameState.meters.left);
-  //  debugLedController(&gameState.meters.right);    
-  // }
-
   if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
       gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;
   }
@@ -480,8 +486,7 @@ void updateGame(){
   }
 
   //updateLEDs();
-  sensorState.rightScan.was_hit=0;
-  sensorState.leftScan.was_hit=0;
+
 }
 
 void loop() {  
@@ -511,13 +516,8 @@ void loop() {
 // ESP32 timer
 void IRAM_ATTR onTimer()
 {
-  int left_target_val = readLeftTarget();
-  int right_target_val = readRightTarget();
-  if ( left_target_val > gameSettings.target.trigger_threshold){
-    leftTargetTriggered = true;
-  }
-  if ( right_target_val > gameSettings.target.trigger_threshold){
-    rightTargetTriggered = true;
-  }  
+  long l = millis();
+  tick(&leftScanner,l);
+  tick(&rightScanner,l);
   clickEncoder.service();
 }

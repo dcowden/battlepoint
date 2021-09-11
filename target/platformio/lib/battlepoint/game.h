@@ -4,11 +4,11 @@
 #include <Clock.h>
 #include <LedMeter.h>
 #include <target.h>
+#include <targetscan.h>
 
 #define STANDARD_METER_MAX_VAL 10
 //important: keep settings separate from 
 //status, so that settings can be saved in eeprom
-
 
 
 //////////////////////////////////////
@@ -51,6 +51,12 @@ typedef struct{
     int capture_decay_rate_secs_per_hit;
     int capture_overtime_seconds;
 } CaptureSettings;
+
+typedef struct {
+    long last_hit_millis;
+    long trigger_threshold;
+    long hit_energy_threshold;
+} TargetSettings;
 
 typedef struct {    
     int BP_VERSION;
@@ -130,13 +136,14 @@ void startGame(GameState* gs, GameSettings* settings, Clock* clock);
 void updateGameTime(GameState* current,GameSettings settings, long current_time_millis);
 void updateOwnership(GameState* current,  GameSettings settings, long current_time_millis);
 void applyHitDecay(GameState* current, GameSettings settings, long current_time_millis);
-void updateGameHits(GameState* current, SensorState* sensors, long current_time_millis);
+void applyLeftHits(GameState* current, TargetHitData hitdata, long current_time_millis);
+void applyRightHits(GameState* current, TargetHitData hitdata, long current_time_millis);
 void updateFirstToHitsGame(GameState* current,  GameSettings settings);
 void updateMostHitsInTimeGame(GameState* current,  GameSettings settings);
 void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateAttackDefendGame(GameState* current,  GameSettings settings);
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
-void updateGame(GameState* game, SensorState* sensors, GameSettings settings, Clock* clock);
+void updateGame(GameState* game, GameSettings settings, Clock* clock);
 void updateLeds(MeterSettings* meters, long current_time_millis );
 void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters);
 

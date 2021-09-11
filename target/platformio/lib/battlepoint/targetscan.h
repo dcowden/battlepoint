@@ -2,13 +2,12 @@
 #define __INC_TARGETSCAN_H
 
 #include <Arduino.h>
-
 #define MAX_TARGET_SAMPLES 500
 
 typedef int (*SampleReader)(); //for reading a pin
 typedef struct {
-    int numSamples = 0;;
-    double data[MAX_TARGET_SAMPLES];
+    int numSamples = 0;
+    int data[MAX_TARGET_SAMPLES];
     int _currentSampleIndex = 0;
     int _ticksLeftToSample = 0;
     int idleSampleInterval = 1; //2 means dont sample every other trigger, unless we're scanning
@@ -24,11 +23,10 @@ typedef struct {
 } TargetScanner;
 
 bool init(TargetScanner* st, int numSamples, int idleSampleInterval, int triggerLevel, SampleReader sampler);
-bool isReady( TargetScanner* st);
-void tick( TargetScanner* st, long millis);
-void reset(TargetScanner* st);
-void enable(TargetScanner* st);
-void disable(TargetScanner* st);
-void _acceptSample(TargetScanner* st, int val );
+bool isReady( volatile TargetScanner* st);
+void tick( volatile TargetScanner* st, long millis);
+void reset(volatile TargetScanner* st);
+void enable(volatile  TargetScanner* st);
+void disable(volatile TargetScanner* st);
 
 #endif

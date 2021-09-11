@@ -3,7 +3,21 @@
 #include <ArduinoLog.h>
 #define INITIAL_INTERVAL 1
 
-void tick( TargetScanner* st, long millis){
+void _acceptSample(volatile TargetScanner* st, int val ){
+    Log.infoln("Sample[%d]= %d", st->_currentSampleIndex, val);
+    st->data[st->_currentSampleIndex] = val;    
+    if ( st->_currentSampleIndex == (st->numSamples - 1)){
+        Log.infoln("Data is Ready:");
+        st->dataReady = true;
+        st->enableScan = false;
+        st->sampling = false;
+    }
+    st->lastSampleValue = val;
+    st->lastScanValue = val;
+    st->_currentSampleIndex++;
+}
+
+void tick(volatile TargetScanner* st, long millis){
   if ( st->enableScan ){
     if ( st->sampling ){
       int v = st->sampler();
@@ -34,21 +48,9 @@ void tick( TargetScanner* st, long millis){
   }
 };
 
-void _acceptSample(TargetScanner* st, int val ){
-    Log.infoln("Sample[%d]= %d", st->_currentSampleIndex, val);
-    st->data[st->_currentSampleIndex] = val;    
-    if ( st->_currentSampleIndex == (st->numSamples - 1)){
-        Log.infoln("Data is Ready:");
-        st->dataReady = true;
-        st->enableScan = false;
-        st->sampling = false;
-    }
-    st->lastSampleValue = val;
-    st->lastScanValue = val;
-    st->_currentSampleIndex++;
-}
 
-bool init(TargetScanner* st, int numSamples, int idleSampleInterval, int triggerLevel, SampleReader sampler){
+
+bool init(volatile TargetScanner* st, int numSamples, int idleSampleInterval, int triggerLevel, SampleReader sampler){
   if ( numSamples >= MAX_TARGET_SAMPLES) return false;
   st->numSamples = numSamples;
   st->idleSampleInterval = idleSampleInterval;
@@ -58,11 +60,11 @@ bool init(TargetScanner* st, int numSamples, int idleSampleInterval, int trigger
   return true;
 }
 
-bool isReady( TargetScanner* st){
+bool isReady(volatile TargetScanner* st){
   return st->dataReady;
 };
 
-void reset(TargetScanner* st){
+void reset(volatile TargetScanner* st){
   st->enableScan = false;
   st->_currentSampleIndex = 0;
   st->_ticksLeftToSample = st->idleSampleInterval;
@@ -74,12 +76,12 @@ void reset(TargetScanner* st){
   st->sampling = false;
 };
 
-void enable(TargetScanner* st){
+void enable(volatile TargetScanner* st){
   st->enableScan = true;
   st->dataReady = false;
 };
 
-void disable(TargetScanner* st){
+void disable(volatile TargetScanner* st){
   st->enableScan = false;
   st->dataReady = false;
 };
