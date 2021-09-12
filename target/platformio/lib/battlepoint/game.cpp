@@ -170,7 +170,6 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
         updateMeter( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
         updateMeter( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
         updateMeter( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black ); 
-            
         updateMeter( meters->left, red_hits, settings->hits.to_win, CRGB::Red, CRGB::Black );
         updateMeter( meters->right, blu_hits, settings->hits.to_win, CRGB::Blue, CRGB::Black );
 
@@ -231,17 +230,17 @@ void startGame(GameState* gs, GameSettings* settings, Clock* clock){
 //TODO: duplicated with below.
 void applyLeftHits(GameState* current, TargetHitData hitdata, long current_time_millis){
     if ( hitdata.hits > 0 ){
-        current->bluHits.hits += hitdata.hits;
-        current->bluHits.last_hit_energy = hitdata.last_hit_energy;
-        current->bluHits.last_hit_millis = current_time_millis;
+        current->redHits.hits += hitdata.hits;
+        current->redHits.last_hit_energy = hitdata.last_hit_energy;
+        current->redHits.last_hit_millis = current_time_millis;
     }
 }
 
 void applyRightHits(GameState* current, TargetHitData hitdata, long current_time_millis){
     if ( hitdata.hits > 0 ){
-        current->redHits.hits += hitdata.hits;
-        current->redHits.last_hit_energy = hitdata.last_hit_energy;
-        current->redHits.last_hit_millis = current_time_millis;
+        current->bluHits.hits += hitdata.hits;
+        current->bluHits.last_hit_energy = hitdata.last_hit_energy;
+        current->bluHits.last_hit_millis = current_time_millis;
     }
 }
 

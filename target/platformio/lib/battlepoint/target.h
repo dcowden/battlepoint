@@ -5,7 +5,9 @@
 
 typedef struct {
     int hits;
-    double last_hit_energy;   
+    double last_hit_energy; 
+    int num_peaks;
+
 } TargetHitData;
 
 TargetHitData analyze_impact( volatile TargetScanner* scanner, long hit_energy_threshold);

@@ -30,6 +30,7 @@ void displayWelcomeBanner( ){
 }
 
 void initDisplay(){
+  oled.setBusClock(2000000);
   oled.begin();
   displayWelcomeBanner();
   oled.clear();

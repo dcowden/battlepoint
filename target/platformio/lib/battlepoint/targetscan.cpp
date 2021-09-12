@@ -4,20 +4,24 @@
 #define INITIAL_INTERVAL 1
 
 void _acceptSample(volatile TargetScanner* st, int val ){
-    Log.infoln("Sample[%d]= %d", st->_currentSampleIndex, val);
+    Log.traceln("Sample[%d]= %d", st->_currentSampleIndex, val);
     st->data[st->_currentSampleIndex] = val;    
     if ( st->_currentSampleIndex == (st->numSamples - 1)){
-        Log.infoln("Data is Ready:");
+        long t = millis();
+        Log.infoln("Data is Ready, t=%l", t);
         st->dataReady = true;
         st->enableScan = false;
         st->sampling = false;
+        st->_currentSampleIndex = 0;
+        st->sampleTimeMillis = (long)(t - st->sampleTimeMillis);
     }
     st->lastSampleValue = val;
     st->lastScanValue = val;
     st->_currentSampleIndex++;
 }
 
-void tick(volatile TargetScanner* st, long millis){
+void tick(volatile TargetScanner* st, long time_millis){
+  
   if ( st->enableScan ){
     if ( st->sampling ){
       int v = st->sampler();
@@ -29,8 +33,9 @@ void tick(volatile TargetScanner* st, long millis){
         
         int v = st->sampler();        
         if ( v > st->triggerLevel ){
-          Log.infoln("Triggered, value=%d", v);
+          Log.infoln("Triggered, value=%d, t=%l", v, time_millis);
           st->sampling = true;
+          st->sampleTimeMillis = time_millis;
           _acceptSample(st,v);
         }
         st->lastScanValue = v;
@@ -41,16 +46,15 @@ void tick(volatile TargetScanner* st, long millis){
         Log.traceln("Scan: %d more ticks till scan", st->_ticksLeftToSample);   
       }
     }
-    st->lastScanMillis = millis;
+    st->lastScanMillis = time_millis;
   }
   else{
     Log.traceln("Scan: Ignoring Disabled");
   }
+  
 };
 
-
-
-bool init(volatile TargetScanner* st, int numSamples, int idleSampleInterval, int triggerLevel, SampleReader sampler){
+bool initScanner(volatile TargetScanner* st, int numSamples, int idleSampleInterval, int triggerLevel, SampleReader sampler){
   if ( numSamples >= MAX_TARGET_SAMPLES) return false;
   st->numSamples = numSamples;
   st->idleSampleInterval = idleSampleInterval;
@@ -70,6 +74,7 @@ void reset(volatile TargetScanner* st){
   st->_ticksLeftToSample = st->idleSampleInterval;
   st->lastHitMillis = 0;
   st->lastScanMillis = 0;
+  st->sampleTimeMillis = 0;
   st->lastScanValue = 0;
   st->lastSampleValue = 0;
   st->dataReady = false;
@@ -79,6 +84,8 @@ void reset(volatile TargetScanner* st){
 void enable(volatile TargetScanner* st){
   st->enableScan = true;
   st->dataReady = false;
+  st->lastScanValue = 0;
+  st->sampleTimeMillis = 0;
 };
 
 void disable(volatile TargetScanner* st){

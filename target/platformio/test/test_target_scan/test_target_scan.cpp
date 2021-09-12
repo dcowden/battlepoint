@@ -36,7 +36,7 @@ int mock_adc_reader(){
 void test_scanner_init(void){
     reset_sample_index();
 
-    init(&ts,NUM_SAMPLES,SAMPLE_INTERVAL,TRIGGER_THRESH,&mock_adc_reader);
+    initScanner(&ts,NUM_SAMPLES,SAMPLE_INTERVAL,TRIGGER_THRESH,&mock_adc_reader);
 
     TEST_ASSERT_TRUE_MESSAGE(ts.dataReady == false, "Initially no data ready");
     TEST_ASSERT_TRUE_MESSAGE(ts.lastHitMillis == 0, "Initially no last hit millis");
@@ -54,7 +54,8 @@ void test_scanner_init(void){
 void test_not_enabled_doesnt_read(void){
     reset_sample_index();
 
-    init(&ts,NUM_SAMPLES,SAMPLE_INTERVAL,TRIGGER_THRESH,&mock_adc_reader);
+    //bool init(TargetScanner* st, int numSamples, int idleSampleInterval, int triggerLevel, SampleReader sampler);
+    initScanner(&ts,NUM_SAMPLES,SAMPLE_INTERVAL,TRIGGER_THRESH,&mock_adc_reader);
 
     tick(&ts,1234);
     TEST_ASSERT_TRUE_MESSAGE(sample_index == 0 , "Not enabled does not sample ");
@@ -68,7 +69,7 @@ void test_not_enabled_doesnt_read(void){
 void test_enabled_reads(void){
     reset_sample_index();
 
-    init(&ts,NUM_SAMPLES,SAMPLE_INTERVAL,TRIGGER_THRESH,&mock_adc_reader);
+    initScanner(&ts,NUM_SAMPLES,SAMPLE_INTERVAL,TRIGGER_THRESH,&mock_adc_reader);
 
     enable(&ts);
     TEST_ASSERT_TRUE_MESSAGE(ts.enableScan == true, "Should  be scanning now ");
@@ -89,7 +90,7 @@ void test_enabled_reads(void){
 void test_sample_interval_one_samples_every_time(void){
     reset_sample_index();
     const int TEST_NUM_SAMPLES = 5;
-    init(&ts,TEST_NUM_SAMPLES,1,TRIGGER_THRESH,&mock_adc_reader);
+    initScanner(&ts,TEST_NUM_SAMPLES,1,TRIGGER_THRESH,&mock_adc_reader);
     enable(&ts);
     for ( int i =0;i<TEST_NUM_SAMPLES;i++){
         tick(&ts,i);
@@ -112,7 +113,7 @@ void test_sample_interval_one_samples_every_time(void){
 
 void test_sample_data_ready(){
     reset_sample_index();
-    init(&ts,NUM_SAMPLES,SAMPLE_INTERVAL,TRIGGER_THRESH,&mock_adc_reader);
+    initScanner(&ts,NUM_SAMPLES,SAMPLE_INTERVAL,TRIGGER_THRESH,&mock_adc_reader);
     enable(&ts);
 
     //read 33 times. Here's how the sequence should burn through mock data
@@ -129,7 +130,8 @@ void test_sample_data_ready(){
     for ( int i=0;i<45;i++){
         tick(&ts,1000 + i );
     }
-    TEST_ASSERT_TRUE_MESSAGE(ts._currentSampleIndex == 20 , "Should be ready to read sample 21");
+    Serial.println(ts._currentSampleIndex);
+    TEST_ASSERT_TRUE_MESSAGE(ts._currentSampleIndex == 1 , "Should be ready to read sample 21");
     TEST_ASSERT_TRUE_MESSAGE(sample_index == 26 , "Should be ready to read datapoint 26");
     TEST_ASSERT_TRUE_MESSAGE(ts.sampling == false, "Should have read a full sample set of 20");
     TEST_ASSERT_TRUE(ts.lastSampleValue == 333);

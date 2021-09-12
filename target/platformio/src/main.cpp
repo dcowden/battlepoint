@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "Ticker.h"
+#include "TickTwo.h"
 #include <U8g2lib.h>
 #include <FastLED.h>
 #include <target.h>
@@ -25,13 +25,14 @@
 #include <targetscan.h>
 #include <target.h>
 
+
 #define MENU_MAX_DEPTH 4
 #define OFFSET_X 0
 #define OFFSET_Y 0
 #define DISPLAY_UPDATE_INTERVAL_MS 100
 #define VERTICAL_LED_SIZE 16
 #define HORIONTAL_LED_SIZE 10
-#define GAME_UPDATE_INTERVAL_MS 50
+#define GAME_UPDATE_INTERVAL_MS 20
 
 #define TRIGGER_MIN 100
 #define TRIGGER_MAX 1000
@@ -57,8 +58,8 @@
 #define VICTORY_HITS_MAX 100
 #define VICTORY_HITS_BIG_STEP_SIZE 5
 #define VICTORY_HITS_LITTLE_STEP_SIZE 1
-
-#define POST_INTERVAL_MS 300
+#define ENCODER_SERVICE_PRESCALER 5
+#define POST_INTERVAL_MS 50
 
 RealClock gameClock = RealClock();
 
@@ -81,34 +82,78 @@ LedMeter leftMeter;
 LedMeter rightMeter;
 
 MeterSettings meters;
-
+volatile int encoderServicePrescaler = 0;
 volatile TargetScanner leftScanner;
 volatile TargetScanner rightScanner;
 
 long updateCounter = 0;
-
-//prototypes
-//void updateDisplay();
-void menuIdleEvent();
-void updateGame();
-void startSelectedGame();
-
-//from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
-ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
-//ClickEncoderStream encStream(clickEncoder, 1); 
-
-void updateDisplayLocal(){
-  updateDisplay(gameState,gameSettings);
-}
-
-Ticker updateDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
-Ticker gameUpdateTimer(updateGame, GAME_UPDATE_INTERVAL_MS );
-
+long targetLoopCounter = 0;
+long targetLoopMillis = 0;
+volatile bool timeToHandleTargets = false;
 
 // ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
 // and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
 hw_timer_t *timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+
+//prototypes
+//void updateDisplay();
+void menuIdleEvent();
+void localUpdateGame();
+void startSelectedGame();
+void updateLEDs();
+void stopGameAndReturnToMenu();
+void disableTargetTriggers();
+void enableTargetTriggers();
+
+//from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
+ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
+//ClickEncoderStream encStream(clickEncoder, 1); 
+
+int readLeftTarget(){
+  return analogRead(Pins::TARGET_LEFT);
+}
+
+int readRightTarget(){
+  //TODO: re-enable when we have multiple targets
+  //return analogRead(Pins::TARGET_RIGHT);
+  return 0;
+}
+
+
+void updateDisplayLocal(){
+  //portENTER_CRITICAL(&timerMux);
+  //disableTargetTriggers();
+  updateDisplay(gameState,gameSettings);
+  updateMeters(&gameState,&gameSettings,&meters);
+  updateLEDs(); 
+  //enableTargetTriggers();
+  //portEXIT_CRITICAL(&timerMux);
+}
+
+
+void localUpdateGame(){  
+  updateCounter++;
+  updateGame(&gameState, gameSettings, (Clock*)(&gameClock));
+  
+  if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
+      gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;
+  }
+
+  if ( gameState.status == GameStatus::GAME_STATUS_ENDED ){
+    Log.warning("Game Over!");
+    Log.warning("Winner=");
+    gameOverDisplay(gameState);
+    stopGameAndReturnToMenu();
+  }
+
+}
+
+TickTwo updateDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
+TickTwo gameUpdateTimer(localUpdateGame, GAME_UPDATE_INTERVAL_MS );
+
+
+
 void IRAM_ATTR onTimer();
 
 void setupLEDs(){
@@ -128,7 +173,7 @@ void setupEncoder(){
   //ESP32 timer
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
-  timerAlarmWrite(timer, 500, true); //run every 0.5ms
+  timerAlarmWrite(timer, 200, true); //units are microseconds, 200 = 0.2ms
   timerAlarmEnable(timer);
     
 }
@@ -293,10 +338,13 @@ void startSelectedGame(){
 
 
   leftScanner.triggerLevel = gameSettings.target.trigger_threshold;
-  rightScanner.triggerLevel = gameSettings.target.trigger_threshold;
+  //rightScanner.triggerLevel = gameSettings.target.trigger_threshold;
 
+  //TODO:remove
+  //leftScanner.triggerLevel = 300;
+  //rightScanner.triggerLevel = 300;
   enable(&leftScanner);
-  enable(&rightScanner);
+  //enable(&rightScanner);
 
   startGame(&gameState, &gameSettings, &gameClock);
 
@@ -305,8 +353,7 @@ void startSelectedGame(){
   nav.idleOn();
 
   Serial.print("sample_no");Serial.print(",");
-  Serial.print("FFT_PEAK");Serial.print(",");
-  Serial.print("yin_peak");Serial.print(",");
+  Serial.print("hits");Serial.print(",");
   Serial.print("energy");Serial.print(",");
   Serial.print("avg_energy");Serial.print(",");
   Serial.print("avg_middle");Serial.print(",");
@@ -317,7 +364,9 @@ void startSelectedGame(){
   Serial.print("peak_1000");Serial.print(",");
   Serial.print("peak_2000");Serial.print(",");
   Serial.print("peak_3000");Serial.print(",");
-  Serial.print("peak_4000");Serial.println("");  
+  Serial.print("peak_4000");Serial.print(",");  
+  Serial.print("totalSampleTime[ms]");Serial.print(",");  
+  Serial.print("avgSampleTime[ms]");Serial.println("");  
 }
 
 void stopGameAndReturnToMenu(){
@@ -353,19 +402,13 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
 }
 
 void updateLEDs(){
+
   updateLeds(&meters, gameClock.milliseconds());
+  //portENTER_CRITICAL(&timerMux);
   FastLED.show();
+  //portEXIT_CRITICAL(&timerMux);
 }
 
-int readLeftTarget(){
-  return analogRead(Pins::TARGET_LEFT);
-}
-
-int readRightTarget(){
-  //TODO: re-enable when we have multiple targets
-  //return analogRead(Pins::TARGET_RIGHT);
-  return 0;
-}
 
 void setMeterValue(LedMeter* meter, int val ){
   meter->val = val;
@@ -383,14 +426,10 @@ void setAllMetersToValue(int v ){
 }
 
 void setupTargetScanners(){
-  leftScanner.sampler = &readLeftTarget;
-  leftScanner.idleSampleInterval=10;
-  leftScanner.numSamples = 500;
-
-  rightScanner.sampler = &readRightTarget;
-  rightScanner.idleSampleInterval=10;
-  rightScanner.numSamples = 500;
-  
+  initScanner(&leftScanner, 400, 10, 100, &readLeftTarget);
+  initScanner(&rightScanner, 400, 10, 100, &readRightTarget);
+  reset(&leftScanner);
+  reset(&rightScanner);
 }
 
 void POST(){
@@ -407,6 +446,7 @@ void POST(){
 
 void setup() {
   setCpuFrequencyMhz(240);
+
   Serial.begin(115200);
   Serial.setTimeout(500);
   initSettings();
@@ -422,10 +462,13 @@ void setup() {
   Menu::options->invertFieldKeys = false;
   Log.warningln("Complete.");
   oled.setFont(u8g2_font_7x13_mf);
-  setupEncoder();
+  
   setupMeters();
-  setupTargetScanners();  
   POST();
+
+  setupTargetScanners();  
+  setupEncoder();
+
   // hardwareOutputTimer.start();
   //nav.idleTask = menuIdleEvent;  
   updateDisplayTimer.start();
@@ -444,63 +487,59 @@ void disableTargetTriggers(){
 }
 
 void enableTargetTriggers(){
-  portENTER_CRITICAL(&timerMux);
-  portEXIT_CRITICAL(&timerMux);
+  
   timerAlarmEnable(timer);
 }
 
 void readTargets(){  
 
   //disableTargetTriggers();
-  //enableTargetTriggers();
+  
   //TODO: how to get rid of this dupcliation?
 
   int current_time_millis = gameClock.milliseconds();
+  //portENTER_CRITICAL(&timerMux);
+
+
   if ( isReady(&leftScanner)){
-      TargetHitData hd = analyze_impact(&leftScanner, gameSettings.target.hit_energy_threshold);
+      
+      TargetHitData hd = analyze_impact(&leftScanner, gameSettings.target.hit_energy_threshold);      
       applyLeftHits(&gameState, hd, current_time_millis );    
-      reset(&leftScanner);
+      //Log.warningln("Left Trigger, hits=%d, sampletime = %l",hd.hits , leftScanner.sampleTimeMillis );
+      enable(&leftScanner);
   }
 
+  /**
   if ( isReady(&rightScanner)){
+      Log.warning("Reading Right Hit...");
+      Serial.println("Right Hit");
       TargetHitData hd = analyze_impact(&rightScanner, gameSettings.target.hit_energy_threshold);
       applyLeftHits(&gameState, hd, current_time_millis );    
-      reset(&rightScanner);
-  }
-
-}
-
-void updateGame(){  
-  updateCounter++;
-  updateGame(&gameState, gameSettings, (Clock*)(&gameClock));
+      enable(&rightScanner);
+      Log.warningln("[OK]");
+  } **/
   
-  if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
-      gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;
-  }
-
-  if ( gameState.status == GameStatus::GAME_STATUS_ENDED ){
-    Log.warning("Game Over!");
-    Log.warning("Winner=");
-    gameOverDisplay(gameState);
-    stopGameAndReturnToMenu();
-  }
-
-  //updateLEDs();
-
+  //portEXIT_CRITICAL(&timerMux);
 }
+
 
 void loop() {  
-
+  //disableTargetTriggers();
+  //if ( timeToHandleTargets ){
+  readTargets();
+  //}
+  //enableTargetTriggers();
   if ( nav.sleepTask){
-    readTargets();
+    //portENTER_CRITICAL(&timerMux);
     gameUpdateTimer.update();
     updateDisplayTimer.update();
-    updateLEDs();
+    
     
     int b = clickEncoder.getButton();
     if ( b == ClickEncoder::DoubleClicked){
        stopGameAndReturnToMenu();
     }
+    //portEXIT_CRITICAL(&timerMux);
   }
   else{
 
@@ -510,14 +549,24 @@ void loop() {
       oled.firstPage();
       do nav.doOutput(); while (oled.nextPage() );
   }
- 
+  //enableTargetTriggers();
 }
+
 
 // ESP32 timer
 void IRAM_ATTR onTimer()
-{
-  long l = millis();
-  tick(&leftScanner,l);
-  tick(&rightScanner,l);
-  clickEncoder.service();
+{  
+  if ( encoderServicePrescaler++ >= ENCODER_SERVICE_PRESCALER ){
+    encoderServicePrescaler = 0;
+    clickEncoder.service();  
+  }
+  //portENTER_CRITICAL_ISR(&timerMux);
+  
+  if ( nav.sleepTask){
+    //portEXIT_CRITICAL_ISR(&timerMux);
+    long l = millis();
+    tick(&leftScanner,l);
+    //tick(&rightScanner,l);
+  }
+
 }

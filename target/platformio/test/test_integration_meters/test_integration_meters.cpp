@@ -28,7 +28,7 @@ CRGB TEAM_COLORS[VERTICAL_LED_SIZE] = {CRGB::Red, CRGB::Red,CRGB::Red, CRGB::Red
 
 GameState gameState;
 GameSettings gameSettings;
-SensorState sensorState;
+//SensorState sensorState;
 
 TestClock gameClock = TestClock();
 
@@ -59,26 +59,26 @@ void ASSERT_LEDS_EQUAL(CRGB* expected, CRGB* actual, int num_leds, const char* m
 }
 
 void red_hit(){
-    sensorState.leftScan.was_hit = true;
-    sensorState.leftScan.hit_millis = gameClock.milliseconds();
-
+    TargetHitData hd;
+    hd.hits=1;
+    applyLeftHits(&gameState,hd,1000);
 }
 void blue_hit(){
-    sensorState.rightScan.was_hit = true;
-    sensorState.rightScan.hit_millis = gameClock.milliseconds();   
+    TargetHitData hd;
+    hd.hits = 1;
+    applyRightHits(&gameState,hd,1000);
 }
 
 void add_seconds(long seconds){
     gameClock.addSeconds(seconds);
 }
 void update(){
-    updateGame(&gameState, &sensorState, gameSettings, (Clock*)(&gameClock));
+    updateGame(&gameState, gameSettings, (Clock*)(&gameClock));
     updateMeters(&gameState, &gameSettings, &meters);
     long current_time_millis = gameClock.milliseconds();
     updateLeds(&meters,current_time_millis);
 
-    sensorState.leftScan.was_hit = false;
-    sensorState.rightScan.was_hit = false;    
+ 
 }
 
 void setupMeters(){

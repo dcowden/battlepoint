@@ -29,12 +29,10 @@ void test_simple_target(void){
     Serial.println("Testing Target Code");
     TestClock tc = TestClock();
     tc.setTime(123456);
-    TargetSettings t;
+    TargetHitData td;
+
     //t.pin=0;
     //t.total_hits=0;
-    t.last_hit_millis=0;
-    t.trigger_threshold=2000;
-    t.hit_energy_threshold=10000.0;
 
     //TargetHitScanResult r = check_target(mock_adc_reader, t, &tc);
     //TEST_ASSERT_FLOAT_WITHIN(14249.97, r.last_hit_energy , 0.01 );
@@ -51,7 +49,7 @@ void setup() {
     Serial.begin(115200);
 
     UNITY_BEGIN();
-    //RUN_TEST(test_simple_target);
+    RUN_TEST(test_simple_target);
     UNITY_END();
 }
 
