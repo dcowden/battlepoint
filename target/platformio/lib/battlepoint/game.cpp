@@ -56,15 +56,39 @@ const char* getCharForGameType(GameType t){
     }
 }
 
+Team getWinnerByHitsWithVictoryMargin(int red_hits, int blu_hits, int hits_to_win, int victory_margin){
+    bool redWins = (red_hits >= hits_to_win ) && (red_hits >= (blu_hits + victory_margin));
+    bool bluWins = (blu_hits >= hits_to_win ) && (blu_hits >= (red_hits + victory_margin));
+    if ( redWins){
+        return Team::RED;
+    }    
+    else if ( bluWins){
+        return Team::BLU;
+    }
+    else{
+        return Team::NOBODY;
+    }
+}
+Team getWinnerByHitsWithoutVictoryMargin(int red_hits, int blu_hits, int hits_to_win){
+    if ( red_hits >= hits_to_win){
+        return Team::RED;
+    }
+    else if ( blu_hits >= hits_to_win){
+        return Team::BLU;
+    }
+    else{
+        return Team::NOBODY;
+    }
+}
 
 void updateLeds(MeterSettings* meters, long current_time_millis ){
-  updateLedMeter(meters->left);
-  updateLedMeter(meters->right);
-  updateLedMeter(meters->center);
-  updateLedMeter(meters->leftTop);
-  updateLedMeter(meters->leftBottom);
-  updateLedMeter(meters->rightTop);
-  updateLedMeter(meters->rightBottom);
+  updateLedMeter(meters->left,current_time_millis);
+  updateLedMeter(meters->right,current_time_millis);
+  updateLedMeter(meters->center,current_time_millis);
+  updateLedMeter(meters->leftTop,current_time_millis);
+  updateLedMeter(meters->leftBottom,current_time_millis);
+  updateLedMeter(meters->rightTop,current_time_millis);
+  updateLedMeter(meters->rightBottom,current_time_millis);
 }
 
 void setFlashMeterForTeam(Team t, MeterSettings* meters, FlashInterval fi ){
@@ -83,43 +107,43 @@ void setFlashMeterForTeam(Team t, MeterSettings* meters, FlashInterval fi ){
 
 void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters){
 
+    /**
+     *  TODO: flashing when close to end of game
+     
+        else if ( closeToWinner != Team::NOBODY){
+            Team aboutToLose = oppositeTeam(closeToWinner);
+            current->status = GameStatus::GAME_STATUS_OVERTIME;
+            setFlashMeterForTeam(closeToWinner, current,FlashInterval::FLASH_SLOW);
+            setFlashMeterForTeam(aboutToLose, current,FlashInterval::FLASH_FAST);
+        }        
+    **/
 
     if ( settings->gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
-        updateMeter( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
-        updateMeter( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
-        updateMeter( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
-        updateMeter( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );  
+        setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );  
 
-        updateMeter( meters->left, game->redHits.hits, settings->hits.to_win, CRGB::Red, CRGB::Black );
-        updateMeter( meters->right, game->bluHits.hits, settings->hits.to_win, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->left, game->redHits.hits, settings->hits.to_win, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->right, game->bluHits.hits, settings->hits.to_win, CRGB::Blue, CRGB::Black );
 
 
-        /**
-         *  TODO: flashing when close to end of game
-         
-            else if ( closeToWinner != Team::NOBODY){
-                Team aboutToLose = oppositeTeam(closeToWinner);
-                current->status = GameStatus::GAME_STATUS_OVERTIME;
-                setFlashMeterForTeam(closeToWinner, current,FlashInterval::FLASH_SLOW);
-                setFlashMeterForTeam(aboutToLose, current,FlashInterval::FLASH_FAST);
-            }        
-        **/
     }
     else if ( settings->gameType == GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME ){
 
-        updateMeter( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
-        updateMeter( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
-        updateMeter( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
-        updateMeter( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );  
+        setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );  
 
-        updateMeter( meters->left, game->time.elapsed_secs, settings->timed.max_duration_seconds, CRGB::Red, CRGB::Black );
-        updateMeter( meters->right, game->time.elapsed_secs, settings->timed.max_duration_seconds, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->left, game->time.elapsed_secs, settings->timed.max_duration_seconds, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->right, game->time.elapsed_secs, settings->timed.max_duration_seconds, CRGB::Blue, CRGB::Black );
         int total_hits = game->bluHits.hits + game->redHits.hits;
         if ( total_hits  > 0 ){
-            updateMeter(meters->center, game->redHits.hits, total_hits, CRGB::Red, CRGB::Blue);
+            setMeterValues(meters->center, game->redHits.hits, total_hits, CRGB::Red, CRGB::Blue);
         }
         else{
-            updateMeter(meters->center, game->bluHits.hits, total_hits, CRGB::Red, CRGB::Blue);
+            setMeterValues(meters->center, game->bluHits.hits, total_hits, CRGB::Red, CRGB::Blue);
             meters->center->max_val = 1;
             meters->center->val = 0;
             meters->center->bgColor = CRGB::Black;
@@ -133,12 +157,12 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
         int red_own_secs = game->ownership.red_millis/1000;
         int blue_own_secs = game->ownership.blu_millis/1000;
 
-        updateMeter( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
-        updateMeter( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
-        updateMeter( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
-        updateMeter( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black ); 
-        updateMeter( meters->left, red_own_secs, secs_to_win, CRGB::Red, CRGB::Black );
-        updateMeter( meters->right, blue_own_secs, secs_to_win, CRGB::Blue, CRGB::Black ); 
+        setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black ); 
+        setMeterValues( meters->left, red_own_secs, secs_to_win, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->right, blue_own_secs, secs_to_win, CRGB::Blue, CRGB::Black ); 
 
         //the center meter is the capture meter
         CRGB captureMeterBackgroundColor;
@@ -146,32 +170,46 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
         captureMeterForegroundColor = getTeamColor(game->ownership.capturing);
         captureMeterBackgroundColor = getTeamColor(game->ownership.owner);
 
-        updateMeter( meters->center, blue_own_secs, secs_to_win, captureMeterForegroundColor, captureMeterBackgroundColor );  
+        setMeterValues( meters->center, blue_own_secs, secs_to_win, captureMeterForegroundColor, captureMeterBackgroundColor );  
 
     }
     else if ( settings->gameType == GameType::GAME_TYPE_ATTACK_DEFEND ){
         int blu_hits = game->bluHits.hits;        
         int hits_to_capture = settings->capture.hits_to_capture;
 
-        updateMeter( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
-        updateMeter( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
-        updateMeter( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
-        updateMeter( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
-        updateMeter( meters->right, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
-        updateMeter( meters->left, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
-        updateMeter( meters->center, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->right, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->left, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->center, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
 
     }
     else if ( settings->gameType == GameType::GAME_TYPE_TARGET_TEST ){
         int blu_hits = game->bluHits.hits;
         int red_hits = game->redHits.hits;
 
-        updateMeter( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
-        updateMeter( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
-        updateMeter( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
-        updateMeter( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black ); 
-        updateMeter( meters->left, red_hits, settings->hits.to_win, CRGB::Red, CRGB::Black );
-        updateMeter( meters->right, blu_hits, settings->hits.to_win, CRGB::Blue, CRGB::Black );
+        const int WARNING_HITS_LEFT = 4;
+
+        int close_to_winning_hits = (settings->hits.to_win - WARNING_HITS_LEFT);
+
+        //if ( red_hits > 0 ){
+        if ( red_hits > close_to_winning_hits ){
+            meters->left->flash_interval_millis = FlashInterval::FLASH_SLOW;
+            meters->right->flash_interval_millis = FlashInterval::FLASH_FAST;
+        }
+        if ( blu_hits > close_to_winning_hits ){
+            meters->left->flash_interval_millis = FlashInterval::FLASH_FAST;
+            meters->right->flash_interval_millis = FlashInterval::FLASH_SLOW;
+        }        
+
+        setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black ); 
+        setMeterValues( meters->left, red_hits, settings->hits.to_win, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->right, blu_hits, settings->hits.to_win, CRGB::Blue, CRGB::Black );
 
     }    
     else{
@@ -233,6 +271,7 @@ void applyLeftHits(GameState* current, TargetHitData hitdata, long current_time_
         current->redHits.hits += hitdata.hits;
         current->redHits.last_hit_energy = hitdata.last_hit_energy;
         current->redHits.last_hit_millis = current_time_millis;
+        current->redHits.last_decay_millis = current_time_millis;
     }
 }
 
@@ -241,6 +280,7 @@ void applyRightHits(GameState* current, TargetHitData hitdata, long current_time
         current->bluHits.hits += hitdata.hits;
         current->bluHits.last_hit_energy = hitdata.last_hit_energy;
         current->bluHits.last_hit_millis = current_time_millis;
+        current->bluHits.last_decay_millis = current_time_millis;
     }
 }
 
@@ -265,12 +305,39 @@ void applyHitDecay(GameState* current, GameSettings settings, long current_time_
     }
 }
 
+void applyTestModeHitDecay(GameState* current, GameSettings settings, long current_time_millis){
+
+    //TODO: factor out decay logic from game logic
+    long decay_millis = settings.capture.capture_decay_rate_secs_per_hit*1000;
+
+    long millis_since_last_red_hit =  ( current_time_millis - current->redHits.last_hit_millis);
+    long millis_since_last_red_decay =  ( current_time_millis - current->redHits.last_decay_millis);
+
+    long millis_since_last_blu_hit =  ( current_time_millis - current->bluHits.last_hit_millis);
+    long millis_since_last_blu_decay =  ( current_time_millis - current->bluHits.last_decay_millis);
+    
+    if ( (millis_since_last_red_hit > decay_millis) && (millis_since_last_red_decay >  decay_millis)){
+        if ( current->redHits.hits > 0 ){
+            Log.warningln("Decaying Red: since_decay=%l, since_hit=%l", millis_since_last_red_decay,millis_since_last_red_hit);
+            current->redHits.hits--;
+            current->redHits.last_decay_millis = current_time_millis;
+        }
+    }
+    if ( (millis_since_last_blu_hit > decay_millis) && (millis_since_last_blu_decay >  decay_millis)){
+        if ( current->bluHits.hits > 0 ){
+            Log.warningln("Decaying Blue: since_decay=%l, since_hit=%l", millis_since_last_blu_decay,millis_since_last_blu_hit);
+            current->bluHits.hits--;
+            current->bluHits.last_decay_millis = current_time_millis;
+        }
+    }
+}
+
+
 //updates timeExpired based on game state. 
 //makes testing easier, so we dont have to set up all those conditions
 void updateGameTime(GameState* current,GameSettings settings, long current_time_millis){
 
     long elapsed_since_start = (current_time_millis - current->time.start_time_millis)/1000;
-
 
     bool isExpired = false;
     bool isOvertimeExpired = false;
@@ -316,30 +383,7 @@ void endGameWithMostOwnership(GameState* current){
     }
 }
 
-Team getWinnerByHitsWithVictoryMargin(int red_hits, int blu_hits, int hits_to_win, int victory_margin){
-    bool redWins = (red_hits >= hits_to_win ) && (red_hits >= (blu_hits + victory_margin));
-    bool bluWins = (blu_hits >= hits_to_win ) && (blu_hits >= (red_hits + victory_margin));
-    if ( redWins){
-        return Team::RED;
-    }    
-    else if ( bluWins){
-        return Team::BLU;
-    }
-    else{
-        return Team::NOBODY;
-    }
-}
-Team getWinnerByHitsWithoutVictoryMargin(int red_hits, int blu_hits, int hits_to_win){
-    if ( red_hits >= hits_to_win){
-        return Team::RED;
-    }
-    else if ( blu_hits >= hits_to_win){
-        return Team::BLU;
-    }
-    else{
-        return Team::NOBODY;
-    }
-}
+
 
 
 
@@ -630,6 +674,9 @@ void updateTargetTestMode(GameState* current,  GameSettings settings, long curre
 
       It counts hits constantly, resetting the meter when necessary
       */
+
+    applyTestModeHitDecay(current, settings,current_time_millis);
+
     int red_hits = current->redHits.hits;
     int blu_hits = current->bluHits.hits;
     Log.traceln("RedHits=%d, BluHits=%d",red_hits,blu_hits);

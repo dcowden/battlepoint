@@ -60,7 +60,7 @@
 #define VICTORY_HITS_LITTLE_STEP_SIZE 1
 #define ENCODER_SERVICE_PRESCALER 5
 #define POST_INTERVAL_MS 50
-
+#define TIMER_INTERVAL_MICROSECONDS 200
 RealClock gameClock = RealClock();
 
 //the different types of games we can play
@@ -89,12 +89,14 @@ volatile TargetScanner rightScanner;
 long updateCounter = 0;
 long targetLoopCounter = 0;
 long targetLoopMillis = 0;
-volatile bool timeToHandleTargets = false;
+//volatile bool timeToHandleTargets = false;
 
 // ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
 // and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
+//portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+
 hw_timer_t *timer = NULL;
-portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+
 
 //prototypes
 //void updateDisplay();
@@ -105,6 +107,7 @@ void updateLEDs();
 void stopGameAndReturnToMenu();
 void disableTargetTriggers();
 void enableTargetTriggers();
+void IRAM_ATTR onTimer();
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
 ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
@@ -120,17 +123,11 @@ int readRightTarget(){
   return 0;
 }
 
-
 void updateDisplayLocal(){
-  //portENTER_CRITICAL(&timerMux);
-  //disableTargetTriggers();
   updateDisplay(gameState,gameSettings);
   updateMeters(&gameState,&gameSettings,&meters);
   updateLEDs(); 
-  //enableTargetTriggers();
-  //portEXIT_CRITICAL(&timerMux);
 }
-
 
 void localUpdateGame(){  
   updateCounter++;
@@ -152,10 +149,6 @@ void localUpdateGame(){
 TickTwo updateDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
 TickTwo gameUpdateTimer(localUpdateGame, GAME_UPDATE_INTERVAL_MS );
 
-
-
-void IRAM_ATTR onTimer();
-
 void setupLEDs(){
   FastLED.addLeds<NEOPIXEL, Pins::LED_TOP>(topLeds, 2* HORIONTAL_LED_SIZE);
   FastLED.addLeds<NEOPIXEL, Pins::LED_BOTTOM>(bottomLeds, 2* HORIONTAL_LED_SIZE);
@@ -166,14 +159,12 @@ void setupLEDs(){
 
 void setupEncoder(){
   clickEncoder.setAccelerationEnabled(true);
-  clickEncoder.setDoubleClickEnabled(true); // Disable doubleclicks makes the response faster.  See: https://github.com/soligen2010/encoder/issues/6
+  clickEncoder.setDoubleClickEnabled(true); 
 
-  //portENTER_CRITICAL_ISR(&timerMux);
-  //portEXIT_CRITICAL_ISR(&timerMux);
   //ESP32 timer
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
-  timerAlarmWrite(timer, 200, true); //units are microseconds, 200 = 0.2ms
+  timerAlarmWrite(timer, TIMER_INTERVAL_MICROSECONDS, true); //units are microseconds, 200 = 0.2ms
   timerAlarmEnable(timer);
     
 }
@@ -220,10 +211,11 @@ Menu::result loadTargetTestSettings(){
   loadSettingsForSelectedGameType();
   gameSettings.hits.to_win = 16;
   gameSettings.timed.max_duration_seconds=999;
+  gameSettings.capture.capture_decay_rate_secs_per_hit = 10;  
   return Menu::proceed;
 }
-//FIELD(var.name, title, units, min., max., step size,fine step size, action, events mask, styles)
 
+//FIELD(var.name, title, units, min., max., step size,fine step size, action, events mask, styles)
 MENU(mostHitsSubMenu, "MostHits", loadMostHitsSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)            ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
@@ -299,8 +291,6 @@ Menu::navNode* nodes[sizeof(panels) / sizeof(Menu::panel)]; //navNodes to store 
 Menu::panelsList pList(panels, nodes, 1); //a list of panels and nodes
 Menu::idx_t tops[MENU_MAX_DEPTH] = {0,0}; //store cursor positions for each level
 
-
-//MENU_INPUTS(in,&encStream);
 MENU_INPUTS(in);
 
 MENU_OUTPUTS(out,MENU_MAX_DEPTH
@@ -336,15 +326,11 @@ void startSelectedGame(){
   Log.warningln("Target Threshold= %l", gameSettings.target.trigger_threshold);
   saveSettingsForSelectedGameType();
 
-
   leftScanner.triggerLevel = gameSettings.target.trigger_threshold;
-  //rightScanner.triggerLevel = gameSettings.target.trigger_threshold;
+  rightScanner.triggerLevel = gameSettings.target.trigger_threshold;
 
-  //TODO:remove
-  //leftScanner.triggerLevel = 300;
-  //rightScanner.triggerLevel = 300;
   enable(&leftScanner);
-  //enable(&rightScanner);
+  enable(&rightScanner);
 
   startGame(&gameState, &gameSettings, &gameClock);
 
@@ -402,11 +388,8 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
 }
 
 void updateLEDs(){
-
   updateLeds(&meters, gameClock.milliseconds());
-  //portENTER_CRITICAL(&timerMux);
   FastLED.show();
-  //portEXIT_CRITICAL(&timerMux);
 }
 
 
@@ -465,15 +448,11 @@ void setup() {
   
   setupMeters();
   POST();
-
   setupTargetScanners();  
   setupEncoder();
 
-  // hardwareOutputTimer.start();
-  //nav.idleTask = menuIdleEvent;  
   updateDisplayTimer.start();
   gameUpdateTimer.start();
-
   loadTargetTestSettings();
   startSelectedGame();
 }
@@ -487,19 +466,15 @@ void disableTargetTriggers(){
 }
 
 void enableTargetTriggers(){
-  
   timerAlarmEnable(timer);
 }
 
 void readTargets(){  
 
-  //disableTargetTriggers();
   
   //TODO: how to get rid of this dupcliation?
 
   int current_time_millis = gameClock.milliseconds();
-  //portENTER_CRITICAL(&timerMux);
-
 
   if ( isReady(&leftScanner)){
       
@@ -509,28 +484,20 @@ void readTargets(){
       enable(&leftScanner);
   }
 
-  /**
-  if ( isReady(&rightScanner)){
-      Log.warning("Reading Right Hit...");
-      Serial.println("Right Hit");
-      TargetHitData hd = analyze_impact(&rightScanner, gameSettings.target.hit_energy_threshold);
-      applyLeftHits(&gameState, hd, current_time_millis );    
-      enable(&rightScanner);
-      Log.warningln("[OK]");
-  } **/
   
-  //portEXIT_CRITICAL(&timerMux);
+  if ( isReady(&rightScanner)){
+      TargetHitData hd = analyze_impact(&rightScanner, gameSettings.target.hit_energy_threshold);
+      applyRightHits(&gameState, hd, current_time_millis );    
+      enable(&rightScanner);
+  } 
 }
 
 
 void loop() {  
-  //disableTargetTriggers();
-  //if ( timeToHandleTargets ){
+
   readTargets();
-  //}
-  //enableTargetTriggers();
+
   if ( nav.sleepTask){
-    //portENTER_CRITICAL(&timerMux);
     gameUpdateTimer.update();
     updateDisplayTimer.update();
     
@@ -539,7 +506,6 @@ void loop() {
     if ( b == ClickEncoder::DoubleClicked){
        stopGameAndReturnToMenu();
     }
-    //portEXIT_CRITICAL(&timerMux);
   }
   else{
 
@@ -549,7 +515,7 @@ void loop() {
       oled.firstPage();
       do nav.doOutput(); while (oled.nextPage() );
   }
-  //enableTargetTriggers();
+  
 }
 
 
@@ -560,13 +526,11 @@ void IRAM_ATTR onTimer()
     encoderServicePrescaler = 0;
     clickEncoder.service();  
   }
-  //portENTER_CRITICAL_ISR(&timerMux);
   
   if ( nav.sleepTask){
-    //portEXIT_CRITICAL_ISR(&timerMux);
     long l = millis();
     tick(&leftScanner,l);
-    //tick(&rightScanner,l);
+    tick(&rightScanner,l);
   }
 
 }

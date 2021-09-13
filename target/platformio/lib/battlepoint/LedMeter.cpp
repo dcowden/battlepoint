@@ -32,13 +32,13 @@ bool isOn ( LedMeter* meter, long current_time_millis){
   long flash_interval_millis = meter->flash_interval_millis;
 
   if ( flash_interval_millis > 0){
-     long elapsed = current_time_millis - meter->last_flash_millis;
-     Log.traceln("Flash Interval=%d, elapsed=%d, current_time=%d", flash_interval_millis,elapsed,current_time_millis);
+     long elapsed = (current_time_millis - meter->last_flash_millis);
+     Log.traceln("Meter %s, Flash Interval=%d, elapsed=%d, current_time=%d", meter->name, flash_interval_millis ,elapsed,current_time_millis);
      if ( elapsed >= flash_interval_millis){
        int old_state = meter->flash_state;
        int new_state = ! meter->flash_state;
-       Log.infoln("Toggling Controller State, %d->%d",old_state,new_state);
-       meter->flash_state = ! meter->flash_state;
+       Log.traceln("Toggling Controller State, %d->%d",old_state,new_state);
+       meter->flash_state = new_state;
 
        meter->last_flash_millis = current_time_millis;
        if ( meter->flash_state == 0 ){
@@ -48,6 +48,14 @@ bool isOn ( LedMeter* meter, long current_time_millis){
        else{
          Log.infoln("Flash:on=false");
          return false;
+       }
+     }
+     else{
+       if ( meter->flash_state){
+         return false;
+       }
+       else{
+         return true;
        }
      }
   }
@@ -69,7 +77,7 @@ void blankLedMeter( LedMeter* meter ){
   meter->bgColor = originalBgColor;
 }
 
-void updateMeter (LedMeter* meter, int val, int max_val, CRGB fgColor, CRGB bgColor ){
+void setMeterValues (LedMeter* meter, int val, int max_val, CRGB fgColor, CRGB bgColor ){
     Log.traceln("Updating Meter, %d/%d", val, max_val);
     meter->val = val;
     meter->max_val = max_val;

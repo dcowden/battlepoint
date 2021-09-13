@@ -8,8 +8,8 @@
 #define DEFAULT_MAX_VAL 10
 
 typedef enum {
-    FLASH_SLOW = 2000,
-    FLASH_FAST = 500,
+    FLASH_SLOW = 800,
+    FLASH_FAST = 400,
     FLASH_NONE = 0
 } FlashInterval;
 
@@ -29,25 +29,11 @@ typedef struct  {
 } LedMeter;
 
 
-//typedef struct {
-//    long last_flash_millis = 0 ;
-//    int flash_state = 0;
-//} LedFlashState;
-
-
-//typedef struct {
-//    LedMeter* meter;
-//    LedFlashState flashState;
-//} LedController;
-
 CRGB getFastLEDColor(TeamColor tc);
 int proportionalValue(int in_val, int in_max, int out_max );
-//void debugLedController (LedController* controller);
 void initMeter ( LedMeter* meter, const char* name, CRGB* leds, int startIndex, int endIndex );
 void configureMeter( LedMeter* meter, int max_val, int val, CRGB fg, CRGB bg);
 void updateLedMeter(LedMeter* meter );
 void updateLedMeter(LedMeter* meter, long current_time_millis );
-
-void updateMeter (LedMeter* meter, int val, int max_val, CRGB fgColor, CRGB bgColor );
-//void updateController(LedController* controller, long current_time_millis);
+void setMeterValues (LedMeter* meter, int val, int max_val, CRGB fgColor, CRGB bgColor );
 #endif
