@@ -25,7 +25,7 @@
 #include <targetscan.h>
 #include <target.h>
 
-
+//TODO: organize these into groups
 #define MENU_MAX_DEPTH 4
 #define OFFSET_X 0
 #define OFFSET_Y 0
@@ -58,14 +58,17 @@
 #define VICTORY_HITS_MAX 100
 #define VICTORY_HITS_BIG_STEP_SIZE 5
 #define VICTORY_HITS_LITTLE_STEP_SIZE 1
+
+
 #define ENCODER_SERVICE_PRESCALER 5
 #define POST_INTERVAL_MS 50
 #define TIMER_INTERVAL_MICROSECONDS 200
-RealClock gameClock = RealClock();
 
 //the different types of games we can play
 GameState gameState;
 GameSettings gameSettings;
+RealClock gameClock = RealClock();
+
 
 CRGB leftLeds[VERTICAL_LED_SIZE];
 CRGB centerLeds[VERTICAL_LED_SIZE];
@@ -86,27 +89,18 @@ volatile int encoderServicePrescaler = 0;
 volatile TargetScanner leftScanner;
 volatile TargetScanner rightScanner;
 
-long updateCounter = 0;
-long targetLoopCounter = 0;
-long targetLoopMillis = 0;
-//volatile bool timeToHandleTargets = false;
-
 // ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
 // and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
 //portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-
 hw_timer_t *timer = NULL;
 
 
 //prototypes
-//void updateDisplay();
 void menuIdleEvent();
 void localUpdateGame();
 void startSelectedGame();
 void updateLEDs();
 void stopGameAndReturnToMenu();
-void disableTargetTriggers();
-void enableTargetTriggers();
 void IRAM_ATTR onTimer();
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
@@ -130,7 +124,6 @@ void updateDisplayLocal(){
 }
 
 void localUpdateGame(){  
-  updateCounter++;
   updateGame(&gameState, gameSettings, (Clock*)(&gameClock));
   
   if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
@@ -186,6 +179,7 @@ void setupTargets(){
   pinMode(Pins::TARGET_RIGHT,INPUT);
 }
 
+//TODO: move menu stuff to another file somehow
 Menu::result loadMostHitsSettings(){
   gameSettings.gameType = GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME;
   loadSettingsForSelectedGameType();
@@ -334,10 +328,11 @@ void startSelectedGame(){
 
   startGame(&gameState, &gameSettings, &gameClock);
 
-  Log.warningln("Meter States:");
+  Log.traceln("Meter States:");
   oled.clear();
   nav.idleOn();
 
+  //TODO: only do this in test mode
   Serial.print("sample_no");Serial.print(",");
   Serial.print("hits");Serial.print(",");
   Serial.print("energy");Serial.print(",");
@@ -392,7 +387,7 @@ void updateLEDs(){
   FastLED.show();
 }
 
-
+//TODO: do these belong in meter?
 void setMeterValue(LedMeter* meter, int val ){
   meter->val = val;
   updateLedMeter(meter);
@@ -408,6 +403,7 @@ void setAllMetersToValue(int v ){
   FastLED.show();       
 }
 
+//TODO: magic numbers: move to constants
 void setupTargetScanners(){
   initScanner(&leftScanner, 400, 10, 100, &readLeftTarget);
   initScanner(&rightScanner, 400, 10, 100, &readRightTarget);
@@ -415,9 +411,9 @@ void setupTargetScanners(){
   reset(&rightScanner);
 }
 
+
 void POST(){
    Log.noticeln("POST...");
-   //all default meters are at their default max values, of 10
    for ( int i = 0;i<=DEFAULT_MAX_VAL;i++){
       setAllMetersToValue(i);
       FastLED.delay(POST_INTERVAL_MS);                                
@@ -457,34 +453,19 @@ void setup() {
   startSelectedGame();
 }
 
-void stopTimers(){
-  updateDisplayTimer.stop();
-}
-
-void disableTargetTriggers(){
-  timerAlarmDisable(timer);
-}
-
-void enableTargetTriggers(){
-  timerAlarmEnable(timer);
-}
-
 void readTargets(){  
 
   
-  //TODO: how to get rid of this dupcliation?
-
+  //TODO: how to get rid of this left/rigth dupcliation?
   int current_time_millis = gameClock.milliseconds();
 
-  if ( isReady(&leftScanner)){
-      
+  if ( isReady(&leftScanner)){      
       TargetHitData hd = analyze_impact(&leftScanner, gameSettings.target.hit_energy_threshold);      
       applyLeftHits(&gameState, hd, current_time_millis );    
       //Log.warningln("Left Trigger, hits=%d, sampletime = %l",hd.hits , leftScanner.sampleTimeMillis );
       enable(&leftScanner);
   }
 
-  
   if ( isReady(&rightScanner)){
       TargetHitData hd = analyze_impact(&rightScanner, gameSettings.target.hit_energy_threshold);
       applyRightHits(&gameState, hd, current_time_millis );    
@@ -501,14 +482,12 @@ void loop() {
     gameUpdateTimer.update();
     updateDisplayTimer.update();
     
-    
     int b = clickEncoder.getButton();
     if ( b == ClickEncoder::DoubleClicked){
        stopGameAndReturnToMenu();
     }
   }
   else{
-
       menuDriver.update();
       nav.doInput();
       oled.setFont(u8g2_font_7x13_mf);
