@@ -497,7 +497,6 @@ void loop() {
   
 }
 
-
 // ESP32 timer
 void IRAM_ATTR onTimer()
 {  
