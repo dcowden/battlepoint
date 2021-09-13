@@ -119,6 +119,9 @@ typedef struct {
     long last_decay_millis=0;
 } Ownership;
 
+//TODO: making hit tracker separate objects would make it easier to factor
+//red/blu functions into single methods, vs left/right versions
+//see applyLeftHits, applyRightHits, etc
 typedef struct {
     GameStatus status;
     GameResult result;
@@ -136,6 +139,7 @@ void startGame(GameState* gs, GameSettings* settings, Clock* clock);
 void updateGameTime(GameState* current,GameSettings settings, long current_time_millis);
 void updateOwnership(GameState* current,  GameSettings settings, long current_time_millis);
 void applyHitDecay(GameState* current, GameSettings settings, long current_time_millis);
+
 void applyLeftHits(GameState* current, TargetHitData hitdata, long current_time_millis);
 void applyRightHits(GameState* current, TargetHitData hitdata, long current_time_millis);
 void updateFirstToHitsGame(GameState* current,  GameSettings settings);

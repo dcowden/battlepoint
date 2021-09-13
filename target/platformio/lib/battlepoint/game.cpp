@@ -194,7 +194,6 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
 
         int close_to_winning_hits = (settings->hits.to_win - WARNING_HITS_LEFT);
 
-        //if ( red_hits > 0 ){
         if ( red_hits > close_to_winning_hits ){
             meters->left->flash_interval_millis = FlashInterval::FLASH_SLOW;
             meters->right->flash_interval_millis = FlashInterval::FLASH_FAST;
@@ -217,6 +216,8 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
     }
 }
 
+//TODO: tons of duplication here. 
+//is there an easier way? 
 void setupMeters(GameState* gs, GameSettings* settings, MeterSettings* meters){
     if ( settings->gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
         configureMeter(meters->center, STANDARD_METER_MAX_VAL, 0, CRGB::Black, CRGB::Black);   //NOT USED in this mode
@@ -249,12 +250,13 @@ void setupMeters(GameState* gs, GameSettings* settings, MeterSettings* meters){
 }
 
 void startGame(GameState* gs, GameSettings* settings, Clock* clock){
-    gs->time.start_time_millis = clock->milliseconds();
+    long current_time_millis = clock->milliseconds();
+    gs->time.start_time_millis = current_time_millis;
     gs->bluHits.hits = 0;
-    gs->bluHits.last_decay_millis = 0;
+    gs->bluHits.last_decay_millis = current_time_millis;
     gs->bluHits.last_hit_millis = 0;
     gs->redHits.hits = 0;
-    gs->redHits.last_decay_millis = 0;
+    gs->redHits.last_decay_millis = current_time_millis;
     gs->redHits.last_hit_millis = 0;    
     gs->status = GameStatus::GAME_STATUS_RUNNING;
     gs->result.winner = Team::NOBODY;
@@ -285,6 +287,7 @@ void applyRightHits(GameState* current, TargetHitData hitdata, long current_time
 }
 
 //assumes that captureHits is being updated first
+//TODO: extract core decay function duplicated with below
 void applyHitDecay(GameState* current, GameSettings settings, long current_time_millis){
     if ( settings.capture.capture_decay_rate_secs_per_hit > 0 ){
         Log.traceln("Time= %d, Decay Rate Does apply",current_time_millis);
@@ -305,9 +308,9 @@ void applyHitDecay(GameState* current, GameSettings settings, long current_time_
     }
 }
 
+//TODO: factor out decay logic from game logic
 void applyTestModeHitDecay(GameState* current, GameSettings settings, long current_time_millis){
 
-    //TODO: factor out decay logic from game logic
     long decay_millis = settings.capture.capture_decay_rate_secs_per_hit*1000;
 
     long millis_since_last_red_hit =  ( current_time_millis - current->redHits.last_hit_millis);
@@ -316,6 +319,8 @@ void applyTestModeHitDecay(GameState* current, GameSettings settings, long curre
     long millis_since_last_blu_hit =  ( current_time_millis - current->bluHits.last_hit_millis);
     long millis_since_last_blu_decay =  ( current_time_millis - current->bluHits.last_decay_millis);
     
+
+    //TODO: remove duplication below
     if ( (millis_since_last_red_hit > decay_millis) && (millis_since_last_red_decay >  decay_millis)){
         if ( current->redHits.hits > 0 ){
             Log.warningln("Decaying Red: since_decay=%l, since_hit=%l", millis_since_last_red_decay,millis_since_last_red_hit);
@@ -382,9 +387,6 @@ void endGameWithMostOwnership(GameState* current){
         endGameWithMostHits(current,current->redHits.hits,current->bluHits.hits);
     }
 }
-
-
-
 
 
 void updateFirstToHitsGame(GameState* current,  GameSettings settings){
