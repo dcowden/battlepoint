@@ -2,6 +2,7 @@
 #include <U8g2lib.h>
 #include <game.h>
 #include <pins.h>
+#include <game.h>
 
 #define U8_WIDTH 128
 #define U8_HEIGHT 64
@@ -9,6 +10,11 @@
 #define WINNER_SPLASH_MS 5000
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0,  I2C_SDA,I2C_SCL);
+
+typedef struct {
+    double vBatt=0.0;
+    const char* version;
+} HardwareInfo;
 
 typedef struct{
     int fontH;
@@ -18,13 +24,16 @@ typedef struct{
 short fontW = 6;
 short fontH = 13;
 
-void displayWelcomeBanner( ){
+void displayWelcomeBanner(const char* version ){
   oled.clearBuffer();
   oled.firstPage();
   oled.setFontPosBaseline();
   oled.setFont(u8g2_font_logisoso16_tf);
-  oled.setCursor(0,40);
-  oled.print("Target v0.2");   
+  oled.setCursor(0,30);
+  oled.print("BattlePoint");
+  oled.setCursor(0,50); 
+  oled.print("v");    
+  oled.print(version);
   oled.sendBuffer();
   delay(SPLASH_WAIT_MS);    
 }
@@ -32,7 +41,6 @@ void displayWelcomeBanner( ){
 void initDisplay(){
   oled.setBusClock(2000000);
   oled.begin();
-  displayWelcomeBanner();
   oled.clear();
   oled.setFlipMode(1);
   oled.setFont(u8g2_font_6x13_tf);
@@ -52,17 +60,28 @@ void gameOverDisplay(GameState gameState){
   oled.setFont(u8g2_font_7x13_mf);   
 }
 
+void diagnosticsDisplay(HardwareInfo hwi){
+  oled.clearBuffer();
+  oled.firstPage();
+  oled.setCursor(5,15);
+  oled.print("VERSION: ");oled.print(hwi.version);
+  oled.setCursor(5,27);
+  oled.print("  VBATT: ");oled.print(hwi.vBatt,2);
+  oled.setFont(u8g2_font_7x13_mf); 
+  oled.sendBuffer();  
+}
+
 void updateDisplay(GameState gameState, GameSettings gameSettings){
   oled.clearBuffer();
   if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
     oled.setCursor(5,15);
     oled.print("HT: R="); oled.print(gameState.redHits.hits); oled.print( "  B="); oled.print(gameState.bluHits.hits);
     oled.setCursor(5,27);
-    oled.print("TRIGGER LVL: "); oled.print(gameSettings.target.hit_energy_threshold); 
+    oled.print("TRIG: "); oled.print(gameSettings.target.hit_energy_threshold); 
     oled.setCursor(5,39);
-    oled.print("LAST RED: "); oled.print(gameState.redHits.last_hit_energy);
+    oled.print("LAST: "); oled.print(gameState.lastHit.avg_energy);oled.print(" ");oled.print(gameState.lastHit.singleSampleTimeMillis,2);oled.print(" ");oled.print(gameState.lastHit.peak0);
     oled.setCursor(5,52);
-    oled.print("LAST BLU: "); oled.print(gameState.bluHits.last_hit_energy);
+    oled.print(gameState.lastHit.middle_energy);oled.print(" ");oled.print(gameState.lastHit.middle_energy2);oled.print(" ");oled.print(gameState.lastHit.middle_energy3);oled.print(" ");oled.print(gameState.lastHit.middle_energy4);
   }
   else{
     oled.setCursor(5,15);

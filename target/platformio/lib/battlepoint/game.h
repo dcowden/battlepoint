@@ -129,6 +129,7 @@ typedef struct {
     HitTracker redHits; 
     HitTracker bluHits;
     Ownership ownership;
+    TargetHitData lastHit;
     //MeterSettings meters;
 } GameState;
 

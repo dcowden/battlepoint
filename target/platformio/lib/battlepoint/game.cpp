@@ -196,12 +196,17 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
 
         if ( red_hits > close_to_winning_hits ){
             meters->left->flash_interval_millis = FlashInterval::FLASH_SLOW;
-            meters->right->flash_interval_millis = FlashInterval::FLASH_FAST;
         }
+        else{
+            meters->left->flash_interval_millis = FlashInterval::FLASH_NONE;
+        }
+
         if ( blu_hits > close_to_winning_hits ){
-            meters->left->flash_interval_millis = FlashInterval::FLASH_FAST;
             meters->right->flash_interval_millis = FlashInterval::FLASH_SLOW;
         }        
+        else{
+            meters->right->flash_interval_millis = FlashInterval::FLASH_NONE;
+        }
 
         setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
         setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );

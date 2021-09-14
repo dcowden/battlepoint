@@ -17,6 +17,7 @@ typedef enum {
     I2C_SCL = 22,
     ENC_BUTTON =33,
     ENC_DOWN=32,
-    ENC_UP=34
+    ENC_UP=34,
+    VBATT=35
 } Pins;
 #endif

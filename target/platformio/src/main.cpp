@@ -25,6 +25,8 @@
 #include <targetscan.h>
 #include <target.h>
 
+#define BATTLEPOINT_VERSION "1.0.1"
+#define BP_MENU "BP v1.0.1"
 //TODO: organize these into groups
 #define MENU_MAX_DEPTH 4
 #define OFFSET_X 0
@@ -33,6 +35,7 @@
 #define VERTICAL_LED_SIZE 16
 #define HORIONTAL_LED_SIZE 10
 #define GAME_UPDATE_INTERVAL_MS 20
+#define HARDWARE_INFO_UPDATE_INTERVAL_MS 1000
 
 #define TRIGGER_MIN 100
 #define TRIGGER_MAX 1000
@@ -89,17 +92,28 @@ volatile int encoderServicePrescaler = 0;
 volatile TargetScanner leftScanner;
 volatile TargetScanner rightScanner;
 
+typedef enum {
+    PROGRAM_MODE_GAME=0,
+    PROGRAM_MODE_MENU = 1,
+    PROGRAM_MODE_DIAGNOSTICS =2,
+    PROGRAM_MODE_TARGET_TEST
+} ProgramMode;
+
+int programMode = ProgramMode::PROGRAM_MODE_MENU;
+
 // ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
 // and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
 //portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 hw_timer_t *timer = NULL;
 
+HardwareInfo hardwareInfo;
 
 //prototypes
 void menuIdleEvent();
 void localUpdateGame();
 void startSelectedGame();
 void updateLEDs();
+void startDiagnostics();
 void stopGameAndReturnToMenu();
 void IRAM_ATTR onTimer();
 
@@ -107,6 +121,15 @@ void IRAM_ATTR onTimer();
 ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
 //ClickEncoderStream encStream(clickEncoder, 1); 
 
+double getBatteryVoltage(){
+  int r = analogRead(Pins::VBATT);
+
+  return (double)r / 1575.0 * 2.0 * 5; //ADC_11db = 1v per 1575 count
+}
+
+void updateHardwareInfo(){
+    hardwareInfo.vBatt = getBatteryVoltage();
+}
 int readLeftTarget(){
   return analogRead(Pins::TARGET_LEFT);
 }
@@ -118,9 +141,15 @@ int readRightTarget(){
 }
 
 void updateDisplayLocal(){
-  updateDisplay(gameState,gameSettings);
-  updateMeters(&gameState,&gameSettings,&meters);
-  updateLEDs(); 
+  if ( programMode == PROGRAM_MODE_GAME || programMode == PROGRAM_MODE_TARGET_TEST){
+    updateDisplay(gameState,gameSettings);
+    updateMeters(&gameState,&gameSettings,&meters);
+    updateLEDs(); 
+  }
+  else if ( programMode == PROGRAM_MODE_DIAGNOSTICS){
+    diagnosticsDisplay(hardwareInfo);
+  }
+
 }
 
 void localUpdateGame(){  
@@ -141,6 +170,7 @@ void localUpdateGame(){
 
 TickTwo updateDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
 TickTwo gameUpdateTimer(localUpdateGame, GAME_UPDATE_INTERVAL_MS );
+TickTwo diagnosticsDataTimer(updateHardwareInfo, HARDWARE_INFO_UPDATE_INTERVAL_MS);
 
 void setupLEDs(){
   FastLED.addLeds<NEOPIXEL, Pins::LED_TOP>(topLeds, 2* HORIONTAL_LED_SIZE);
@@ -179,6 +209,25 @@ void setupTargets(){
   pinMode(Pins::TARGET_RIGHT,INPUT);
 }
 
+
+void printTestTargetDataHeaders(){
+  Serial.print("sample_no");Serial.print(",");
+  Serial.print("hits");Serial.print(",");
+  Serial.print("energy");Serial.print(",");
+  Serial.print("avg_energy");Serial.print(",");
+  Serial.print("avg_middle");Serial.print(",");
+  Serial.print("avg_middle2");Serial.print(",");
+  Serial.print("avg_middle3");Serial.print(",");
+  Serial.print("avg_middle4");Serial.print(",");
+  Serial.print("peak_0");Serial.print(",");
+  Serial.print("peak_1000");Serial.print(",");
+  Serial.print("peak_2000");Serial.print(",");
+  Serial.print("peak_3000");Serial.print(",");
+  Serial.print("peak_4000");Serial.print(",");  
+  Serial.print("totalSampleTime[ms]");Serial.print(",");  
+  Serial.print("avgSampleTime[ms]");Serial.println("");   
+}
+
 //TODO: move menu stuff to another file somehow
 Menu::result loadMostHitsSettings(){
   gameSettings.gameType = GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME;
@@ -206,6 +255,8 @@ Menu::result loadTargetTestSettings(){
   gameSettings.hits.to_win = 16;
   gameSettings.timed.max_duration_seconds=999;
   gameSettings.capture.capture_decay_rate_secs_per_hit = 10;  
+  printTestTargetDataHeaders();
+
   return Menu::proceed;
 }
 
@@ -257,12 +308,14 @@ MENU(testTargetMenu, "TargetTest",  loadTargetTestSettings, Menu::enterEvent, Me
     ,EXIT("<Back")
 );
 
-MENU(mainMenu, "BP Target v0.5", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
+
+MENU(mainMenu, BP_MENU, Menu::doNothing, Menu::noEvent, Menu::wrapStyle
   ,SUBMENU(mostHitsSubMenu)
   ,SUBMENU(ozSubMenu)
   ,SUBMENU(firstToHitsSubMenu)
   ,SUBMENU(adSubMenu)
   ,SUBMENU(testTargetMenu)
+  ,OP("Diagnostics",startDiagnostics,Menu::enterEvent)
 );
 
 //{{disabled normal,disabled selected},{enabled normal,enabled selected, enabled editing}}
@@ -331,23 +384,19 @@ void startSelectedGame(){
   Log.traceln("Meter States:");
   oled.clear();
   nav.idleOn();
-
-  //TODO: only do this in test mode
-  Serial.print("sample_no");Serial.print(",");
-  Serial.print("hits");Serial.print(",");
-  Serial.print("energy");Serial.print(",");
-  Serial.print("avg_energy");Serial.print(",");
-  Serial.print("avg_middle");Serial.print(",");
-  Serial.print("avg_middle2");Serial.print(",");
-  Serial.print("avg_middle3");Serial.print(",");
-  Serial.print("avg_middle4");Serial.print(",");
-  Serial.print("peak_0");Serial.print(",");
-  Serial.print("peak_1000");Serial.print(",");
-  Serial.print("peak_2000");Serial.print(",");
-  Serial.print("peak_3000");Serial.print(",");
-  Serial.print("peak_4000");Serial.print(",");  
-  Serial.print("totalSampleTime[ms]");Serial.print(",");  
-  Serial.print("avgSampleTime[ms]");Serial.println("");  
+  if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
+     programMode = PROGRAM_MODE_TARGET_TEST;
+     Serial.println("Target Test Mode");
+  }
+  else{
+    programMode = PROGRAM_MODE_GAME;
+  }
+ 
+}
+void startDiagnostics(){
+  oled.clear();
+  nav.idleOn();
+  programMode = PROGRAM_MODE_DIAGNOSTICS;
 }
 
 void stopGameAndReturnToMenu(){
@@ -355,6 +404,7 @@ void stopGameAndReturnToMenu(){
   oled.clear();
   nav.idleOff();  
   nav.refresh();
+  programMode = PROGRAM_MODE_MENU;
 }
 
 Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
@@ -425,19 +475,21 @@ void POST(){
 
 void setup() {
   setCpuFrequencyMhz(240);
-
+  hardwareInfo.version = BATTLEPOINT_VERSION;
   Serial.begin(115200);
   Serial.setTimeout(500);
   initSettings();
   Log.begin(LOG_LEVEL_WARNING, &Serial, true);
   Log.warning("Starting...");
   initDisplay();
+  displayWelcomeBanner(hardwareInfo.version);
   Log.notice("OLED [OK]");
   setupLEDs();    
   Log.notice("LEDS [OK]");  
   setupTargets();
   Log.notice("TARGETS [OK]");
-
+  analogSetAttenuation(ADC_11db);
+  analogReadResolution(12);
   Menu::options->invertFieldKeys = false;
   Log.warningln("Complete.");
   oled.setFont(u8g2_font_7x13_mf);
@@ -449,6 +501,7 @@ void setup() {
 
   updateDisplayTimer.start();
   gameUpdateTimer.start();
+  diagnosticsDataTimer.start();
   loadTargetTestSettings();
   startSelectedGame();
 }
@@ -460,15 +513,23 @@ void readTargets(){
   int current_time_millis = gameClock.milliseconds();
 
   if ( isReady(&leftScanner)){      
-      TargetHitData hd = analyze_impact(&leftScanner, gameSettings.target.hit_energy_threshold);      
-      applyLeftHits(&gameState, hd, current_time_millis );    
-      //Log.warningln("Left Trigger, hits=%d, sampletime = %l",hd.hits , leftScanner.sampleTimeMillis );
+      TargetHitData td = analyze_impact(&leftScanner, gameSettings.target.hit_energy_threshold,false);      
+      if ( programMode == PROGRAM_MODE_TARGET_TEST){
+        printTargetData(&td);
+      }
+      applyLeftHits(&gameState, td, current_time_millis );    
+      gameState.lastHit = td;
+      Log.warningln("Left Trigger, hits=%d, sampletime = %l",td.hits , leftScanner.sampleTimeMillis );
       enable(&leftScanner);
   }
 
   if ( isReady(&rightScanner)){
-      TargetHitData hd = analyze_impact(&rightScanner, gameSettings.target.hit_energy_threshold);
-      applyRightHits(&gameState, hd, current_time_millis );    
+      TargetHitData td = analyze_impact(&rightScanner, gameSettings.target.hit_energy_threshold,false);
+      if ( programMode == PROGRAM_MODE_TARGET_TEST){
+        printTargetData(&td);
+      }      
+      applyRightHits(&gameState, td, current_time_millis );    
+      gameState.lastHit = td;
       enable(&rightScanner);
   } 
 }
@@ -476,23 +537,28 @@ void readTargets(){
 
 void loop() {  
 
-  readTargets();
+  diagnosticsDataTimer.update();
+  
 
-  if ( nav.sleepTask){
-    gameUpdateTimer.update();
-    updateDisplayTimer.update();
-    
-    int b = clickEncoder.getButton();
-    if ( b == ClickEncoder::DoubleClicked){
-       stopGameAndReturnToMenu();
-    }
+  if ( programMode == PROGRAM_MODE_GAME || programMode == PROGRAM_MODE_TARGET_TEST || programMode == PROGRAM_MODE_DIAGNOSTICS){
+      readTargets();
+      gameUpdateTimer.update();
+      updateDisplayTimer.update();
+      
+      int b = clickEncoder.getButton();
+      if ( b == ClickEncoder::DoubleClicked){
+        stopGameAndReturnToMenu();
+      }
   }
-  else{
+  else if ( programMode == PROGRAM_MODE_MENU){
       menuDriver.update();
       nav.doInput();
       oled.setFont(u8g2_font_7x13_mf);
       oled.firstPage();
       do nav.doOutput(); while (oled.nextPage() );
+  }
+  else{
+      Serial.println("Unknown Program Mode");
   }
   
 }
