@@ -225,7 +225,7 @@ void printTestTargetDataHeaders(){
   Serial.print("peak_3000");Serial.print(",");
   Serial.print("peak_4000");Serial.print(",");  
   Serial.print("totalSampleTime[ms]");Serial.print(",");  
-  Serial.print("avgSampleTime[ms]");Serial.println("");   
+  Serial.println("avgSampleTime[ms]");
 }
 
 //TODO: move menu stuff to another file somehow
@@ -386,7 +386,6 @@ void startSelectedGame(){
   nav.idleOn();
   if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
      programMode = PROGRAM_MODE_TARGET_TEST;
-     Serial.println("Target Test Mode");
   }
   else{
     programMode = PROGRAM_MODE_GAME;
@@ -479,7 +478,7 @@ void setup() {
   Serial.begin(115200);
   Serial.setTimeout(500);
   initSettings();
-  Log.begin(LOG_LEVEL_WARNING, &Serial, true);
+  Log.begin(LOG_LEVEL_SILENT, &Serial, true);
   Log.warning("Starting...");
   initDisplay();
   displayWelcomeBanner(hardwareInfo.version);
