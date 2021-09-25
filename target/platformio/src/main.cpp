@@ -33,7 +33,7 @@
 #define OFFSET_Y 0
 #define DISPLAY_UPDATE_INTERVAL_MS 100
 #define VERTICAL_LED_SIZE 16
-#define HORIONTAL_LED_SIZE 10
+#define HORIONTAL_LED_SIZE 12
 #define GAME_UPDATE_INTERVAL_MS 20
 #define HARDWARE_INFO_UPDATE_INTERVAL_MS 1000
 
@@ -65,7 +65,14 @@
 
 #define ENCODER_SERVICE_PRESCALER 5
 #define POST_INTERVAL_MS 50
-#define TIMER_INTERVAL_MICROSECONDS 200
+#define TIMER_INTERVAL_MICROSECONDS 100
+
+//two shots from an atlas are 50ms apart, so we need to take samples 
+//after a hit for no more than 50ms. 
+//This is 40ms at 0.1ms/sample, see timer config
+//also note that this can't be more than 500
+#define TARGET_NUM_SAMPLES 400
+#define TARGET_DEFAULT_TRIGGER_LEVEL 4000
 
 //the different types of games we can play
 GameState gameState;
@@ -76,7 +83,7 @@ RealClock gameClock = RealClock();
 CRGB leftLeds[VERTICAL_LED_SIZE];
 CRGB centerLeds[VERTICAL_LED_SIZE];
 CRGB rightLeds[VERTICAL_LED_SIZE];
-CRGB topLeds[2* HORIONTAL_LED_SIZE];
+CRGB topLeds[2*HORIONTAL_LED_SIZE];
 CRGB bottomLeds[2* HORIONTAL_LED_SIZE];
 
 LedMeter leftTopMeter;
@@ -135,9 +142,7 @@ int readLeftTarget(){
 }
 
 int readRightTarget(){
-  //TODO: re-enable when we have multiple targets
-  //return analogRead(Pins::TARGET_RIGHT);
-  return 0;
+  return analogRead(Pins::TARGET_RIGHT);
 }
 
 void updateDisplayLocal(){
@@ -187,7 +192,7 @@ void setupEncoder(){
   //ESP32 timer
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
-  timerAlarmWrite(timer, TIMER_INTERVAL_MICROSECONDS, true); //units are microseconds, 200 = 0.2ms
+  timerAlarmWrite(timer, TIMER_INTERVAL_MICROSECONDS, true); //units are microseconds, 100 = 0.1ms
   timerAlarmEnable(timer);
     
 }
@@ -210,23 +215,7 @@ void setupTargets(){
 }
 
 
-void printTestTargetDataHeaders(){
-  Serial.print("sample_no");Serial.print(",");
-  Serial.print("hits");Serial.print(",");
-  Serial.print("energy");Serial.print(",");
-  Serial.print("avg_energy");Serial.print(",");
-  Serial.print("avg_middle");Serial.print(",");
-  Serial.print("avg_middle2");Serial.print(",");
-  Serial.print("avg_middle3");Serial.print(",");
-  Serial.print("avg_middle4");Serial.print(",");
-  Serial.print("peak_0");Serial.print(",");
-  Serial.print("peak_1000");Serial.print(",");
-  Serial.print("peak_2000");Serial.print(",");
-  Serial.print("peak_3000");Serial.print(",");
-  Serial.print("peak_4000");Serial.print(",");  
-  Serial.print("totalSampleTime[ms]");Serial.print(",");  
-  Serial.println("avgSampleTime[ms]");
-}
+
 
 //TODO: move menu stuff to another file somehow
 Menu::result loadMostHitsSettings(){
@@ -255,7 +244,7 @@ Menu::result loadTargetTestSettings(){
   gameSettings.hits.to_win = 16;
   gameSettings.timed.max_duration_seconds=999;
   gameSettings.capture.capture_decay_rate_secs_per_hit = 10;  
-  printTestTargetDataHeaders();
+  printTargetDataHeaders();
 
   return Menu::proceed;
 }
@@ -264,6 +253,7 @@ Menu::result loadTargetTestSettings(){
 MENU(mostHitsSubMenu, "MostHits", loadMostHitsSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)            ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
@@ -273,6 +263,7 @@ MENU(firstToHitsSubMenu, "FirstToHits", loadFirstToHitsSettings, Menu::enterEven
     ,FIELD(gameSettings.hits.to_win,"Hits","",VICTORY_HITS_MIN,VICTORY_HITS_MAX,VICTORY_HITS_BIG_STEP_SIZE,VICTORY_HITS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)            ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     
     ,OP("Start",startSelectedGame, Menu::enterEvent)
@@ -358,13 +349,14 @@ void setupMeters(){
   meters.left  = &leftMeter;
   meters.right = &rightMeter;
 
+
   initMeter(meters.leftTop,"leftTop",topLeds,0,9);
-  initMeter(meters.leftBottom,"leftBottom",bottomLeds,0,9);
-  initMeter(meters.rightTop,"rightTop",topLeds,10,19);
-  initMeter(meters.rightBottom,"rightBottom",bottomLeds,10,19);
-  initMeter(meters.center,"center",centerLeds,0,15);
-  initMeter(meters.left,"left",leftLeds,0,15);
-  initMeter(meters.right,"right",rightLeds,0,15);
+  initMeter(meters.leftBottom,"leftBottom",bottomLeds,0,2*HORIONTAL_LED_SIZE-1);
+  initMeter(meters.rightTop,"rightTop",topLeds,HORIONTAL_LED_SIZE,2*HORIONTAL_LED_SIZE-1);
+  initMeter(meters.rightBottom,"rightBottom",bottomLeds,HORIONTAL_LED_SIZE,2*HORIONTAL_LED_SIZE-1);
+  initMeter(meters.center,"center",centerLeds,0,VERTICAL_LED_SIZE-1);
+  initMeter(meters.left,"left",leftLeds,0,VERTICAL_LED_SIZE-1);
+  initMeter(meters.right,"right",rightLeds,0,VERTICAL_LED_SIZE-1);
 }
 
 void startSelectedGame(){  
@@ -454,8 +446,8 @@ void setAllMetersToValue(int v ){
 
 //TODO: magic numbers: move to constants
 void setupTargetScanners(){
-  initScanner(&leftScanner, 400, 10, 100, &readLeftTarget);
-  initScanner(&rightScanner, 400, 10, 100, &readRightTarget);
+  initScanner(&leftScanner, TARGET_NUM_SAMPLES, 10, TARGET_DEFAULT_TRIGGER_LEVEL, &readLeftTarget);
+  initScanner(&rightScanner, TARGET_NUM_SAMPLES, 10, TARGET_DEFAULT_TRIGGER_LEVEL, &readRightTarget);
   reset(&leftScanner);
   reset(&rightScanner);
 }
@@ -468,7 +460,7 @@ void POST(){
       FastLED.delay(POST_INTERVAL_MS);                                
    }
    setAllMetersToValue(0);
-   Log.notice("POST COMPLETE");
+   Log.noticeln("POST COMPLETE");
 }
 
 
@@ -536,7 +528,7 @@ void readTargets(){
 
 void loop() {  
 
-  diagnosticsDataTimer.update();
+  //diagnosticsDataTimer.update();
   
 
   if ( programMode == PROGRAM_MODE_GAME || programMode == PROGRAM_MODE_TARGET_TEST || programMode == PROGRAM_MODE_DIAGNOSTICS){

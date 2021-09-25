@@ -3,15 +3,14 @@
 #include <Arduino.h>
 #include <targetscan.h>
 
+#define DATA_BIN_COUNT 20
+
 typedef struct {
     int hits;
     int sample_number;
     double last_hit_energy; 
-    int avg_energy;
-    int middle_energy;
-    int middle_energy2;
-    int middle_energy3;
-    int middle_energy4;
+    double avg_energy_bins[DATA_BIN_COUNT];
+    double overall_avg_energy;
     int peak0;
     int peak1000;
     int peak2000;
@@ -24,5 +23,6 @@ typedef struct {
 
 TargetHitData analyze_impact( volatile TargetScanner* scanner, long hit_energy_threshold,bool printData);
 void printTargetData( TargetHitData* td);
+void printTargetDataHeaders();
 
 #endif

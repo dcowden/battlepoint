@@ -95,7 +95,7 @@ void updateLedMeter(LedMeter* meter ){
   //TODO annoying! after all this work trying NOT to go to OO, 
   //the log framwork really pushes us to implemetning printable
   //https://arduino.stackexchange.com/questions/53732/is-it-possible-to-print-a-custom-object-by-passing-it-to-serial-print
-  Log.infoln("UpdateMeter '%s': %d/%d [%d:%d]",meter->name, meter->val,meter->max_val,startIndex,endIndex );
+  Log.traceln("UpdateMeter '%s': %d/%d [%d:%d]",meter->name, meter->val,meter->max_val,startIndex,endIndex );
 
   if ( startIndex < endIndex ){
     total_lights = endIndex - startIndex + 1;

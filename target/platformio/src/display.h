@@ -42,7 +42,7 @@ void initDisplay(){
   oled.setBusClock(2000000);
   oled.begin();
   oled.clear();
-  oled.setFlipMode(1);
+  oled.setFlipMode(0);
   oled.setFont(u8g2_font_6x13_tf);
 }
 
@@ -79,9 +79,9 @@ void updateDisplay(GameState gameState, GameSettings gameSettings){
     oled.setCursor(5,27);
     oled.print("TRIG: "); oled.print(gameSettings.target.hit_energy_threshold); 
     oled.setCursor(5,39);
-    oled.print("LAST: "); oled.print(gameState.lastHit.avg_energy);oled.print(" ");oled.print(gameState.lastHit.singleSampleTimeMillis,2);oled.print(" ");oled.print(gameState.lastHit.peak0);
+    oled.print("LAST: "); oled.print(gameState.lastHit.last_hit_energy);oled.print(" ");oled.print(gameState.lastHit.singleSampleTimeMillis,2);oled.print(" ");oled.print(gameState.lastHit.peak0);
     oled.setCursor(5,52);
-    oled.print(gameState.lastHit.middle_energy);oled.print(" ");oled.print(gameState.lastHit.middle_energy2);oled.print(" ");oled.print(gameState.lastHit.middle_energy3);oled.print(" ");oled.print(gameState.lastHit.middle_energy4);
+    oled.print(gameState.lastHit.last_hit_energy);oled.print(" ");oled.print(gameState.lastHit.overall_avg_energy);oled.print(" ");oled.print(gameState.lastHit.avg_energy_bins[5]);oled.print(" ");oled.print(gameState.lastHit.avg_energy_bins[8]);
   }
   else{
     oled.setCursor(5,15);

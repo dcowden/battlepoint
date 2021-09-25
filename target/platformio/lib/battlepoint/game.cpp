@@ -215,6 +215,17 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
         setMeterValues( meters->left, red_hits, settings->hits.to_win, CRGB::Red, CRGB::Black );
         setMeterValues( meters->right, blu_hits, settings->hits.to_win, CRGB::Blue, CRGB::Black );
 
+        //compute the seesaw meter
+        //if there are hits, it's the ratio of blue to red
+        int total_hits = blu_hits + red_hits;
+        if ( total_hits > 0 ){
+            float percentRed = (float)red_hits / (float)total_hits * 100.0;
+            setMeterValues( meters->center, (int)(percentRed), 100, CRGB::Red, CRGB::Blue );
+        }
+        else{
+            //nothing interesting yet
+            setMeterValues( meters->center, 0, 100, CRGB::Black, CRGB::Black );
+        }
     }    
     else{
        Log.errorln("UNKNOWN GAME TYPE");
@@ -245,7 +256,7 @@ void setupMeters(GameState* gs, GameSettings* settings, MeterSettings* meters){
         configureMeter(meters->right, settings->capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
     }
     else if ( settings->gameType == GameType::GAME_TYPE_TARGET_TEST ){
-        configureMeter(meters->center, STANDARD_METER_MAX_VAL, 0, CRGB::Black, CRGB::Black);   //NOT USED in this mode
+        configureMeter(meters->center, settings->hits.to_win, 0, CRGB::Red, CRGB::Blue);  
         configureMeter(meters->left, settings->hits.to_win, 0, CRGB::Blue, CRGB::Black); //hits scored for blue , count from zero to total required to win
         configureMeter(meters->right, settings->hits.to_win, 0, CRGB::Red, CRGB::Black); //hits scored for red , count from zero to total required to win
     }    
