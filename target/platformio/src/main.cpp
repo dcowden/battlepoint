@@ -64,7 +64,7 @@
 
 
 #define ENCODER_SERVICE_PRESCALER 5
-#define POST_INTERVAL_MS 50
+#define POST_INTERVAL_MS 80
 #define TIMER_INTERVAL_MICROSECONDS 100
 
 //two shots from an atlas are 50ms apart, so we need to take samples 
@@ -441,6 +441,7 @@ void setAllMetersToValue(int v ){
   setMeterValue(&rightTopMeter,v);      
   setMeterValue(&rightBottomMeter,v);      
   setMeterValue(&rightMeter,v);
+  setMeterValue(&centerMeter,v);
   FastLED.show();       
 }
 
@@ -489,7 +490,7 @@ void setup() {
   POST();
   setupTargetScanners();  
   setupEncoder();
-
+  setup_target_classifier();
   updateDisplayTimer.start();
   gameUpdateTimer.start();
   diagnosticsDataTimer.start();
@@ -506,7 +507,10 @@ void readTargets(){
   if ( isReady(&leftScanner)){      
       TargetHitData td = analyze_impact(&leftScanner, gameSettings.target.hit_energy_threshold,false);      
       if ( programMode == PROGRAM_MODE_TARGET_TEST){
-        printTargetData(&td);
+        if ( td.hits > 0){
+          printTargetData(&td,'L');  
+        }
+        
       }
       applyLeftHits(&gameState, td, current_time_millis );    
       gameState.lastHit = td;
@@ -517,8 +521,10 @@ void readTargets(){
   if ( isReady(&rightScanner)){
       TargetHitData td = analyze_impact(&rightScanner, gameSettings.target.hit_energy_threshold,false);
       if ( programMode == PROGRAM_MODE_TARGET_TEST){
-        printTargetData(&td);
-      }      
+        if ( td.hits > 0){
+          printTargetData(&td,'R');  
+        }
+      }   
       applyRightHits(&gameState, td, current_time_millis );    
       gameState.lastHit = td;
       enable(&rightScanner);

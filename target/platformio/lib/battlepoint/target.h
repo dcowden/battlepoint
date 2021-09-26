@@ -18,11 +18,12 @@ typedef struct {
     int peak4000;
     long totalSampleTimeMillis;
     int numSamples;
+    float hitProbability;
     double singleSampleTimeMillis;
 } TargetHitData;
 
 TargetHitData analyze_impact( volatile TargetScanner* scanner, long hit_energy_threshold,bool printData);
-void printTargetData( TargetHitData* td);
+void printTargetData( TargetHitData* td,const char side);
 void printTargetDataHeaders();
-
+void setup_target_classifier();
 #endif
