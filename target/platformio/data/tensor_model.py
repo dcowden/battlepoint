@@ -13,12 +13,25 @@ FIELDS=['energy','peak_0','peak_1000','peak_2000','peak_3000','peak_4000','overa
 #FIELDS=['peak_0','peak_1000','peak_2000','peak_3000','peak_4000']
 #FIELDS=['energy','overallAvgEnergy','bin0','bin1','bin2']
 
+ESP_32_DATATYPE='float32'
 fake_hits_df = pd.read_csv('fake_hits_metal_target.csv') # fake hits only
 real_hits_df = pd.read_csv('real_hits_metal_target.csv') #hits only
 fake_hits_df = fake_hits_df[FIELDS]
 real_hits_df = real_hits_df[FIELDS]
-fake_hits_df = fake_hits_df.astype({'peak_0': 'float64','peak_1000': 'float64','peak_2000': 'float64','peak_3000': 'float64','peak_4000': 'float64'})
-real_hits_df = real_hits_df.astype({'peak_0': 'float64','peak_1000': 'float64','peak_2000': 'float64','peak_3000': 'float64','peak_4000': 'float64'})
+ESP_32_TYPE_DICT = {
+  'energy':ESP_32_DATATYPE,
+  'peak_0': ESP_32_DATATYPE,
+  'peak_1000': ESP_32_DATATYPE,
+  'peak_2000': ESP_32_DATATYPE,
+  'peak_3000': ESP_32_DATATYPE,
+  'overallAvgEnergy': ESP_32_DATATYPE,
+  'peak_4000': ESP_32_DATATYPE,
+  'bin0': ESP_32_DATATYPE,
+  'bin1': ESP_32_DATATYPE,
+  'bin2': ESP_32_DATATYPE,
+}
+fake_hits_df = fake_hits_df.astype(ESP_32_TYPE_DICT)
+real_hits_df = real_hits_df.astype(ESP_32_TYPE_DICT)
 fake_hits_df['target'] = 0
 real_hits_df['target'] = 1
 all_df = pd.concat([fake_hits_df,real_hits_df])
@@ -54,7 +67,9 @@ def get_normalization_layer(name, dataset):
   normalizer.adapt(feature_ds)
 
   return normalizer
-  
+
+
+
 BATCH_SIZE=25
 train_ds = df_to_dataset(train_df,batch_size=BATCH_SIZE)
 val_ds = df_to_dataset(val_df,batch_size=BATCH_SIZE)
@@ -71,8 +86,16 @@ for h in FIELDS:
     encoded_features.append(encoded_numeric_col)
 
 
+def representative_data_gen():
+  for input_value in tf.data.Dataset.from_tensor_slices(train_ds).batch(1).take(100):
+    yield [input_value]
+
+
+def sigmoid(x):
+  return 1.0 / ( 1.0 + pow(0.3678749025,x))
+
 all_features = tf.keras.layers.concatenate(encoded_features)
-x = tf.keras.layers.Dense(16, activation="relu")(all_features)
+x = tf.keras.layers.Dense(16, activation="sigmoid")(all_features)
 x = tf.keras.layers.Dropout(0.5)(x)
 output = tf.keras.layers.Dense(1)(x)
 model = tf.keras.Model(all_inputs, output)
@@ -82,6 +105,7 @@ model.compile(optimizer='adam',
 
 
 model.fit(train_ds, epochs=200, validation_data=val_ds)
+
 
 loss, accuracy = model.evaluate(test_ds)
 print("Accuracy", accuracy)
@@ -95,13 +119,15 @@ model.summary()
 #print(c_code)
 
 converter = tf.lite.TFLiteConverter.from_keras_model(model)
-converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
+#converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.representative_dataset = tf.lite.RepresentativeDataset(representative_data_gen)
+#converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
 #converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
 #converter.inference_input_type = tf.int8  # or tf.uint8
 #converter.inference_output_type = tf.int8  # or tf.uint8
 #converter.target_spec.supported_types = [tf.float16]
 #converter.optimizations = [tf.lite.Optimize.OPTIMIZE_FOR_SIZE]
-#converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
 tflite_model = converter.convert()
 
 # Save the model to disk
@@ -121,7 +147,7 @@ for counter,r in enumerate(input_df.to_dict(orient='records')):
     j = {name: tf.convert_to_tensor([value]) for name, value in r.items()}
     predictions = reloaded_model.predict(j)
     prob = tf.nn.sigmoid(predictions)
-
-    print("Probability %d of Hit: %0.1f" % (counter,prob*100))  
+    print("Predictions=",predictions)
+    print("Probability %d of Hit: %0.1f, %0.1f" % (counter,prob*100,sigmoid(predictions[0]) ))  
 
 print ("Now Run xxd -i target_classifier_quantized.tflite > ../lib/battlepoint/TargetClassifier.h")

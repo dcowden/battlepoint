@@ -7,6 +7,7 @@
 #include "tensorflow/lite/micro/all_ops_resolver.h"
 #include "tensorflow/lite/micro/micro_error_reporter.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
+#include "tensorflow/lite/micro/kernels/micro_ops.h"
 
 //#define NUM_INPUTS 6
 #define NUM_OUTPUTS 1
@@ -25,7 +26,8 @@ byte tensorArena[TENSOR_ARENA_SIZE] __attribute__((aligned(16)));
 tflite::ErrorReporter *reporter;
 tflite::MicroInterpreter *interpreter;
 TfLiteTensor *input;
-TfLiteTensor *output;
+TfLiteTensor *output_v;
+TfLiteTensor *output_type;
 const tflite::Model *model;
 
 
@@ -54,7 +56,12 @@ void setup_target_classifier(){
     }
 
     input = interpreter->input(0);
-    output = interpreter->output(0);
+    output_v = interpreter->output(0);
+    output_type = interpreter->output(1);
+
+    //Serial.println(input->type);
+    //Serial.println(output_type->type);
+    //Serial.println(output_v->type);    
 
 }
 
@@ -139,6 +146,10 @@ int count_peaks(volatile int* data, int num_samples, int min_thresh, int max_thr
   return peaks;
 }
 
+float sigmoid(float x){
+  return 1.0 / ( 1.0 + exp(-x));
+}
+
 void classifyModel(TargetHitData*  td , volatile int* data){
   //ml.begin(target_classifier_quantized_tflite);
   //only 10 fields allowed for input max
@@ -162,9 +173,12 @@ void classifyModel(TargetHitData*  td , volatile int* data){
       reporter->Report("Inference failed");
   }
 
-  float predicted= output->data.f[0];
-  td->hitProbability = output->data.f[0];
+  float r = output_v->data.f[0];
+  Serial.print("Inferred: ");Serial.println(r);
+  td->hitProbability = r;
 }
+
+
 
 //more sophisticated code could check the two targets
 //in parallel, but I dont think that'll be necessary.
