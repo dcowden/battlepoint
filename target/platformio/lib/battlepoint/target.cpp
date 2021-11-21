@@ -183,7 +183,7 @@ void classifyModel(TargetHitData*  td , volatile int* data){
 //more sophisticated code could check the two targets
 //in parallel, but I dont think that'll be necessary.
 //and if it is, we maybe want to use a separate ADC
-TargetHitData analyze_impact( volatile TargetScanner* scanner, long hit_energy_threshold,bool printData){
+TargetHitData analyze_impact( volatile TargetScanner* scanner, bool printData){
 
     long start = millis();
     TargetHitData td;

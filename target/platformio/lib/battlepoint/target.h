@@ -22,7 +22,7 @@ typedef struct {
     double singleSampleTimeMillis;
 } TargetHitData;
 
-TargetHitData analyze_impact( volatile TargetScanner* scanner, long hit_energy_threshold,bool printData);
+TargetHitData analyze_impact( volatile TargetScanner* scanner, bool printData);
 void printTargetData( TargetHitData* td,const char side);
 void printTargetDataHeaders();
 void setup_target_classifier();

@@ -33,7 +33,6 @@ void tick(volatile TargetScanner* st, long time_millis){
         
         int v = st->sampler();        
         if ( v > st->triggerLevel ){
-          Log.infoln("Triggered, value=%d, t=%l", v, time_millis);
           st->sampling = true;
           st->sampleTimeMillis = time_millis;
           _acceptSample(st,v);
@@ -83,6 +82,7 @@ void reset(volatile TargetScanner* st){
 
 void enable(volatile TargetScanner* st){
   st->enableScan = true;
+  st->sampling = false;
   st->dataReady = false;
   st->lastScanValue = 0;
   st->sampleTimeMillis = 0;

@@ -214,9 +214,6 @@ void setupTargets(){
   pinMode(Pins::TARGET_RIGHT,INPUT);
 }
 
-
-
-
 //TODO: move menu stuff to another file somehow
 Menu::result loadMostHitsSettings(){
   gameSettings.gameType = GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME;
@@ -244,6 +241,7 @@ Menu::result loadTargetTestSettings(){
   gameSettings.hits.to_win = 16;
   gameSettings.timed.max_duration_seconds=999;
   gameSettings.capture.capture_decay_rate_secs_per_hit = 10;  
+  gameSettings.target.trigger_threshold = 2000;
   printTargetDataHeaders();
 
   return Menu::proceed;
@@ -350,10 +348,12 @@ void setupMeters(){
   meters.right = &rightMeter;
 
 
-  initMeter(meters.leftTop,"leftTop",topLeds,0,9);
-  initMeter(meters.leftBottom,"leftBottom",bottomLeds,0,2*HORIONTAL_LED_SIZE-1);
+  initMeter(meters.leftTop,"leftTop",topLeds,0,HORIONTAL_LED_SIZE-1);
   initMeter(meters.rightTop,"rightTop",topLeds,HORIONTAL_LED_SIZE,2*HORIONTAL_LED_SIZE-1);
+
+  initMeter(meters.leftBottom,"leftBottom",bottomLeds,0,HORIONTAL_LED_SIZE-1);
   initMeter(meters.rightBottom,"rightBottom",bottomLeds,HORIONTAL_LED_SIZE,2*HORIONTAL_LED_SIZE-1);
+
   initMeter(meters.center,"center",centerLeds,0,VERTICAL_LED_SIZE-1);
   initMeter(meters.left,"left",leftLeds,0,VERTICAL_LED_SIZE-1);
   initMeter(meters.right,"right",rightLeds,0,VERTICAL_LED_SIZE-1);
@@ -500,12 +500,11 @@ void setup() {
 
 void readTargets(){  
 
-  
   //TODO: how to get rid of this left/rigth dupcliation?
   int current_time_millis = gameClock.milliseconds();
 
-  if ( isReady(&leftScanner)){      
-      TargetHitData td = analyze_impact(&leftScanner, gameSettings.target.hit_energy_threshold,false);      
+  if ( isReady(&leftScanner)){    
+      TargetHitData td = analyze_impact(&leftScanner,false);      
       if ( programMode == PROGRAM_MODE_TARGET_TEST){
         if ( td.hits > 0){
           printTargetData(&td,'L');  
@@ -519,7 +518,7 @@ void readTargets(){
   }
 
   if ( isReady(&rightScanner)){
-      TargetHitData td = analyze_impact(&rightScanner, gameSettings.target.hit_energy_threshold,false);
+      TargetHitData td = analyze_impact(&rightScanner,false);
       if ( programMode == PROGRAM_MODE_TARGET_TEST){
         if ( td.hits > 0){
           printTargetData(&td,'R');  
@@ -527,6 +526,7 @@ void readTargets(){
       }   
       applyRightHits(&gameState, td, current_time_millis );    
       gameState.lastHit = td;
+      Log.warningln("Right Trigger, hits=%d, sampletime = %l",td.hits , rightScanner.sampleTimeMillis );
       enable(&rightScanner);
   } 
 }

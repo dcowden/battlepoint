@@ -77,7 +77,7 @@ void updateDisplay(GameState gameState, GameSettings gameSettings){
     oled.setCursor(5,15);
     oled.print("HT: R="); oled.print(gameState.redHits.hits); oled.print( "  B="); oled.print(gameState.bluHits.hits);
     oled.setCursor(5,27);
-    oled.print("TRIG: "); oled.print(gameSettings.target.hit_energy_threshold); 
+    oled.print("TRIG: "); oled.print(gameSettings.target.trigger_threshold); 
     oled.setCursor(5,39);
     oled.print("LAST: "); oled.print(gameState.lastHit.last_hit_energy);oled.print(" ");oled.print(gameState.lastHit.singleSampleTimeMillis,2);oled.print(" ");oled.print(gameState.lastHit.peak0);
     oled.setCursor(5,52);
