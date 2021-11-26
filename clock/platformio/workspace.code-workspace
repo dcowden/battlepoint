@@ -1,0 +1,24 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.tcc": "cpp",
+			"display.h": "c",
+			"u8g2lib.h": "c",
+			"arduino.h": "c",
+			"deque": "cpp",
+			"string": "cpp",
+			"unordered_map": "cpp",
+			"unordered_set": "cpp",
+			"vector": "cpp",
+			"system_error": "cpp",
+			"array": "cpp",
+			"type_traits": "cpp",
+			"cstring": "cpp"
+		}
+	}
+}

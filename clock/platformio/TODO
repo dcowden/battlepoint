@@ -1,0 +1,22 @@
+# efficiency things
+only 512 bytes of EEPROM, probably need to not save all of GameSettings.
+
+
+# factorings
+
+# code cleanup
+how to avoid duplicate menu handler functions for each game type? ie,
+   loadMostHitsSettings
+   loadFirstToHitsSettings
+   loadOwnZoneSettings
+
+# move to 
+
+# expansions/generalizations
+how to provide more slots? 
+
+#hardware
+wire in encoder. i hate the button. can use the same pins the buttons were on since they are pull down
+
+# testing
+really need to add tests for game updates
