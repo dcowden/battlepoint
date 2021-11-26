@@ -30,5 +30,5 @@ typedef struct {
 
 void initGameClock(GameClockState* clockState,int start_delay_secs, int game_time_secs,long current_time_millis);
 void updateGameClock(GameClockState* clockState, long current_time_millis);
-void updateServoTime(int value_seconds, ClockColor color);
+
 #endif
