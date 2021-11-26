@@ -69,13 +69,13 @@ void diagnosticsDisplay(HardwareInfo hwi){
 }
 
 
-void updateDisplay(ClockState clockState){
+void updateDisplay(GameClockState* clockState){
   oled.clearBuffer();
 
   oled.setCursor(5,15);
-  oled.print("Elapsed:  "); oled.print(clockState.game_elapsed_secs);
+  oled.print("Elapsed:  "); oled.print(clockState->game_elapsed_secs);
   oled.setCursor(5,27);
-  oled.print("Remaining:  "); oled.print(clockState.game_remaining_secs);
+  oled.print("Remaining:  "); oled.print(clockState->game_remaining_secs);
   oled.sendBuffer();
   
 } 

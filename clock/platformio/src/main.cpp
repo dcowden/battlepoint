@@ -46,7 +46,7 @@
 //the different types of games we can play
 RealClock gameClock = RealClock();
 ClockSettings clockSettings;
-ClockState clockState;
+GameClockState clockState;
 
 //prototypes
 void startCountDown();
@@ -69,7 +69,7 @@ HardwareInfo hardwareInfo;
 void IRAM_ATTR onTimer();
 void stopGameAndReturnToMenu();
 void startCountDown();
-
+void updateGameClockLocal();
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
 ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
@@ -85,16 +85,16 @@ void updateHardwareInfo(){
 
 void updateDisplayLocal(){
   if ( programMode == PROGRAM_MODE_GAME){
-    updateDisplay(clockState);
+    updateDisplay(&clockState);
   }
 }
-void updateSegments(){
-
+void updateGameClockLocal(){
+  updateGameClock(&clockState,millis());
 }
 
 Ticker updateDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
 Ticker hardwareUpdateDataTimer(updateHardwareInfo, HARDWARE_INFO_UPDATE_INTERVAL_MS);
-Ticker segmentUpdateTime(updateSegments, SEGMENT_UPDATE_INTERVAL_MS);
+Ticker segmentUpdateTime(updateGameClockLocal, SEGMENT_UPDATE_INTERVAL_MS);
 
 void setupSegments(){
 
@@ -166,6 +166,9 @@ void startCountDown(){
   saveSettings();
   oled.clear();
   nav.idleOn();
+  //TODO: really this should take clockSettings, but this prevents having settings import clockdisplay.h
+
+  initGameClock(&clockState,clockSettings.start_delay_secs,clockSettings.game_secs,millis());
   programMode = PROGRAM_MODE_GAME;
 }
 
