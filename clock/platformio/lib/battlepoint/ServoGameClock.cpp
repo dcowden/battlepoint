@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ServoGameClock.h>
 #include <SevenSegmentMap.h>
+#include <ArduinoLog.h>
 //from https://github.com/bremme/arduino-tm1637/blob/master/src/SevenSegmentTM1637.cpp
 
 #define SERVO_POS_BASE 0
@@ -38,10 +39,33 @@ int getServoAngleFromColor(int v, ClockColor color){
     return SERVO_POS_BASE;
 }
 void setServoAngle(int digitNum, int positionNum, int angle){
+
     //TODO:populate, send servo command directly to servos from here
 }
 
-void setServoToDigit(int digitNum, uint8_t value , ClockColor color){
+char charForColor(ClockColor color){
+    if ( color == ClockColor::BLACK){
+        return 'K';
+    }
+    else if ( color == ClockColor::YELLOW){
+        return 'Y';
+    }
+    else if (color == ClockColor::RED){
+        return 'R';
+    }
+    else if (color == ClockColor::GREEN){
+        return 'G';
+    }
+    else if (color == ClockColor::WHITE){
+        return 'W';
+    }
+    else if (color == ClockColor::BLUE){
+        return 'B';
+    }
+    return '?';
+}
+void setServoToChar(int digitNum, uint8_t value , ClockColor color){
+    Log.noticeln("DIGIT %d--> %B %c",value,charForColor(color));
     //for each of the segments
     for( int i=0;i<8;i++){
         int angle=getServoAngleFromColor(bitRead(value,i),color);
@@ -49,7 +73,7 @@ void setServoToDigit(int digitNum, uint8_t value , ClockColor color){
     }   
 }
 
-void updateServoValue(int value, ClockColor color){
+void updateNumber(int value, ClockColor color){
     if ( value > 99 ){
         Serial.println("Cant Encode Integer Value > 99");
     }
@@ -61,17 +85,24 @@ void updateServoValue(int value, ClockColor color){
 
     uint8_t leftSegmentValues = encode(leftDigit);
     uint8_t rightSegmentValues = encode(rightDigit);
-    setServoToDigit(ServoClockDigit::LEFT, leftSegmentValues, color);
-    setServoToDigit(ServoClockDigit::RIGHT, rightSegmentValues, color);
+    setServoToChar(ServoClockDigit::LEFT, leftSegmentValues, color);
+    setServoToChar(ServoClockDigit::RIGHT, rightSegmentValues, color);
 }
 
-void updateServoTime(int value_seconds, ClockColor color){
+void updateTime(int value_seconds, ClockColor color){
     int value_to_show = value_seconds;
     if ( value_seconds > SECONDS_PER_MINUTE){
         value_to_show = value_seconds / SECONDS_PER_MINUTE;
     }
-    updateServoValue(value_to_show,color);
+    updateNumber(value_to_show,color);
 }
-
-
-
+void setAllDigitsToValue(char c, ClockColor color){
+    setServoToChar(ServoClockDigit::LEFT, c, color);
+    setServoToChar(ServoClockDigit::RIGHT, c, color);
+}
+void blank(){
+    setAllDigitsToValue(SEG_CHAR_SPACE,ClockColor::BLACK);
+}
+void null(ClockColor color){
+    setAllDigitsToValue(SEG_CHAR_MIN,color);
+}
