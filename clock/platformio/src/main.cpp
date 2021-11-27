@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <U8g2lib.h>
-#include <Clock.h>
 #include "Ticker.h"
 #include "EncoderMenuDriver.h"
 #include <display.h>
@@ -17,6 +16,8 @@
 #include <menuIO/chainStream.h>
 #include <menuIO/serialIn.h>
 #include <ClockDisplay.h>
+#include "ServoGameClock.h"
+#include "SevenSegmentMap.h"
 
 #define BATTLEPOINT_VERSION "1.0.1"
 #define BP_MENU "BP v1.0.1"
@@ -44,7 +45,6 @@
 #define SEGMENT_UPDATE_INTERVAL_MS 1000
 
 //the different types of games we can play
-RealClock gameClock = RealClock();
 ClockSettings clockSettings;
 GameClockState clockState;
 
@@ -95,10 +95,6 @@ void updateGameClockLocal(){
 Ticker updateDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
 Ticker hardwareUpdateDataTimer(updateHardwareInfo, HARDWARE_INFO_UPDATE_INTERVAL_MS);
 Ticker segmentUpdateTime(updateGameClockLocal, SEGMENT_UPDATE_INTERVAL_MS);
-
-void setupSegments(){
-
-}
 
 void setupEncoder(){
   clickEncoder.setAccelerationEnabled(true);
@@ -208,9 +204,17 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
 void POST(){
    Log.noticeln("POST...");
 
-     //TSTARTUP SEQUENCE
-     //setAllMetersToValue(i);                              
-   //setAllMetersToValue(0);
+    int DELAY_MS = 1000;
+    servo_clock_blank();
+    delay(DELAY_MS);
+    servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_O,ClockColor::BLUE);
+    delay(DELAY_MS);
+    servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_O,ClockColor::RED);
+    delay(DELAY_MS);
+    servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_O,ClockColor::YELLOW);
+    delay(DELAY_MS);
+    servo_clock_blank();
+
    Log.noticeln("POST COMPLETE");
 }
 
@@ -228,13 +232,14 @@ void setup() {
   Menu::options->invertFieldKeys = false;
   Log.warningln("Complete.");
   oled.setFont(u8g2_font_7x13_mf);
-
-  setupSegments();  
+  servo_clock_init();  
   POST();
   updateDisplayTimer.start();
   segmentUpdateTime.start();
   hardwareUpdateDataTimer.start();
   loadSettings();
+
+  servo_clock_blank();
   startCountDown();
 }
 

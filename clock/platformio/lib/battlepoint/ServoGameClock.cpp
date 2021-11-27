@@ -2,10 +2,22 @@
 #include <ServoGameClock.h>
 #include <SevenSegmentMap.h>
 #include <ArduinoLog.h>
+#include "PCA9685.h"
+#include <Wire.h>
+
 //from https://github.com/bremme/arduino-tm1637/blob/master/src/SevenSegmentTM1637.cpp
 
 #define SERVO_POS_BASE 0
 #define SERVO_POS_OFFSET 45
+
+PCA9685 pwmController(Wire);   
+PCA9685_ServoEvaluator  servoHelper;
+
+void servo_clock_init(){
+  pwmController.resetDevices();       // Resets all PCA9685 devices on i2c lin
+  pwmController.init();               // Initializes module using default totem-pole driver mode, and default disabled phase balancer
+  pwmController.setPWMFrequency(50);
+}
 
 // Helpers
 uint8_t encode(char c) {
@@ -27,20 +39,30 @@ uint8_t encode(int d) {
 int getServoAngleFromColor(int v, ClockColor color){
     if ( v == 1){
         if ( color == ClockColor::YELLOW){
-            return SERVO_POS_BASE + SERVO_POS_OFFSET;
+            return SERVO_POS_YELLOW;
         }
         else if ( color == ClockColor::RED){
-            return SERVO_POS_BASE - SERVO_POS_OFFSET;
+            return SERVO_POS_RED;
         }
         else if ( color == ClockColor::BLUE){
-            return SERVO_POS_BASE + 2*SERVO_POS_OFFSET;
+            return SERVO_POS_BLUE;
         }
     }
     return SERVO_POS_BASE;
 }
-void setServoAngle(int digitNum, int positionNum, int angle){
+int getServoChannelForDigitAndSegment(int digitNum, int segmentNum){
+    //digit is either zero or one
+    if ( digitNum == 0){
+        return segmentNum;
+    }
+    else{
+        return segmentNum + 8;
+    }
+}
 
-    //TODO:populate, send servo command directly to servos from here
+void setServoAngle(int digitNum, int segmentNum, int angle){
+    int channel = getServoChannelForDigitAndSegment(digitNum, segmentNum);
+    pwmController.setChannelPWM(channel, servoHelper.pwmForAngle(angle)); 
 }
 
 char charForColor(ClockColor color){
@@ -64,7 +86,7 @@ char charForColor(ClockColor color){
     }
     return '?';
 }
-void setServoToChar(int digitNum, uint8_t value , ClockColor color){
+void set_servo_to_char(int digitNum, uint8_t value , ClockColor color){
     Log.noticeln("DIGIT %d--> %B %c",value,charForColor(color));
     //for each of the segments
     for( int i=0;i<8;i++){
@@ -73,7 +95,7 @@ void setServoToChar(int digitNum, uint8_t value , ClockColor color){
     }   
 }
 
-void updateNumber(int value, ClockColor color){
+void servo_clock_update_number(int value, ClockColor color){
     if ( value > 99 ){
         Serial.println("Cant Encode Integer Value > 99");
     }
@@ -85,24 +107,24 @@ void updateNumber(int value, ClockColor color){
 
     uint8_t leftSegmentValues = encode(leftDigit);
     uint8_t rightSegmentValues = encode(rightDigit);
-    setServoToChar(ServoClockDigit::LEFT, leftSegmentValues, color);
-    setServoToChar(ServoClockDigit::RIGHT, rightSegmentValues, color);
+    set_servo_to_char(1, leftSegmentValues, color);
+    set_servo_to_char(0, rightSegmentValues, color);
 }
 
-void updateTime(int value_seconds, ClockColor color){
+void servo_clock_update_time(int value_seconds, ClockColor color){
     int value_to_show = value_seconds;
     if ( value_seconds > SECONDS_PER_MINUTE){
         value_to_show = value_seconds / SECONDS_PER_MINUTE;
     }
-    updateNumber(value_to_show,color);
+    servo_clock_update_number(value_to_show,color);
 }
-void setAllDigitsToValue(char c, ClockColor color){
-    setServoToChar(ServoClockDigit::LEFT, c, color);
-    setServoToChar(ServoClockDigit::RIGHT, c, color);
+void servo_clock_update_all_digits_to_map_symbol(char c, ClockColor color){
+    set_servo_to_char(1, c, color);
+    set_servo_to_char(0, c, color);
 }
-void blank(){
-    setAllDigitsToValue(SEG_CHAR_SPACE,ClockColor::BLACK);
+void servo_clock_blank(){
+    servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_SPACE,ClockColor::BLACK);
 }
-void null(ClockColor color){
-    setAllDigitsToValue(SEG_CHAR_MIN,color);
+void servo_clock_null(ClockColor color){
+    servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_MIN,color);
 }
