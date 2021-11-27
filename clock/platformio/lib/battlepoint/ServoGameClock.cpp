@@ -6,12 +6,20 @@
 #include <Wire.h>
 
 //from https://github.com/bremme/arduino-tm1637/blob/master/src/SevenSegmentTM1637.cpp
+#define SECONDS_PER_MINUTE 60
+#define BASE_POS 0
+#define DELTA 45
 
-#define SERVO_POS_BASE 0
-#define SERVO_POS_OFFSET 45
+enum COLOR_POS {
+  SERVO_POS_BLACK = BASE_POS,
+  SERVO_POS_YELLOW = BASE_POS + DELTA,
+  SERVO_POS_BLUE = BASE_POS - DELTA,
+  SERVO_POS_RED = BASE_POS + 2* DELTA,
+  SERVO_POS_CENTER=BASE_POS
+};
 
-PCA9685 pwmController(Wire);   
-PCA9685_ServoEvaluator  servoHelper;
+static PCA9685 pwmController(Wire);   
+static PCA9685_ServoEvaluator  servoHelper;
 
 void servo_clock_init(){
   pwmController.resetDevices();       // Resets all PCA9685 devices on i2c lin
@@ -48,7 +56,7 @@ int getServoAngleFromColor(int v, ClockColor color){
             return SERVO_POS_BLUE;
         }
     }
-    return SERVO_POS_BASE;
+    return SERVO_POS_CENTER;
 }
 int getServoChannelForDigitAndSegment(int digitNum, int segmentNum){
     //digit is either zero or one

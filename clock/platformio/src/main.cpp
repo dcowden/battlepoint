@@ -15,7 +15,7 @@
 #include <menuIO/serialIO.h>
 #include <menuIO/chainStream.h>
 #include <menuIO/serialIn.h>
-#include <ClockDisplay.h>
+#include <GameClock.h>
 #include "ServoGameClock.h"
 #include "SevenSegmentMap.h"
 
@@ -42,14 +42,14 @@
 #define POST_INTERVAL_MS 80
 #define TIMER_INTERVAL_MICROSECONDS 500
 #define HARDWARE_INFO_UPDATE_INTERVAL_MS 1000
-#define SEGMENT_UPDATE_INTERVAL_MS 1000
+#define GAME_CLOCK_UPDATE_INTERVAL_MS 1000
 
 //the different types of games we can play
 ClockSettings clockSettings;
 GameClockState clockState;
 
 //prototypes
-void startCountDown();
+void start();
 
 typedef enum {
     PROGRAM_MODE_GAME=0,
@@ -68,7 +68,7 @@ HardwareInfo hardwareInfo;
 //prototypes
 void IRAM_ATTR onTimer();
 void stopGameAndReturnToMenu();
-void startCountDown();
+void start();
 void updateGameClockLocal();
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
@@ -89,12 +89,14 @@ void updateDisplayLocal(){
   }
 }
 void updateGameClockLocal(){
-  updateGameClock(&clockState,millis());
+  game_clock_update(&clockState,millis());
+  ClockColor cc = game_clock_color_for_state(&clockState);
+  servo_clock_update_time(clockState.time_to_display_secs, cc);
 }
 
-Ticker updateDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
+Ticker updateOledDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
 Ticker hardwareUpdateDataTimer(updateHardwareInfo, HARDWARE_INFO_UPDATE_INTERVAL_MS);
-Ticker segmentUpdateTime(updateGameClockLocal, SEGMENT_UPDATE_INTERVAL_MS);
+Ticker gameClockUpdateTimer(updateGameClockLocal, GAME_CLOCK_UPDATE_INTERVAL_MS);
 
 void setupEncoder(){
   clickEncoder.setAccelerationEnabled(true);
@@ -123,7 +125,7 @@ void saveSettings(){
 MENU(mainMenu, BP_MENU, Menu::doNothing, Menu::noEvent, Menu::wrapStyle
     ,FIELD(clockSettings.start_delay_secs,"Start Delay","",START_DELAY_MIN,START_DELAY_MAX,START_DELAY_BIG_STEP_SIZE,START_DELAY_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(clockSettings.game_secs,"Game Time","s",GAME_TIME_MIN,GAME_TIME_MAX,GAME_TIME_BIG_STEP_SIZE,GAME_TIME_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)            
-    ,OP("Start",startCountDown, Menu::enterEvent)
+    ,OP("Start",start, Menu::enterEvent)
 );
 
 //{{disabled normal,disabled selected},{enabled normal,enabled selected, enabled editing}}
@@ -157,14 +159,15 @@ NAVROOT(nav, mainMenu, MENU_MAX_DEPTH, in, out);
 
 EncoderMenuDriver menuDriver = EncoderMenuDriver(&nav, &clickEncoder);
 
-void startCountDown(){  
+void start(){  
   Log.noticeln("Starting Timer");
   saveSettings();
   oled.clear();
   nav.idleOn();
   //TODO: really this should take clockSettings, but this prevents having settings import clockdisplay.h
 
-  initGameClock(&clockState,clockSettings.start_delay_secs,clockSettings.game_secs,millis());
+  game_clock_configure(&clockState,clockSettings.start_delay_secs,clockSettings.game_secs);
+  game_clock_start(&clockState,millis());
   programMode = PROGRAM_MODE_GAME;
 }
 
@@ -234,13 +237,13 @@ void setup() {
   oled.setFont(u8g2_font_7x13_mf);
   servo_clock_init();  
   POST();
-  updateDisplayTimer.start();
-  segmentUpdateTime.start();
+  updateOledDisplayTimer.start();
+  gameClockUpdateTimer.start();
   hardwareUpdateDataTimer.start();
   loadSettings();
 
   servo_clock_blank();
-  startCountDown();
+  start();
 }
 
 
@@ -250,8 +253,8 @@ void loop() {
 
   if ( programMode == PROGRAM_MODE_GAME ){
 
-      segmentUpdateTime.update();
-      updateDisplayTimer.update();
+      gameClockUpdateTimer.update();
+      updateOledDisplayTimer.update();
       
       int b = clickEncoder.getButton();
       if ( b == ClickEncoder::DoubleClicked){

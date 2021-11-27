@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <pins.h>
-#include <ClockDisplay.h>
+#include <GameClock.h>
 
 #define U8_WIDTH 128
 #define U8_HEIGHT 64
