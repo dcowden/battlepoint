@@ -19,8 +19,8 @@
 #include "ServoGameClock.h"
 #include "SevenSegmentMap.h"
 
-#define BATTLEPOINT_VERSION "1.0.1"
-#define BP_MENU "BP v1.0.1"
+#define BATTLEPOINT_VERSION "1.0.3"
+#define BP_MENU "BP v1.0.3"
 
 #define MENU_MAX_DEPTH 4
 #define OFFSET_X 0
@@ -48,8 +48,6 @@
 ClockSettings clockSettings;
 GameClockState clockState;
 
-//prototypes
-void start();
 
 typedef enum {
     PROGRAM_MODE_GAME=0,
@@ -80,14 +78,17 @@ double getBatteryVoltage(){
 }
 
 void updateHardwareInfo(){
-    hardwareInfo.vBatt = getBatteryVoltage();
+  timerAlarmDisable(timer);
+  hardwareInfo.vBatt = getBatteryVoltage();
+  timerAlarmEnable(timer);  
 }
 
 void updateDisplayLocal(){
   if ( programMode == PROGRAM_MODE_GAME){
-    updateDisplay(&clockState);
+    updateDisplay(&clockState,&hardwareInfo);
   }
 }
+
 void updateGameClockLocal(){
   game_clock_update(&clockState,millis());
   ClockColor cc = game_clock_color_for_state(&clockState);
@@ -105,7 +106,7 @@ void setupEncoder(){
   //ESP32 timer
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
-  timerAlarmWrite(timer, TIMER_INTERVAL_MICROSECONDS, true); //units are microseconds, 100 = 0.1ms
+  timerAlarmWrite(timer, TIMER_INTERVAL_MICROSECONDS, true); //units are microseconds
   timerAlarmEnable(timer);
 }
 
@@ -121,8 +122,13 @@ void saveSettings(){
   timerAlarmEnable(timer);
 }
 
+Menu::result menuaction_loadSavedSettings(){
+  loadSettings();
+  return Menu::proceed;
+}
+
 //FIELD(var.name, title, units, min., max., step size,fine step size, action, events mask, styles)
-MENU(mainMenu, BP_MENU, Menu::doNothing, Menu::noEvent, Menu::wrapStyle
+MENU(mainMenu, BP_MENU, menuaction_loadSavedSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(clockSettings.start_delay_secs,"Start Delay","",START_DELAY_MIN,START_DELAY_MAX,START_DELAY_BIG_STEP_SIZE,START_DELAY_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(clockSettings.game_secs,"Game Time","s",GAME_TIME_MIN,GAME_TIME_MAX,GAME_TIME_BIG_STEP_SIZE,GAME_TIME_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)            
     ,OP("Start",start, Menu::enterEvent)
@@ -160,12 +166,10 @@ NAVROOT(nav, mainMenu, MENU_MAX_DEPTH, in, out);
 EncoderMenuDriver menuDriver = EncoderMenuDriver(&nav, &clickEncoder);
 
 void start(){  
-  Log.noticeln("Starting Timer");
+  Log.noticeln("Starting Game Clock");
   saveSettings();
   oled.clear();
   nav.idleOn();
-  //TODO: really this should take clockSettings, but this prevents having settings import clockdisplay.h
-
   game_clock_configure(&clockState,clockSettings.start_delay_secs,clockSettings.game_secs);
   game_clock_start(&clockState,millis());
   programMode = PROGRAM_MODE_GAME;
@@ -205,20 +209,18 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
 }
 
 void POST(){
-   Log.noticeln("POST...");
-
-    int DELAY_MS = 1000;
-    servo_clock_blank();
-    delay(DELAY_MS);
-    servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_O,ClockColor::BLUE);
-    delay(DELAY_MS);
-    servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_O,ClockColor::RED);
-    delay(DELAY_MS);
-    servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_O,ClockColor::YELLOW);
-    delay(DELAY_MS);
-    servo_clock_blank();
-
-   Log.noticeln("POST COMPLETE");
+  Log.noticeln("POST...");
+  int DELAY_MS = 1000;
+  servo_clock_blank();
+  delay(DELAY_MS);
+  servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_8,ClockColor::BLUE);
+  delay(DELAY_MS);
+  servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_8,ClockColor::RED);
+  delay(DELAY_MS);
+  servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_8,ClockColor::YELLOW);
+  delay(DELAY_MS);
+  servo_clock_blank();
+  Log.noticeln("POST COMPLETE");
 }
 
 
@@ -240,9 +242,10 @@ void setup() {
   updateOledDisplayTimer.start();
   gameClockUpdateTimer.start();
   hardwareUpdateDataTimer.start();
-  loadSettings();
+  //loadSettings();
 
   servo_clock_blank();
+  //temporary
   start();
 }
 
@@ -250,7 +253,6 @@ void setup() {
 void loop() {  
 
   hardwareUpdateDataTimer.update();
-
   if ( programMode == PROGRAM_MODE_GAME ){
 
       gameClockUpdateTimer.update();

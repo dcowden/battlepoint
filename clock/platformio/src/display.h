@@ -57,25 +57,14 @@ void gameOverDisplay(){
   oled.setFont(u8g2_font_7x13_mf);   
 }
 
-void diagnosticsDisplay(HardwareInfo hwi){
-  oled.clearBuffer();
-  oled.firstPage();
-  oled.setCursor(5,15);
-  oled.print("VERSION: ");oled.print(hwi.version);
-  oled.setCursor(5,27);
-  oled.print("  VBATT: ");oled.print(hwi.vBatt,2);
-  oled.setFont(u8g2_font_7x13_mf); 
-  oled.sendBuffer();  
-}
-
-
-void updateDisplay(GameClockState* clockState){
+void updateDisplay(GameClockState* clockState,HardwareInfo* hwi){
   oled.clearBuffer();
 
   oled.setCursor(5,15);
   oled.print("Elapsed:  "); oled.print(clockState->game_elapsed_secs);
   oled.setCursor(5,27);
   oled.print("Remaining:  "); oled.print(clockState->game_remaining_secs);
+  oled.setCursor(5,39);
+  oled.print("VBATT:  "); oled.print(hwi->vBatt,2);
   oled.sendBuffer();
-  
 } 
