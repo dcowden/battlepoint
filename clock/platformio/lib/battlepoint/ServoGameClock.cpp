@@ -94,8 +94,48 @@ char charForColor(ClockColor color){
     }
     return '?';
 }
-void set_servo_to_char(int digitNum, uint8_t value , ClockColor color){
-    Log.noticeln("DIGIT %d--> %B %c",digitNum,value,charForColor(color));
+
+char getDebugSegmentChar(int bit_num, char v){
+    int t = bitRead(v,bit_num);
+    if ( t == 1){
+        return '*';
+    }
+    else{
+        return ' ';
+    }
+}
+void printDigitRow(char c1, char c2, char c3, char c4, char c5, char c6, char c7, char c8){
+    Serial.print("|");Serial.print(c1);Serial.print(c2);Serial.print(c3);Serial.print(c4);Serial.print("|");Serial.print(c5);Serial.print(c6);Serial.print(c7);Serial.print(c8);Serial.println("|");
+}
+
+void debugPrintdigits( char v1, char v0,ClockColor cc ){
+    const char c00 = getDebugSegmentChar(0,v0);
+    const char c10 = getDebugSegmentChar(1,v0);
+    const char c20 = getDebugSegmentChar(2,v0);
+    const char c30 = getDebugSegmentChar(3,v0);
+    const char c40 = getDebugSegmentChar(4,v0);
+    const char c50 = getDebugSegmentChar(5,v0);
+    const char c60 = getDebugSegmentChar(6,v0);
+    const char c01 = getDebugSegmentChar(0,v1);
+    const char c11 = getDebugSegmentChar(1,v1);
+    const char c21 = getDebugSegmentChar(2,v1);
+    const char c31 = getDebugSegmentChar(3,v1);
+    const char c41 = getDebugSegmentChar(4,v1);
+    const char c51 = getDebugSegmentChar(5,v1);
+    const char c61 = getDebugSegmentChar(6,v1);    
+    const char SP = ' ';
+    Serial.print("+-");Serial.print(charForColor(cc));Serial.print(charForColor(cc));Serial.println("-|----+");
+    printDigitRow(SP,c01,c01,SP,SP,c00,c00,SP);
+    printDigitRow(c51,SP,SP,c11,c50,SP,SP,c10);
+    printDigitRow(c51,SP,SP,c11,c50,SP,SP,c10);
+    printDigitRow(SP,c61,c61,SP,SP,c60,c60,SP);
+    printDigitRow(c41,SP,SP,c21,c40,SP,SP,c20);
+    printDigitRow(c41,SP,SP,c21,c40,SP,SP,c20);
+    printDigitRow(SP,c31,c31,SP,SP,c30,c30,SP);    
+    Serial.println("+----|----+");
+}
+
+void set_servo_to_char(int digitNum, uint8_t value , ClockColor color){    
     //for each of the segments
     for( int i=0;i<8;i++){
         int angle=getServoAngleFromColor(bitRead(value,i),color);
@@ -115,6 +155,7 @@ void servo_clock_update_number(int value, ClockColor color){
 
     uint8_t leftSegmentValues = encode(leftDigit);
     uint8_t rightSegmentValues = encode(rightDigit);
+    debugPrintdigits(leftSegmentValues,rightSegmentValues,color);
     set_servo_to_char(1, leftSegmentValues, color);
     set_servo_to_char(0, rightSegmentValues, color);
 }

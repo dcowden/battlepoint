@@ -20,10 +20,11 @@ const char* get_state_desc(ClockState state){
 
 ClockColor game_clock_color_for_state(GameClockState* clockState){
     ClockState cs = clockState->clockState;
-    if ( cs == ClockState::NOT_STARTED || ClockState::COUNTING_TO_START){
+    Serial.print("clock state=");Serial.println(cs);
+    if ( ClockState::NOT_STARTED  == cs || ClockState::COUNTING_TO_START == cs){
         return ClockColor::YELLOW;
     }
-    else if ( cs == ClockState::IN_PROGRESS ){
+    else if ( ClockState::IN_PROGRESS  == cs){
         if ( clockState->game_remaining_secs < 10){
             return ClockColor::RED;
         }
