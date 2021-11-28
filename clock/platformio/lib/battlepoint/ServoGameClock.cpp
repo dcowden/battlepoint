@@ -95,7 +95,7 @@ char charForColor(ClockColor color){
     return '?';
 }
 void set_servo_to_char(int digitNum, uint8_t value , ClockColor color){
-    Log.noticeln("DIGIT %d--> %B %c",value,charForColor(color));
+    Log.noticeln("DIGIT %d--> %B %c",digitNum,value,charForColor(color));
     //for each of the segments
     for( int i=0;i<8;i++){
         int angle=getServoAngleFromColor(bitRead(value,i),color);

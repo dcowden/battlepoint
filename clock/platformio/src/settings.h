@@ -8,9 +8,10 @@ typedef enum {
 } SettingSlot;
 
 typedef struct {
-    int start_delay_secs;
-    long game_secs;
-    int VERSION;
+  int VERSION;
+  int start_delay_secs;
+  long game_secs;
+
 } ClockSettings;
 
 void initSettings(){

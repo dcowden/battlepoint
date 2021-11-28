@@ -43,7 +43,7 @@
 #define TIMER_INTERVAL_MICROSECONDS 1000
 #define HARDWARE_INFO_UPDATE_INTERVAL_MS 1000
 #define GAME_CLOCK_UPDATE_INTERVAL_MS 1000
-#define ENCODER_UPDATE_INTERVAL_MS 5
+#define ENCODER_UPDATE_INTERVAL_MS 1
 
 //the different types of games we can play
 ClockSettings clockSettings;
@@ -73,6 +73,9 @@ void updateEncoder();
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
 ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
+void updateEncoder(){
+  clickEncoder.service();
+}
 
 double getBatteryVoltage(){
   int r = analogRead(Pins::VBATT);
@@ -80,9 +83,9 @@ double getBatteryVoltage(){
 }
 
 void updateHardwareInfo(){
-  timerAlarmDisable(timer);
+  //timerAlarmDisable(timer);
   hardwareInfo.vBatt = getBatteryVoltage();
-  timerAlarmEnable(timer);  
+  //timerAlarmEnable(timer);  
 }
 
 void updateDisplayLocal(){
@@ -117,9 +120,7 @@ void setupEncoder(){
   timerAlarmEnable(timer);
 }*/
 
-void updateEncoder(){
-  clickEncoder.service();
-}
+
 
 void loadSettings(){
   //timerAlarmDisable(timer);
@@ -177,7 +178,7 @@ NAVROOT(nav, mainMenu, MENU_MAX_DEPTH, in, out);
 EncoderMenuDriver menuDriver = EncoderMenuDriver(&nav, &clickEncoder);
 
 void start(){  
-  Log.noticeln("Starting Game Clock");
+  Log.traceln("Starting Game Clock");
   saveSettings();
   oled.clear();
   nav.idleOn();
@@ -242,7 +243,7 @@ void setup() {
   Serial.setTimeout(500);
   //setupEncoder();
   initSettings();
-  Log.begin(LOG_LEVEL_SILENT, &Serial, true);
+  Log.begin(LOG_LEVEL_INFO, &Serial, true);
   Log.warning("Starting...");
   initDisplay();
   displayWelcomeBanner(hardwareInfo.version);
@@ -254,7 +255,9 @@ void setup() {
   updateOledDisplayTimer.start();
   gameClockUpdateTimer.start();
   hardwareUpdateDataTimer.start();
-  //loadSettings();
+  encoderUpdateTimer.start();
+  
+  loadSettings();
 
   servo_clock_blank();
   //temporary
@@ -263,7 +266,7 @@ void setup() {
 
 
 void loop() {  
-  clickEncoder.service();  
+  encoderUpdateTimer.update(); 
   hardwareUpdateDataTimer.update();
   if ( programMode == PROGRAM_MODE_GAME ){
 
