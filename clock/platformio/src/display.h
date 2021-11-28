@@ -65,6 +65,8 @@ void updateDisplay(GameClockState* clockState,HardwareInfo* hwi){
   oled.setCursor(5,27);
   oled.print("Remaining:  "); oled.print(clockState->game_remaining_secs);
   oled.setCursor(5,39);
+  oled.println(get_state_desc(clockState->clockState));
+  oled.setCursor(5,51);
   oled.print("VBATT:  "); oled.print(hwi->vBatt,2);
   oled.sendBuffer();
 } 

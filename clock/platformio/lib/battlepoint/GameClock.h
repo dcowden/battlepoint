@@ -13,9 +13,9 @@ typedef enum {
 
 typedef enum {
     NOT_STARTED = 1,
-    COUNTING_TO_START,
-    IN_PROGRESS,
-    OVER
+    COUNTING_TO_START = 2,
+    IN_PROGRESS = 3,
+    OVER = 4
 } ClockState;
 
 typedef struct {
@@ -34,6 +34,8 @@ typedef struct {
 } GameClockState;
 
 ClockColor game_clock_color_for_state(GameClockState* clockState);
+
+const char* get_state_desc(ClockState state);
 void game_clock_configure(GameClockState* clockState,int start_delay_secs, int game_time_secs);
 void game_clock_start(GameClockState* clockState,long current_time_millis);
 void game_clock_update(GameClockState* clockState, long current_time_millis);

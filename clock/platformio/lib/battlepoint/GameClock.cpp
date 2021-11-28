@@ -3,6 +3,20 @@
 
 #define SECONDS_PER_MINUTE 60
 
+const char* get_state_desc(ClockState state){
+    if ( state == COUNTING_TO_START ){
+        return "Counting..";
+    }
+    else if ( state ==  IN_PROGRESS){
+        return "running";
+    }
+    else if ( state == OVER){
+        return "Over";
+    }
+    else{
+        return "?";
+    }
+}
 
 ClockColor game_clock_color_for_state(GameClockState* clockState){
     ClockState cs = clockState->clockState;
@@ -23,7 +37,7 @@ ClockColor game_clock_color_for_state(GameClockState* clockState){
 }
 void game_clock_configure(GameClockState* clockState,int start_delay_secs, int game_time_secs){
     clockState->game_duration_secs = game_time_secs;
-    clockState->start_delay_secs = game_time_secs;
+    clockState->start_delay_secs = start_delay_secs;
 
     clockState->game_elapsed_secs=0;
     clockState->secs_till_start=start_delay_secs;
@@ -60,14 +74,16 @@ void game_clock_update(GameClockState* clockState, long current_time_millis){
             clockState->clockState = ClockState::IN_PROGRESS;
             clockState->secs_till_start = 0;
             clockState->time_to_display_secs = seconds_left_in_game;
-            clockState->game_elapsed_secs=seconds_since_game_start;            
+            clockState->game_elapsed_secs=seconds_since_game_start; 
+            clockState->game_remaining_secs=clockState->game_duration_secs -  seconds_since_game_start;          
         }
         else{
             //game over
             clockState->clockState = ClockState::OVER;
             clockState->secs_till_start = 0;
             clockState->time_to_display_secs = 0;
-            clockState->game_elapsed_secs=clockState->game_duration_secs;                
+            clockState->game_elapsed_secs=clockState->game_duration_secs;  
+            clockState->game_remaining_secs=0;              
         }
     }
 

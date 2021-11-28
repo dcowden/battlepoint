@@ -9,14 +9,15 @@ int DELAY =10;
 int GAME_TIME = 100;
 
 long OFFSET_SECS_FROM_START(int duration_secs){
-    return (START_MILLIS + duration_secs*1000);
+    long o = (START_MILLIS + duration_secs*1000);
+    Serial.print("OffSet: "); Serial.println(o);
+    return o;
 }
 
 void test_initial_state(void){    
     game_clock_configure(&cs,DELAY,GAME_TIME);
 
-    TEST_ASSERT_EQUAL(ClockState::NOT_STARTED,cs.clockState);
-    TEST_ASSERT_EQUAL(START_MILLIS,cs.lastupdate_time_millis);
+    TEST_ASSERT_EQUAL(ClockState::NOT_STARTED,cs.clockState);    
     TEST_ASSERT_EQUAL(DELAY,cs.start_delay_secs);
     TEST_ASSERT_EQUAL(GAME_TIME,cs.game_duration_secs);
     TEST_ASSERT_EQUAL(0,cs.game_elapsed_secs);
@@ -34,7 +35,7 @@ void test_just_before_delay(){
     TEST_ASSERT_EQUAL(0,cs.game_elapsed_secs);
     TEST_ASSERT_EQUAL(GAME_TIME,cs.game_remaining_secs);
     TEST_ASSERT_EQUAL(1,cs.secs_till_start);
-    TEST_ASSERT_EQUAL(DELAY-secs_from_start,cs.time_to_display_secs);
+    TEST_ASSERT_EQUAL(1,cs.time_to_display_secs);
 
 }
 
@@ -43,39 +44,44 @@ void test_just_after_delay(){
     game_clock_start(&cs,START_MILLIS);
     int secs_from_start = OFFSET_SECS_FROM_START(11);
     game_clock_update(&cs,secs_from_start);
-
-    TEST_ASSERT_EQUAL(ClockState::COUNTING_TO_START,cs.clockState);
-    TEST_ASSERT_EQUAL(secs_from_start-DELAY,cs.game_elapsed_secs);
-    TEST_ASSERT_EQUAL(GAME_TIME-secs_from_start-DELAY,cs.game_remaining_secs);
+    int REMAINING_SECS = GAME_TIME - 1;
+    TEST_ASSERT_EQUAL(ClockState::IN_PROGRESS,cs.clockState);
+    TEST_ASSERT_EQUAL(1,cs.game_elapsed_secs);
+    TEST_ASSERT_EQUAL(REMAINING_SECS,cs.game_remaining_secs);
     TEST_ASSERT_EQUAL(0,cs.secs_till_start);
-    TEST_ASSERT_EQUAL(GAME_TIME-secs_from_start-DELAY,cs.time_to_display_secs);
+    TEST_ASSERT_EQUAL(REMAINING_SECS,cs.time_to_display_secs);
 }
 
 void test_just_before_over(){
     game_clock_configure(&cs,DELAY,GAME_TIME);
     game_clock_start(&cs,START_MILLIS);
-    int secs_from_start = OFFSET_SECS_FROM_START(99);
-    game_clock_update(&cs,secs_from_start);
+
+    int SECS_FROM_START=99;
+    int msec_from_start = OFFSET_SECS_FROM_START(SECS_FROM_START);
+    game_clock_update(&cs,msec_from_start);
+
+    int REMAINING_TIME = GAME_TIME-(SECS_FROM_START-DELAY);
 
     TEST_ASSERT_EQUAL(ClockState::IN_PROGRESS,cs.clockState);
-    TEST_ASSERT_EQUAL(secs_from_start-DELAY,cs.game_elapsed_secs);
-    TEST_ASSERT_EQUAL(GAME_TIME-secs_from_start-DELAY,cs.game_remaining_secs);
+    TEST_ASSERT_EQUAL(SECS_FROM_START-DELAY,cs.game_elapsed_secs);
+    TEST_ASSERT_EQUAL(REMAINING_TIME,cs.game_remaining_secs);
     TEST_ASSERT_EQUAL(0,cs.secs_till_start);
-    TEST_ASSERT_EQUAL(GAME_TIME-secs_from_start-DELAY,cs.time_to_display_secs);
+    TEST_ASSERT_EQUAL(REMAINING_TIME,cs.time_to_display_secs);
 
 }
 
 void test_just_after_over(){
     game_clock_configure(&cs,DELAY,GAME_TIME);
     game_clock_start(&cs,START_MILLIS);
-    int secs_from_start = OFFSET_SECS_FROM_START(101);
-    game_clock_update(&cs,secs_from_start);
+    int SECS_FROM_START=111;
+    int msec_from_start = OFFSET_SECS_FROM_START(SECS_FROM_START);
+    game_clock_update(&cs,msec_from_start);
 
     TEST_ASSERT_EQUAL(ClockState::OVER,cs.clockState);
     TEST_ASSERT_EQUAL(GAME_TIME,cs.game_elapsed_secs);
     TEST_ASSERT_EQUAL(0,cs.game_remaining_secs);
     TEST_ASSERT_EQUAL(0,cs.secs_till_start);
-    TEST_ASSERT_EQUAL(GAME_TIME,cs.time_to_display_secs);
+    TEST_ASSERT_EQUAL(0,cs.time_to_display_secs);
 
 }
 

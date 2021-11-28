@@ -40,9 +40,10 @@
 #define GAME_TIME_LITTLE_STEP_SIZE 1
 
 #define POST_INTERVAL_MS 80
-#define TIMER_INTERVAL_MICROSECONDS 500
+#define TIMER_INTERVAL_MICROSECONDS 1000
 #define HARDWARE_INFO_UPDATE_INTERVAL_MS 1000
 #define GAME_CLOCK_UPDATE_INTERVAL_MS 1000
+#define ENCODER_UPDATE_INTERVAL_MS 5
 
 //the different types of games we can play
 ClockSettings clockSettings;
@@ -68,13 +69,14 @@ void IRAM_ATTR onTimer();
 void stopGameAndReturnToMenu();
 void start();
 void updateGameClockLocal();
+void updateEncoder();
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
 ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
 
 double getBatteryVoltage(){
   int r = analogRead(Pins::VBATT);
-  return (double)r / 1575.0 * 2.0 * 5; //ADC_11db = 1v per 1575 count
+  return (double)r / 1575.0 * 2.0; //ADC_11db = 1v per 1575 count
 }
 
 void updateHardwareInfo(){
@@ -93,12 +95,17 @@ void updateGameClockLocal(){
   game_clock_update(&clockState,millis());
   ClockColor cc = game_clock_color_for_state(&clockState);
   servo_clock_update_time(clockState.time_to_display_secs, cc);
+  if ( clockState.clockState == ClockState::OVER){
+    stopGameAndReturnToMenu();
+  }
 }
 
+Ticker encoderUpdateTimer(updateEncoder,ENCODER_UPDATE_INTERVAL_MS);
 Ticker updateOledDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
 Ticker hardwareUpdateDataTimer(updateHardwareInfo, HARDWARE_INFO_UPDATE_INTERVAL_MS);
 Ticker gameClockUpdateTimer(updateGameClockLocal, GAME_CLOCK_UPDATE_INTERVAL_MS);
 
+/*
 void setupEncoder(){
   clickEncoder.setAccelerationEnabled(true);
   clickEncoder.setDoubleClickEnabled(true); 
@@ -108,18 +115,22 @@ void setupEncoder(){
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, TIMER_INTERVAL_MICROSECONDS, true); //units are microseconds
   timerAlarmEnable(timer);
+}*/
+
+void updateEncoder(){
+  clickEncoder.service();
 }
 
 void loadSettings(){
-  timerAlarmDisable(timer);
+  //timerAlarmDisable(timer);
   loadSetting(&clockSettings);
-  timerAlarmEnable(timer);
+  //timerAlarmEnable(timer);
 }
 
 void saveSettings(){
-  timerAlarmDisable(timer);
+  //timerAlarmDisable(timer);
   saveSetting(&clockSettings);
-  timerAlarmEnable(timer);
+  //timerAlarmEnable(timer);
 }
 
 Menu::result menuaction_loadSavedSettings(){
@@ -229,6 +240,7 @@ void setup() {
   hardwareInfo.version = BATTLEPOINT_VERSION;
   Serial.begin(115200);
   Serial.setTimeout(500);
+  //setupEncoder();
   initSettings();
   Log.begin(LOG_LEVEL_SILENT, &Serial, true);
   Log.warning("Starting...");
@@ -251,7 +263,7 @@ void setup() {
 
 
 void loop() {  
-
+  clickEncoder.service();  
   hardwareUpdateDataTimer.update();
   if ( programMode == PROGRAM_MODE_GAME ){
 
@@ -277,7 +289,7 @@ void loop() {
 }
 
 // ESP32 timer
-void IRAM_ATTR onTimer()
-{  
-  clickEncoder.service();  
-}
+//void IRAM_ATTR onTimer()
+//{  
+  //clickEncoder.service();  
+//}
