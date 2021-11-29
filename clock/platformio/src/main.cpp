@@ -69,13 +69,9 @@ void IRAM_ATTR onTimer();
 void stopGameAndReturnToMenu();
 void start();
 void updateGameClockLocal();
-void updateEncoder();
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
 ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
-void updateEncoder(){
-  clickEncoder.service();
-}
 
 double getBatteryVoltage(){
   int r = analogRead(Pins::VBATT);
@@ -83,9 +79,9 @@ double getBatteryVoltage(){
 }
 
 void updateHardwareInfo(){
-  //timerAlarmDisable(timer);
+  timerAlarmDisable(timer);
   hardwareInfo.vBatt = getBatteryVoltage();
-  //timerAlarmEnable(timer);  
+  timerAlarmEnable(timer);  
 }
 
 void updateDisplayLocal(){
@@ -103,12 +99,11 @@ void updateGameClockLocal(){
   }
 }
 
-Ticker encoderUpdateTimer(updateEncoder,ENCODER_UPDATE_INTERVAL_MS);
 Ticker updateOledDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
 Ticker hardwareUpdateDataTimer(updateHardwareInfo, HARDWARE_INFO_UPDATE_INTERVAL_MS);
 Ticker gameClockUpdateTimer(updateGameClockLocal, GAME_CLOCK_UPDATE_INTERVAL_MS);
 
-/*
+
 void setupEncoder(){
   clickEncoder.setAccelerationEnabled(true);
   clickEncoder.setDoubleClickEnabled(true); 
@@ -118,20 +113,20 @@ void setupEncoder(){
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, TIMER_INTERVAL_MICROSECONDS, true); //units are microseconds
   timerAlarmEnable(timer);
-}*/
+}
 
 
 
 void loadSettings(){
-  //timerAlarmDisable(timer);
+  timerAlarmDisable(timer);
   loadSetting(&clockSettings);
-  //timerAlarmEnable(timer);
+  timerAlarmEnable(timer);
 }
 
 void saveSettings(){
-  //timerAlarmDisable(timer);
+  timerAlarmDisable(timer);
   saveSetting(&clockSettings);
-  //timerAlarmEnable(timer);
+  timerAlarmEnable(timer);
 }
 
 Menu::result menuaction_loadSavedSettings(){
@@ -241,9 +236,9 @@ void setup() {
   hardwareInfo.version = BATTLEPOINT_VERSION;
   Serial.begin(115200);
   Serial.setTimeout(500);
-  //setupEncoder();
   initSettings();
-  Log.begin(LOG_LEVEL_INFO, &Serial, true);
+  
+  Log.begin(LOG_LEVEL_SILENT, &Serial, true);
   Log.warning("Starting...");
   initDisplay();
   displayWelcomeBanner(hardwareInfo.version);
@@ -255,18 +250,16 @@ void setup() {
   updateOledDisplayTimer.start();
   gameClockUpdateTimer.start();
   hardwareUpdateDataTimer.start();
-  encoderUpdateTimer.start();
-  
+
+  setupEncoder();
   loadSettings();
 
   servo_clock_blank();
-  //temporary
-  start();
+
 }
 
-
 void loop() {  
-  encoderUpdateTimer.update(); 
+
   hardwareUpdateDataTimer.update();
   if ( programMode == PROGRAM_MODE_GAME ){
 
@@ -279,11 +272,11 @@ void loop() {
       }
   }
   else if ( programMode == PROGRAM_MODE_MENU){
-      menuDriver.update();
-      nav.doInput();
-      oled.setFont(u8g2_font_7x13_mf);
-      oled.firstPage();
-      do nav.doOutput(); while (oled.nextPage() );
+    menuDriver.update();
+    nav.doInput();
+    oled.setFont(u8g2_font_7x13_mf);
+    oled.firstPage();
+    do nav.doOutput(); while (oled.nextPage() );    
   }
   else{
       Serial.println("Unknown Program Mode");
@@ -292,7 +285,7 @@ void loop() {
 }
 
 // ESP32 timer
-//void IRAM_ATTR onTimer()
-//{  
-  //clickEncoder.service();  
-//}
+void IRAM_ATTR onTimer()
+{  
+  clickEncoder.service();  
+}

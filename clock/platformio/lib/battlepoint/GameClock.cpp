@@ -20,7 +20,6 @@ const char* get_state_desc(ClockState state){
 
 ClockColor game_clock_color_for_state(GameClockState* clockState){
     ClockState cs = clockState->clockState;
-    Serial.print("clock state=");Serial.println(cs);
     if ( ClockState::NOT_STARTED  == cs || ClockState::COUNTING_TO_START == cs){
         return ClockColor::YELLOW;
     }
