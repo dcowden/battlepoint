@@ -18,6 +18,7 @@
 #include <GameClock.h>
 #include "ServoGameClock.h"
 #include "SevenSegmentMap.h"
+#include "WiFi.h"
 
 #define BATTLEPOINT_VERSION "1.0.3"
 #define BP_MENU "BP v1.0.3"
@@ -56,7 +57,7 @@ typedef enum {
 } ProgramMode;
 
 int programMode = ProgramMode::PROGRAM_MODE_MENU;
-
+int manualMenuDigit  = 0;
 // ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
 // and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
 //portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -116,6 +117,10 @@ void setupEncoder(){
 }
 
 
+void handleChangedDigit(){
+  Serial.println("digit Changed");
+  servo_clock_update_number(manualMenuDigit,ClockColor::YELLOW);
+}
 
 void loadSettings(){
   timerAlarmDisable(timer);
@@ -135,9 +140,24 @@ Menu::result menuaction_loadSavedSettings(){
 }
 
 //FIELD(var.name, title, units, min., max., step size,fine step size, action, events mask, styles)
+SELECT(manualMenuDigit,digitMenu,"Value",handleChangedDigit,Menu::exitEvent  ,Menu::noStyle
+      ,VALUE("0",0,Menu::doNothing,Menu::noEvent)
+      ,VALUE("1",1,Menu::doNothing,Menu::noEvent)
+      ,VALUE("2",2,Menu::doNothing,Menu::noEvent)
+      ,VALUE("3",3,Menu::doNothing,Menu::noEvent)
+      ,VALUE("4",4,Menu::doNothing,Menu::noEvent)
+      ,VALUE("5",5,Menu::doNothing,Menu::noEvent)
+      ,VALUE("6",6,Menu::doNothing,Menu::noEvent)
+      ,VALUE("7",7,Menu::doNothing,Menu::noEvent)
+      ,VALUE("8",8,Menu::doNothing,Menu::noEvent)
+      ,VALUE("9",9,Menu::doNothing,Menu::noEvent)
+);
+
+//FIELD(var.name, title, units, min., max., step size,fine step size, action, events mask, styles)
 MENU(mainMenu, BP_MENU, menuaction_loadSavedSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(clockSettings.start_delay_secs,"Start Delay","",START_DELAY_MIN,START_DELAY_MAX,START_DELAY_BIG_STEP_SIZE,START_DELAY_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(clockSettings.game_secs,"Game Time","s",GAME_TIME_MIN,GAME_TIME_MAX,GAME_TIME_BIG_STEP_SIZE,GAME_TIME_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)            
+    ,FIELD(clockSettings.game_secs,"Game Time","s",GAME_TIME_MIN,GAME_TIME_MAX,GAME_TIME_BIG_STEP_SIZE,GAME_TIME_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,SUBMENU(digitMenu)            
     ,OP("Start",start, Menu::enterEvent)
 );
 
@@ -217,14 +237,14 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
 
 void POST(){
   Log.noticeln("POST...");
-  int DELAY_MS = 1000;
+  int DELAY_MS = 2000;
   servo_clock_blank();
   delay(DELAY_MS);
   servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_8,ClockColor::BLUE);
   delay(DELAY_MS);
-  servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_8,ClockColor::RED);
+  servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_3,ClockColor::RED);
   delay(DELAY_MS);
-  servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_8,ClockColor::YELLOW);
+  servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_1,ClockColor::YELLOW);
   delay(DELAY_MS);
   servo_clock_blank();
   Log.noticeln("POST COMPLETE");
@@ -232,10 +252,13 @@ void POST(){
 
 
 void setup() {
-  setCpuFrequencyMhz(240);
+  setCpuFrequencyMhz(80);
+  WiFi.mode(WIFI_OFF);
+  btStop();
   hardwareInfo.version = BATTLEPOINT_VERSION;
   Serial.begin(115200);
   Serial.setTimeout(500);
+
   initSettings();
   
   Log.begin(LOG_LEVEL_SILENT, &Serial, true);

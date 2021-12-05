@@ -8,7 +8,7 @@
 //from https://github.com/bremme/arduino-tm1637/blob/master/src/SevenSegmentTM1637.cpp
 #define SECONDS_PER_MINUTE 60
 #define BASE_POS 0
-#define DELTA 45
+#define DELTA 43
 
 enum COLOR_POS {
   SERVO_POS_BLACK = BASE_POS,
@@ -45,7 +45,7 @@ uint8_t encode(int d) {
 
 
 int getServoAngleFromColor(int v, ClockColor color){
-    if ( v == 1){
+    if ( v == 1){        
         if ( color == ClockColor::YELLOW){
             return SERVO_POS_YELLOW;
         }
@@ -70,7 +70,7 @@ int getServoChannelForDigitAndSegment(int digitNum, int segmentNum){
 
 void setServoAngle(int digitNum, int segmentNum, int angle){
     int channel = getServoChannelForDigitAndSegment(digitNum, segmentNum);
-    pwmController.setChannelPWM(channel, servoHelper.pwmForAngle(angle)); 
+    pwmController.setChannelPWM(channel, servoHelper.pwmForAngle(angle));
 }
 
 char charForColor(ClockColor color){
