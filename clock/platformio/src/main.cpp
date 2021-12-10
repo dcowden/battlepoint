@@ -161,6 +161,9 @@ MENU(mainMenu, BP_MENU, menuaction_loadSavedSettings, Menu::enterEvent, Menu::wr
     ,OP("Start",start, Menu::enterEvent)
 );
 
+Menu::serialIn serial(Serial);
+
+
 //{{disabled normal,disabled selected},{enabled normal,enabled selected, enabled editing}}
 const colorDef<uint8_t> colors[6] MEMMODE={
   {{0,0},{0,1,1}},//bgColor
@@ -181,7 +184,7 @@ Menu::navNode* nodes[sizeof(panels) / sizeof(Menu::panel)]; //navNodes to store 
 Menu::panelsList pList(panels, nodes, 1); //a list of panels and nodes
 Menu::idx_t tops[MENU_MAX_DEPTH] = {0,0}; //store cursor positions for each level
 
-MENU_INPUTS(in);
+MENU_INPUTS(in,&serial);
 
 MENU_OUTPUTS(out,MENU_MAX_DEPTH
   ,U8G2_OUT(oled,colors,fontW,fontH,OFFSET_X,OFFSET_Y,{0,0,charWidth,lineHeight})
@@ -239,20 +242,21 @@ void POST(){
   Log.noticeln("POST...");
   int DELAY_MS = 2000;
   servo_clock_blank();
-  delay(DELAY_MS);
-  servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_8,ClockColor::BLUE);
-  delay(DELAY_MS);
-  servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_3,ClockColor::RED);
-  delay(DELAY_MS);
-  servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_1,ClockColor::YELLOW);
-  delay(DELAY_MS);
+  //delay(DELAY_MS);
+  //servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_8,ClockColor::BLUE);
+  //delay(DELAY_MS);
+  //servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_3,ClockColor::RED);
+  //delay(DELAY_MS);
+  //servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_1,ClockColor::YELLOW);
+  
   servo_clock_blank();
+  //delay(DELAY_MS);
   Log.noticeln("POST COMPLETE");
 }
 
 
 void setup() {
-  setCpuFrequencyMhz(80);
+  setCpuFrequencyMhz(240);
   WiFi.mode(WIFI_OFF);
   btStop();
   hardwareInfo.version = BATTLEPOINT_VERSION;
@@ -261,7 +265,7 @@ void setup() {
 
   initSettings();
   
-  Log.begin(LOG_LEVEL_SILENT, &Serial, true);
+  Log.begin(LOG_LEVEL_INFO, &Serial, true);
   Log.warning("Starting...");
   initDisplay();
   displayWelcomeBanner(hardwareInfo.version);
@@ -278,7 +282,7 @@ void setup() {
   loadSettings();
 
   servo_clock_blank();
-
+  //start();
 }
 
 void loop() {  

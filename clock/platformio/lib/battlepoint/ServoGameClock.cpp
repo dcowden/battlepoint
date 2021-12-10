@@ -58,6 +58,7 @@ int getServoAngleFromColor(int v, ClockColor color){
     }
     return SERVO_POS_CENTER;
 }
+
 int getServoChannelForDigitAndSegment(int digitNum, int segmentNum){
     //digit is either zero or one
     if ( digitNum == 0){
@@ -136,11 +137,25 @@ void debugPrintdigits( char v1, char v0,ClockColor cc ){
 }
 
 void set_servo_to_char(int digitNum, uint8_t value , ClockColor color){    
+    long start_ms = millis();
     //for each of the segments
+    //setServoAngle(int digitNum, int segmentNum, int angle)
+    //uint16_t pwms[8];
     for( int i=0;i<8;i++){
         int angle=getServoAngleFromColor(bitRead(value,i),color);
-        setServoAngle(digitNum,i, angle );
-    }   
+        //int channel = getServoChannelForDigitAndSegment(digitNum, i);
+        setServoAngle(digitNum,i,angle);
+        //pwms[i] = servoHelper.pwmForAngle(angle);        
+    }
+    /*
+    if ( digitNum == 1){
+        pwmController.setChannelsPWM(8,7,pwms);   //tens digit
+    }
+    else{
+        pwmController.setChannelsPWM(0,7,pwms);   //ones digit    
+    }*/
+    Log.noticeln("set_servo_char: %l ms",(millis()-start_ms));
+    
 }
 
 void servo_clock_update_number(int value, ClockColor color){
@@ -152,7 +167,7 @@ void servo_clock_update_number(int value, ClockColor color){
     }    
     int leftDigit = value / 10;
     int rightDigit = value % 10;
-
+    Log.infoln("Left: %d, Right: %d",leftDigit, rightDigit);
     uint8_t leftSegmentValues = encode(leftDigit);
     uint8_t rightSegmentValues = encode(rightDigit);
     debugPrintdigits(leftSegmentValues,rightSegmentValues,color);
