@@ -4,11 +4,13 @@
 #include <ArduinoLog.h>
 #include "PCA9685.h"
 #include <Wire.h>
+#include <FastLED.h>
 
 //from https://github.com/bremme/arduino-tm1637/blob/master/src/SevenSegmentTM1637.cpp
 #define SECONDS_PER_MINUTE 60
 #define BASE_POS 0
 #define DELTA 43
+#define DIAL_SERVO_CHANNEL 15
 
 enum COLOR_POS {
   SERVO_POS_BLACK = BASE_POS,
@@ -44,6 +46,38 @@ uint8_t encode(int d) {
 };
 
 
+CRGB getLedColorForClockColor(ClockColor color){
+    if ( color == ClockColor::YELLOW){
+        return CRGB::Yellow;
+    }
+    else if ( color == ClockColor::RED){
+        return CRGB::Red;
+    }
+    else if ( color == ClockColor::BLUE){
+        return CRGB::Blue;
+    }
+}
+
+float getServoAngleFromSeconds(int seconds){
+    //zero, 20 is the top
+    //servo 180 degrees = 1 rotation
+    const int ANGLE_FOR_20 = 63;
+    const int ANGLE_FOR_0 = -89;
+    int INCLUDED_ANGLE = ANGLE_FOR_20 - ANGLE_FOR_0;
+    
+    if ( seconds > 1200 || seconds < 0 ){
+        Serial.println("Error: Seconds out of bound for getServoAngleFromSeconds");
+        return 0;
+    }    
+    float DEGREES_PER_SECOND = (float)INCLUDED_ANGLE / 1200.0;
+    float angle = (float)seconds* DEGREES_PER_SECOND;
+    
+    float r = (float)ANGLE_FOR_0 + angle;
+    Serial.println("");Serial.print("****Angle****:");
+    Serial.println(r);
+    return r; //center on the bottom of the clock at zero  
+
+}
 int getServoAngleFromColor(int v, ClockColor color){
     if ( v == 1){        
         if ( color == ClockColor::YELLOW){
@@ -139,26 +173,27 @@ void debugPrintdigits( char v1, char v0,ClockColor cc ){
 void set_servo_to_char(int digitNum, uint8_t value , ClockColor color){    
     long start_ms = millis();
     //for each of the segments
-    //setServoAngle(int digitNum, int segmentNum, int angle)
-    //uint16_t pwms[8];
     for( int i=0;i<8;i++){
         int angle=getServoAngleFromColor(bitRead(value,i),color);
         //int channel = getServoChannelForDigitAndSegment(digitNum, i);
         setServoAngle(digitNum,i,angle);
         //pwms[i] = servoHelper.pwmForAngle(angle);        
     }
-    /*
-    if ( digitNum == 1){
-        pwmController.setChannelsPWM(8,7,pwms);   //tens digit
-    }
-    else{
-        pwmController.setChannelsPWM(0,7,pwms);   //ones digit    
-    }*/
     Log.noticeln("set_servo_char: %l ms",(millis()-start_ms));
     
 }
+void updateDialAngle(float angle){
+    pwmController.setChannelPWM(DIAL_SERVO_CHANNEL, servoHelper.pwmForAngle(angle));
+}
+void updateDial(int dial_value){
+    float dialAngle = getServoAngleFromSeconds(dial_value);
+    pwmController.setChannelPWM(DIAL_SERVO_CHANNEL, servoHelper.pwmForAngle(dialAngle));
+}
 
 void servo_clock_update_number(int value, ClockColor color){
+    int minutes_left = value / 60;
+    updateDial(minutes_left);
+
     if ( value > 99 ){
         Serial.println("Cant Encode Integer Value > 99");
     }
