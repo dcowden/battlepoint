@@ -292,16 +292,18 @@ MENU(ozSubMenu, "OwnZone", loadOwnZoneSettings, Menu::enterEvent, Menu::wrapStyl
 );
 
 MENU(adSubMenu, "Capture", loadCPSettings, Menu::enterEvent, Menu::wrapStyle
-    ,FIELD(gameSettings.hits.to_win,"Hits","",VICTORY_HITS_MIN,VICTORY_HITS_MAX,VICTORY_HITS_BIG_STEP_SIZE,VICTORY_HITS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)\
+    ,FIELD(gameSettings.capture.hits_to_capture,"HitsToCapture","",1,500,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.hits.victory_margin,"VictMargin","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)        
     ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.timed.max_overtime_seconds,"Overtime","s",1,120,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)   
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
- 
+    ,FIELD(gameSettings.capture.capture_decay_rate_secs_per_hit,"Hit Decay","s",1,100,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)  
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
 
-MENU(testTargetMenu, "TargetTest",  loadTargetTestSettings, Menu::enterEvent, Menu::wrapStyle    
+MENU(testTargetMenu, "TugOWar",  loadTargetTestSettings, Menu::enterEvent, Menu::wrapStyle    
     ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,OP("Start",startSelectedGame, Menu::enterEvent)
@@ -528,9 +530,9 @@ void victoryDance( Team winner ){
 
   for (int i=0;i<NUM_FLASHES;i++){
     setAllMetersToValue(0);
-    delay(DELAY_MS);  
+    FastLED.delay(DELAY_MS);  
     setAllMetersToMax();
-    delay(DELAY_MS);  
+    FastLED.delay(DELAY_MS);  
   }
 }
 
@@ -561,7 +563,7 @@ void setup() {
   Serial.begin(115200);
   Serial.setTimeout(500);
   initSettings();
-  Log.begin(LOG_LEVEL_INFO, &Serial, true);
+  Log.begin(LOG_LEVEL_SILENT, &Serial, true);
   Log.warning("Starting...");
   initDisplay();
   displayWelcomeBanner(hardwareInfo.version);

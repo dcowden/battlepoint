@@ -149,7 +149,7 @@ void applyRightHits(GameState* current, GameSettings* settings,TargetHitData hit
 void updateFirstToHitsGame(GameState* current,  GameSettings settings);
 void updateMostHitsInTimeGame(GameState* current,  GameSettings settings);
 void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
-void updateAttackDefendGame(GameState* current,  GameSettings settings);
+void updateAttackDefendGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateGame(GameState* game, GameSettings settings, Clock* clock);
 void updateLeds(MeterSettings* meters, long current_time_millis );

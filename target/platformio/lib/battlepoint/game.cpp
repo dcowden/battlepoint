@@ -207,16 +207,16 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
 
     }
     else if ( settings->gameType == GameType::GAME_TYPE_ATTACK_DEFEND ){
-        int blu_hits = game->bluHits.hits;        
+        int total_hits = game->ownership.capture_hits;        
         int hits_to_capture = settings->capture.hits_to_capture;
 
         setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
         setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
         setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
         setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
-        setMeterValues( meters->right, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
-        setMeterValues( meters->left, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
-        setMeterValues( meters->center, blu_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->right, total_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->left, total_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
+        setMeterValues( meters->center, total_hits, hits_to_capture, CRGB::Blue, CRGB::Black );
 
     }
     else if ( settings->gameType == GameType::GAME_TYPE_TARGET_TEST ){
@@ -247,7 +247,7 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
         setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black ); 
         setMeterValues( meters->left, red_hits, settings->hits.to_win, CRGB::Red, CRGB::Black );
         setMeterValues( meters->right, blu_hits, settings->hits.to_win, CRGB::Blue, CRGB::Black );
-
+    
         //compute the seesaw meter
         //if there are hits, it's the ratio of blue to red
         int total_hits = blu_hits + red_hits;
@@ -284,9 +284,9 @@ void setupMeters(GameState* gs, GameSettings* settings, MeterSettings* meters){
         configureMeter(meters->right, settings->timed.ownership_time_seconds, 0, CRGB::Red, CRGB::Black);   //ownership time for red, count from zero to time required to win
     }
     else if ( settings->gameType == GameType::GAME_TYPE_ATTACK_DEFEND ){
-        configureMeter(meters->center, settings->capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);   //hit progress: count from zero to hits required to win
-        configureMeter(meters->left, settings->capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
-        configureMeter(meters->right, settings->capture.hits_to_capture, 0, CRGB::Red, CRGB::Black);    //hit progress: count from zero to hits required to win
+        configureMeter(meters->center, settings->capture.hits_to_capture, 0, CRGB::Blue, CRGB::Black);   //hit progress: count from zero to hits required to win
+        configureMeter(meters->left, settings->capture.hits_to_capture, 0, CRGB::Blue, CRGB::Black);    //hit progress: count from zero to hits required to win
+        configureMeter(meters->right, settings->capture.hits_to_capture, 0, CRGB::Blue, CRGB::Black);    //hit progress: count from zero to hits required to win
     }
     else if ( settings->gameType == GameType::GAME_TYPE_TARGET_TEST ){
         configureMeter(meters->center, settings->hits.to_win, 0, CRGB::Red, CRGB::Blue);  
@@ -314,6 +314,11 @@ void startGame(GameState* gs, GameSettings* settings, Clock* clock){
     gs->ownership.owner = Team::NOBODY;
     gs->ownership.capturing = Team::NOBODY;
     gs->ownership.capture_hits = 0;
+
+    if ( settings->gameType == GAME_TYPE_ATTACK_DEFEND){
+        gs->ownership.capturing = Team::BLU;  
+    }
+
 }
 
 //TODO: duplicated with below. combine this, its nearly identical between red and blue
@@ -325,10 +330,13 @@ void applyLeftHits(GameState* current, GameSettings* settings,TargetHitData hitd
         current->redHits.last_hit_millis = current_time_millis;
         current->redHits.last_decay_millis = current_time_millis;
     }
-    if ( settings->gameType == GAME_TYPE_KOTH_FIRST_TO_OWN_TIME || settings->gameType == GAME_TYPE_KOTH_MOST_OWN_IN_TIME){
+    if ( settings->gameType == GAME_TYPE_KOTH_FIRST_TO_OWN_TIME || settings->gameType == GAME_TYPE_KOTH_MOST_OWN_IN_TIME ){
         if ( current->ownership.capturing == Team::RED){
-            current->ownership.capture_hits += hitdata.hits;
+           
         }
+    }
+    else if (settings->gameType == GAME_TYPE_ATTACK_DEFEND ){
+         current->ownership.capture_hits += hitdata.hits;
     }
 }
 
@@ -340,11 +348,14 @@ void applyRightHits(GameState* current, GameSettings* settings,TargetHitData hit
         current->bluHits.last_hit_millis = current_time_millis;
         current->bluHits.last_decay_millis = current_time_millis;
     }
-    if ( settings->gameType == GAME_TYPE_KOTH_FIRST_TO_OWN_TIME || settings->gameType == GAME_TYPE_KOTH_MOST_OWN_IN_TIME){
+    if ( settings->gameType == GAME_TYPE_KOTH_FIRST_TO_OWN_TIME || settings->gameType == GAME_TYPE_KOTH_MOST_OWN_IN_TIME ){
         if ( current->ownership.capturing == Team::BLU){
             current->ownership.capture_hits += hitdata.hits;
         }
-    }    
+    }  
+    else if (settings->gameType == GAME_TYPE_ATTACK_DEFEND ){
+         current->ownership.capture_hits += hitdata.hits;
+    }      
 }
 
 //assumes that captureHits is being updated first
@@ -554,7 +565,7 @@ void updateMostHitsInTimeGame(GameState* current,  GameSettings settings){
 
 }
 
-void updateAttackDefendGame(GameState* current,  GameSettings settings){
+void updateAttackDefendGame(GameState* current,  GameSettings settings, long current_time_millis){
     /*
         VICTORY
         Blue is the attacking team, and wins if it achieves the desired number of hits
@@ -570,30 +581,33 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings){
 
         METERS          val                 max-val             fgColor     bgColor
         ----------------------------------------------------------------------------
-        left            blue_hits           hits_to_capture     blue         black
+        left            blue_hits+red_hits  hits_to_capture     blue         black
         left-top        10,flashing in OT   10                  blue         black
         left-bottom     10,flashing in OT   10                  blue         black
-        center          blue_hits           hits_to_capture     blue         black
+        center          blue_hits+red_hits  hits_to_capture     blue         black
         right-top       10,flashing in OT   10                  blue         black
-        right           blue_hits           hits_to_capture     blue         black
+        right           blue_hits+red_hits  hits_to_capture     blue         black
         right-bottom    10,flashing in OT   10                  blue         black
 
-    */    
-    int blu_hits = current->bluHits.hits;
+    */
+
+    applyHitDecay(current, settings,current_time_millis);
+
+    int total_hits = current->ownership.capture_hits;
     int hits_to_capture = settings.capture.hits_to_capture;
 
-    if ( blu_hits >= hits_to_capture){
+    if ( total_hits >= hits_to_capture){
         endGame(current, Team::BLU);
     }
     else if ( current->time.overtimeExpired){
         endGame(current, Team::RED);
     }
     else if ( current->time.timeExpired ){
-        if ( blu_hits >= (hits_to_capture - settings.hits.victory_margin)){
-             current->status = GameStatus::GAME_STATUS_OVERTIME;
+        if ( total_hits > (hits_to_capture - settings.hits.victory_margin) ){
+            current->status = GameStatus::GAME_STATUS_OVERTIME;
         }
         else{
-            endGame(current,Team::RED);
+            endGame(current, Team::RED);
         }
     }
     else {
@@ -799,7 +813,7 @@ void updateGame(GameState* current,  GameSettings settings, Clock* clock){
         updateFirstToOwnTimeGame(current,settings,clock->milliseconds());
     }
     else if ( settings.gameType == GameType::GAME_TYPE_ATTACK_DEFEND){
-        updateAttackDefendGame(current,settings);
+        updateAttackDefendGame(current,settings,clock->milliseconds());
     }
     else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_OWN_IN_TIME){
         updateMostOwnInTimeGame(current,settings,clock->milliseconds());
