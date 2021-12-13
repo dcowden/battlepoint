@@ -170,12 +170,12 @@ void classifyModel(TargetHitData*  td , volatile int* data){
 
   if (interpreter->Invoke() != kTfLiteOk) {
       error = TFL_INVOKE_ERROR;
-      Serial.println("Inference failed");
+      //Serial.println("Inference failed");
       reporter->Report("Inference failed");
   }
 
   float r = output_v->data.f[0];
-  Serial.print("Inferred: ");Serial.println(r);
+  //Serial.print("Inferred: ");Serial.println(r);
   td->hitProbability = r;
 }
 
@@ -206,7 +206,7 @@ TargetHitData analyze_impact( volatile TargetScanner* scanner, int hit_threshold
     classifyModel(&td,data);
 
     long end = millis() - start;
-    Serial.print("analzye impact:");Serial.print(end);Serial.println(" ms");
+    //Serial.print("analzye impact:");Serial.print(end);Serial.println(" ms");
     Log.info("Peaks= %d, Thresh= %d", td.peak4000, hit_threshold);
     if ( td.peak4000 >= hit_threshold){
       td.hits =1;
