@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <targetscan.h>
 
+
 #define DATA_BIN_COUNT 20
 
 typedef struct {
@@ -22,7 +23,7 @@ typedef struct {
     double singleSampleTimeMillis;
 } TargetHitData;
 
-TargetHitData analyze_impact( volatile TargetScanner* scanner, bool printData);
+TargetHitData analyze_impact( volatile TargetScanner* scanner, int hit_threshold, bool printData);
 void printTargetData( TargetHitData* td,const char side);
 void printTargetDataHeaders();
 void setup_target_classifier();

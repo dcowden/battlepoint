@@ -24,6 +24,7 @@
 #include <menuIO/serialIn.h>
 #include <targetscan.h>
 #include <target.h>
+#include <Teams.h>
 
 #define BATTLEPOINT_VERSION "1.0.1"
 #define BP_MENU "BP v1.0.1"
@@ -42,10 +43,10 @@
 #define TRIGGER_BIG_STEP_SIZE 100
 #define TRIGGER_LITTLE_STEP_SIZE 10
 
-#define HIT_MIN 1000
-#define HIT_MAX 25000
-#define HIT_BIG_STEP_SIZE 1000
-#define HIT_LITTLE_STEP_SIZE 500
+#define HIT_MIN 1
+#define HIT_MAX 10
+#define HIT_BIG_STEP_SIZE 1
+#define HIT_LITTLE_STEP_SIZE 1
 
 #define TIME_LIMIT_MIN 10
 #define TIME_LIMIT_MAX 1000
@@ -122,6 +123,8 @@ void startSelectedGame();
 void updateLEDs();
 void startDiagnostics();
 void stopGameAndReturnToMenu();
+void victoryDance(Team winner);
+void captureDance(Team capture);
 void IRAM_ATTR onTimer();
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
@@ -163,10 +166,16 @@ void localUpdateGame(){
   if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
       gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;
   }
+     
+  if ( gameState.ownership.just_captured != Team::NOBODY){
+     captureDance(gameState.ownership.just_captured);
+     gameState.ownership.just_captured = Team::NOBODY;
+  }
 
   if ( gameState.status == GameStatus::GAME_STATUS_ENDED ){
     Log.warning("Game Over!");
     Log.warning("Winner=");
+    victoryDance(gameState.result.winner);
     gameOverDisplay(gameState);
     stopGameAndReturnToMenu();
   }
@@ -250,7 +259,9 @@ Menu::result loadTargetTestSettings(){
 //FIELD(var.name, title, units, min., max., step size,fine step size, action, events mask, styles)
 MENU(mostHitsSubMenu, "MostHits", loadMostHitsSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)            ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.hits.to_win,"HitsToWin","",1,100,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)                
+    ,FIELD(gameSettings.timed.max_overtime_seconds,"Overtime","s",1,120,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)        
     ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
     ,OP("Start",startSelectedGame, Menu::enterEvent)
@@ -258,21 +269,21 @@ MENU(mostHitsSubMenu, "MostHits", loadMostHitsSettings, Menu::enterEvent, Menu::
 );
 
 MENU(firstToHitsSubMenu, "FirstToHits", loadFirstToHitsSettings, Menu::enterEvent, Menu::wrapStyle
-    ,FIELD(gameSettings.hits.to_win,"Hits","",VICTORY_HITS_MIN,VICTORY_HITS_MAX,VICTORY_HITS_BIG_STEP_SIZE,VICTORY_HITS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)            ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.hits.to_win,"HitsToWin","",VICTORY_HITS_MIN,VICTORY_HITS_MAX,VICTORY_HITS_BIG_STEP_SIZE,VICTORY_HITS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.timed.max_overtime_seconds,"Overtime","s",1,120,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)                
     ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
 
 MENU(ozSubMenu, "OwnZone", loadOwnZoneSettings, Menu::enterEvent, Menu::wrapStyle
-    ,FIELD(gameSettings.capture.capture_cooldown_seconds,"Capture Cooldown","s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
-    ,FIELD(gameSettings.capture.capture_decay_rate_secs_per_hit,"Capture Decay","/s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.capture.hits_to_capture,"HitsToCapture","",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.timed.ownership_time_seconds,"OwnTimeToWin","s",1,1,1,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.capture.capture_cooldown_seconds,"Cap. Cooldown","s",1,30,5,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
+    ,FIELD(gameSettings.capture.capture_decay_rate_secs_per_hit,"Hit Decay","s",1,100,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.capture.hits_to_capture,"HitsToCapture","",1,500,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
+    ,FIELD(gameSettings.timed.ownership_time_seconds,"OwnTimeToWin","s",1,200,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)        
     ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
@@ -428,11 +439,25 @@ void updateLEDs(){
   FastLED.show();
 }
 
-//TODO: do these belong in meter?
+
 void setMeterValue(LedMeter* meter, int val ){
   meter->val = val;
   updateLedMeter(meter);
+  FastLED.show();
 }
+
+CRGB getLedColorForTeam(TeamColor teamColor){
+  if ( teamColor == TeamColor::COLOR_BLUE){
+    return CRGB::Blue;
+  }
+  else if ( teamColor == TeamColor::COLOR_RED){
+    return CRGB::Red;
+  }
+  else{
+    return CRGB::Yellow;
+  }
+}
+
 
 void setAllMetersToValue(int v ){
   setMeterValue(&leftTopMeter,v);
@@ -442,8 +467,73 @@ void setAllMetersToValue(int v ){
   setMeterValue(&rightBottomMeter,v);      
   setMeterValue(&rightMeter,v);
   setMeterValue(&centerMeter,v);
-  FastLED.show();       
 }
+void setAllMetersToMax(){
+  //TODO: should be a meter method
+  setMeterValue(&leftTopMeter,leftTopMeter.max_val);
+  setMeterValue(&leftBottomMeter,leftBottomMeter.max_val);      
+  setMeterValue(&leftMeter,leftMeter.max_val);      
+  setMeterValue(&rightTopMeter,rightTopMeter.max_val);      
+  setMeterValue(&rightBottomMeter,rightBottomMeter.max_val);      
+  setMeterValue(&rightMeter,rightMeter.max_val);
+  setMeterValue(&centerMeter,centerMeter.max_val);     
+}
+
+void setAllMeterColors(CRGB fgColor, CRGB bgColor){
+  leftTopMeter.fgColor = fgColor;
+  leftBottomMeter.fgColor = fgColor;
+  leftMeter.fgColor = fgColor;
+  rightTopMeter.fgColor = fgColor;
+  rightBottomMeter.fgColor = fgColor;
+  rightMeter.fgColor = fgColor;
+  centerMeter.fgColor = fgColor;
+
+  leftTopMeter.bgColor = bgColor;
+  leftBottomMeter.bgColor = bgColor;
+  leftMeter.bgColor = bgColor;
+  rightTopMeter.bgColor = bgColor;
+  rightBottomMeter.bgColor = bgColor;
+  rightMeter.bgColor = bgColor;
+  centerMeter.bgColor = bgColor;
+
+}
+void captureDance( Team capturing){
+    const int NUM_FLASHES=10;
+    const int DELAY_MS=50;  
+    TeamColor tc = getTeamColor(capturing);
+    CRGB winnerColor = getLedColorForTeam(tc);
+    centerMeter.fgColor = winnerColor;
+    centerMeter.bgColor = CRGB::Black;
+    for ( int i =0;i<NUM_FLASHES;i++){
+      setMeterValue(&centerMeter,0);
+      delay(DELAY_MS);
+      setMeterValue(&centerMeter,centerMeter.max_val);
+      delay(DELAY_MS);
+    }  
+}
+
+void victoryDance( Team winner ){
+  //todo: write to be time based, not number of flash based
+  const int NUM_FLASHES=40;
+
+  //TOODO: could simplfiy using LED meter built-in flashing
+  //but i like having the control here to do other stuff too
+  //really need ability to apply a function to all the meters!
+  const int DELAY_MS=100;
+  TeamColor tc = getTeamColor(winner);
+  CRGB winnerColor = getLedColorForTeam(tc);
+
+  //special, here we set the color of all the meters!
+  setAllMeterColors(winnerColor, CRGB::Black);
+
+  for (int i=0;i<NUM_FLASHES;i++){
+    setAllMetersToValue(0);
+    delay(DELAY_MS);  
+    setAllMetersToMax();
+    delay(DELAY_MS);  
+  }
+}
+
 
 //TODO: magic numbers: move to constants
 void setupTargetScanners(){
@@ -471,7 +561,7 @@ void setup() {
   Serial.begin(115200);
   Serial.setTimeout(500);
   initSettings();
-  Log.begin(LOG_LEVEL_SILENT, &Serial, true);
+  Log.begin(LOG_LEVEL_INFO, &Serial, true);
   Log.warning("Starting...");
   initDisplay();
   displayWelcomeBanner(hardwareInfo.version);
@@ -495,7 +585,7 @@ void setup() {
   gameUpdateTimer.start();
   diagnosticsDataTimer.start();
   loadTargetTestSettings();
-  startSelectedGame();
+  //startSelectedGame();
 }
 
 void readTargets(){  
@@ -504,27 +594,27 @@ void readTargets(){
   int current_time_millis = gameClock.milliseconds();
 
   if ( isReady(&leftScanner)){    
-      TargetHitData td = analyze_impact(&leftScanner,false);      
+      TargetHitData td = analyze_impact(&leftScanner,(int)gameSettings.target.hit_energy_threshold, false);      
       if ( programMode == PROGRAM_MODE_TARGET_TEST){
         if ( td.hits > 0){
           printTargetData(&td,'L');  
         }
         
       }
-      applyLeftHits(&gameState, td, current_time_millis );    
+      applyLeftHits(&gameState, &gameSettings, td, current_time_millis );    
       gameState.lastHit = td;
       Log.warningln("Left Trigger, hits=%d, sampletime = %l",td.hits , leftScanner.sampleTimeMillis );
       enable(&leftScanner);
   }
 
   if ( isReady(&rightScanner)){
-      TargetHitData td = analyze_impact(&rightScanner,false);
+      TargetHitData td = analyze_impact(&rightScanner,(int)gameSettings.target.hit_energy_threshold,false);
       if ( programMode == PROGRAM_MODE_TARGET_TEST){
         if ( td.hits > 0){
           printTargetData(&td,'R');  
         }
       }   
-      applyRightHits(&gameState, td, current_time_millis );    
+      applyRightHits(&gameState, &gameSettings,td, current_time_millis );    
       gameState.lastHit = td;
       Log.warningln("Right Trigger, hits=%d, sampletime = %l",td.hits , rightScanner.sampleTimeMillis );
       enable(&rightScanner);

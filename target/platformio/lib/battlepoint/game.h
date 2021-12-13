@@ -117,6 +117,9 @@ typedef struct {
     long overtime_remaining_millis = 0;
     long last_hit_millis=0;
     long last_decay_millis=0;
+
+    //TODO: this is a poor-mans event. its done this way so the display can update
+    Team just_captured=Team::NOBODY;
 } Ownership;
 
 //TODO: making hit tracker separate objects would make it easier to factor
@@ -141,8 +144,8 @@ void updateGameTime(GameState* current,GameSettings settings, long current_time_
 void updateOwnership(GameState* current,  GameSettings settings, long current_time_millis);
 void applyHitDecay(GameState* current, GameSettings settings, long current_time_millis);
 
-void applyLeftHits(GameState* current, TargetHitData hitdata, long current_time_millis);
-void applyRightHits(GameState* current, TargetHitData hitdata, long current_time_millis);
+void applyLeftHits(GameState* current, GameSettings* settings,TargetHitData hitdata, long current_time_millis);
+void applyRightHits(GameState* current, GameSettings* settings,TargetHitData hitdata, long current_time_millis);
 void updateFirstToHitsGame(GameState* current,  GameSettings settings);
 void updateMostHitsInTimeGame(GameState* current,  GameSettings settings);
 void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long current_time_millis);

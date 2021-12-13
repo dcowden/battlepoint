@@ -9,7 +9,7 @@
 
 void setDefaultGameSettings(GameSettings* gs){
 
-    gs->hits.to_win = 10;
+    gs->hits.to_win = 1;
     gs->hits.victory_margin=1;
     gs->gameType = GameType::GAME_TYPE_UNSELECTED;
     gs->capture.capture_cooldown_seconds=10;
@@ -19,7 +19,7 @@ void setDefaultGameSettings(GameSettings* gs){
     
     gs->timed.max_duration_seconds=120;
     gs->timed.ownership_time_seconds=120;
-    gs->timed.max_overtime_seconds=120;
+    gs->timed.max_overtime_seconds=60;
 
     gs->target.hit_energy_threshold = 5000;
     gs->target.last_hit_millis=0;
@@ -104,7 +104,15 @@ void setFlashMeterForTeam(Team t, MeterSettings* meters, FlashInterval fi ){
         Log.warningln("Ignored updating flash on meters for invalid team.");
     }
 }
-
+void setMetersToFlashInterval(MeterSettings* meters, long flashInterval){
+    meters->center->flash_interval_millis = flashInterval;
+    meters->leftBottom->flash_interval_millis = flashInterval;
+    meters->leftTop->flash_interval_millis = flashInterval;
+    meters->left->flash_interval_millis = flashInterval;
+    meters->rightBottom->flash_interval_millis = flashInterval;
+    meters->rightTop->flash_interval_millis = flashInterval;
+    meters->right->flash_interval_millis = flashInterval;
+}
 void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters){
 
     /**
@@ -118,15 +126,20 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
         }        
     **/
 
+    if ( game->time.timeExpired){
+        setMetersToFlashInterval(meters, FlashInterval::FLASH_FAST);
+    }
+    else{
+        setMetersToFlashInterval(meters, FlashInterval::FLASH_NONE);
+    }
     if ( settings->gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
         setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
         setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
         setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
         setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );  
-
+        setMeterValues( meters->center, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Black, CRGB::Black ); 
         setMeterValues( meters->left, game->redHits.hits, settings->hits.to_win, CRGB::Red, CRGB::Black );
         setMeterValues( meters->right, game->bluHits.hits, settings->hits.to_win, CRGB::Blue, CRGB::Black );
-
 
     }
     else if ( settings->gameType == GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME ){
@@ -165,12 +178,32 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
         setMeterValues( meters->right, blue_own_secs, secs_to_win, CRGB::Blue, CRGB::Black ); 
 
         //the center meter is the capture meter
-        CRGB captureMeterBackgroundColor;
-        CRGB captureMeterForegroundColor;
-        captureMeterForegroundColor = getTeamColor(game->ownership.capturing);
-        captureMeterBackgroundColor = getTeamColor(game->ownership.owner);
-
-        setMeterValues( meters->center, blue_own_secs, secs_to_win, captureMeterForegroundColor, captureMeterBackgroundColor );  
+        //its neutral until someone is the owner. then its the capture meter
+        //TODO: this can be factored to be shorter
+        if ( game->ownership.owner == Team::NOBODY){
+            //if only one team has capture hits, show progress towards capture.
+            //if both teams have capture hits, one team must get more than the other by the capture_hits margin.
+            int blu_hits = game->bluHits.hits;
+            int red_hits = game->redHits.hits;
+            if ( blu_hits == red_hits){
+                setMeterValues( meters->center, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Yellow, CRGB::Yellow ); 
+            }
+            else{
+                int hit_diff = abs(blu_hits - red_hits);
+                if ( blu_hits > red_hits){
+                    setMeterValues( meters->center, hit_diff, settings->capture.hits_to_capture, CRGB::Blue, CRGB::Yellow ); 
+                }
+                else{ //red_hits > blu_hits
+                    setMeterValues( meters->center, hit_diff, settings->capture.hits_to_capture, CRGB::Red, CRGB::Yellow ); 
+                }
+            }
+        }
+        else if ( game->ownership.owner == Team::BLU) {
+            setMeterValues( meters->center, game->ownership.capture_hits, settings->capture.hits_to_capture, CRGB::Red, CRGB::Blue );  
+        }
+        else if ( game->ownership.owner == Team::RED){
+            setMeterValues( meters->center, game->ownership.capture_hits, settings->capture.hits_to_capture, CRGB::Blue, CRGB::Red );  
+        }
 
     }
     else if ( settings->gameType == GameType::GAME_TYPE_ATTACK_DEFEND ){
@@ -283,23 +316,35 @@ void startGame(GameState* gs, GameSettings* settings, Clock* clock){
     gs->ownership.capture_hits = 0;
 }
 
-//TODO: duplicated with below.
-void applyLeftHits(GameState* current, TargetHitData hitdata, long current_time_millis){
+//TODO: duplicated with below. combine this, its nearly identical between red and blue
+void applyLeftHits(GameState* current, GameSettings* settings,TargetHitData hitdata, long current_time_millis){
     if ( hitdata.hits > 0 ){
+        //used mainly in hit-count games
         current->redHits.hits += hitdata.hits;
         current->redHits.last_hit_energy = hitdata.last_hit_energy;
         current->redHits.last_hit_millis = current_time_millis;
         current->redHits.last_decay_millis = current_time_millis;
     }
+    if ( settings->gameType == GAME_TYPE_KOTH_FIRST_TO_OWN_TIME || settings->gameType == GAME_TYPE_KOTH_MOST_OWN_IN_TIME){
+        if ( current->ownership.capturing == Team::RED){
+            current->ownership.capture_hits += hitdata.hits;
+        }
+    }
 }
 
-void applyRightHits(GameState* current, TargetHitData hitdata, long current_time_millis){
+void applyRightHits(GameState* current, GameSettings* settings,TargetHitData hitdata, long current_time_millis){
     if ( hitdata.hits > 0 ){
+        //used mainly in hit-count games
         current->bluHits.hits += hitdata.hits;
         current->bluHits.last_hit_energy = hitdata.last_hit_energy;
         current->bluHits.last_hit_millis = current_time_millis;
         current->bluHits.last_decay_millis = current_time_millis;
     }
+    if ( settings->gameType == GAME_TYPE_KOTH_FIRST_TO_OWN_TIME || settings->gameType == GAME_TYPE_KOTH_MOST_OWN_IN_TIME){
+        if ( current->ownership.capturing == Team::BLU){
+            current->ownership.capture_hits += hitdata.hits;
+        }
+    }    
 }
 
 //assumes that captureHits is being updated first
@@ -448,7 +493,6 @@ void updateFirstToHitsGame(GameState* current,  GameSettings settings){
         endGameWithMostHits(current,red_hits, blu_hits);
     }
     else if ( closeToWinner != Team::NOBODY){
-        //Team aboutToLose = oppositeTeam(closeToWinner);
         current->status = GameStatus::GAME_STATUS_OVERTIME;
     }
     else{
@@ -560,11 +604,11 @@ void triggerOvertime(GameState* current,  GameSettings settings){
     Log.infoln("Overtime Triggered!");
     current->ownership.overtime_remaining_millis = settings.capture.capture_overtime_seconds;
 }
-void capture(GameState* current,  GameSettings settings){
-    
-    current->ownership.owner = current->ownership.capturing;
-    Log.infoln("Control Point has been captured by: %c", teamTextChar(current->ownership.capturing));
-    current->ownership.capturing = Team::NOBODY;        
+void capture(GameState* current,  Team capturingTeam){
+    current->ownership.owner = capturingTeam;
+    Log.infoln("Control Point has been captured by: %c", teamTextChar(capturingTeam));
+    current->ownership.capturing = oppositeTeam(capturingTeam);      
+    current->ownership.just_captured = capturingTeam;
     current->ownership.capture_hits = 0;
 }
 
@@ -572,19 +616,41 @@ void updateOwnership(GameState* current,  GameSettings settings, long current_ti
 
     long elapsed_since_last_update = (current_time_millis - current->time.last_update_millis);
 
-    if ( current->ownership.owner== Team::RED){
-        current->ownership.red_millis += elapsed_since_last_update;
-    }
 
-    if ( current->ownership.owner== Team::BLU){
-        current->ownership.blu_millis += elapsed_since_last_update;
-    }
-    Log.infoln("Checking for Capture, %d/%d to capture.",current->ownership.capture_hits,settings.capture.hits_to_capture);
-    if ( current->ownership.capture_hits >= settings.capture.hits_to_capture ){
-        if ( current->ownership.owner != Team::NOBODY){
-            triggerOvertime(current,settings);
+    if ( current->ownership.owner== Team::NOBODY){
+        //waiting for the first capture!
+        //before capture, we use the regular hit counters, because either team can capture
+        //if somehow both teams get enough hits in the same update interval( unlikely, the bigger wins it)
+
+        //TODO: this logic is materially duplicated in the updateMeter area. need to put 
+        //compute here and give a simple value in game state the meter can use
+        //if only one team has capture hits, show progress towards capture.
+        //if both teams have capture hits, one team must get more than the other by the capture_hits margin.
+        int blu_hits = current->bluHits.hits;
+        int red_hits = current->redHits.hits;
+        int hit_diff = abs(blu_hits - red_hits);
+        if ( hit_diff >= settings.capture.hits_to_capture){
+            if ( blu_hits > red_hits){
+                capture(current, Team::BLU);
+            }
+            else{
+                capture(current, Team::RED);
+            }
         }
-        capture(current,settings);
+    }
+    else{
+        if ( current->ownership.owner== Team::RED){
+            current->ownership.red_millis += elapsed_since_last_update;
+        }
+        else if ( current->ownership.owner== Team::BLU){
+            current->ownership.blu_millis += elapsed_since_last_update;
+        }
+        Log.infoln("Checking for Capture, %d/%d to capture.",current->ownership.capture_hits,settings.capture.hits_to_capture);
+        if ( current->ownership.capture_hits >= settings.capture.hits_to_capture ){
+            triggerOvertime(current,settings);
+            capture(current,current->ownership.capturing);
+        }
+
     }
 
 }
@@ -600,7 +666,11 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
 
         HITS
         in this game, hits decay at the rate provided by capture settings. 
-        defense and offense can both score hits, but offense hits are weighed hire than defense its        
+
+        at the beginning of the game, when nobody has captured the point, both teams can capture.
+        If one team achives more hits than the other by the capture margin, that team caputures. 
+        It's essentially tug of war till the capture margin is reached.
+        Example: 5 hits required to capture: if red has no hits, blue can capture with 5. but if red has 4, blue will need 9 to capture  
 
         TIME
         Any time the team owns the point, their time accumulates.
@@ -624,7 +694,7 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
         left            red_own_time        own_time_to_win     red         black
         left-top        10,flashing in OT   10                  red         black
         left-bottom     10,flashing in OT   10                  red         black
-        center          capture_hits        hits_to_capture     capturing   owner(black if no owner)
+        center          capture_hits        hits_to_capture     capturing   owner(yellow if no owner)
         right-top       10,flashing in OT   10                  blue         black
         right           blu_own_time        own_time_to_win     blue         black
         right-bottom    10,flashing in OT   10                  blue         black

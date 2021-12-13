@@ -4,11 +4,11 @@
 #define INITIAL_INTERVAL 1
 
 void _acceptSample(volatile TargetScanner* st, int val ){
-    Log.traceln("Sample[%d]= %d", st->_currentSampleIndex, val);
+    //Log.traceln("Sample[%d]= %d", st->_currentSampleIndex, val);
     st->data[st->_currentSampleIndex] = val;    
     if ( st->_currentSampleIndex == (st->numSamples - 1)){
         long t = millis();
-        Log.infoln("Data is Ready, t=%l", t);
+        //Log.infoln("Data is Ready, t=%l", t);
         st->dataReady = true;
         st->enableScan = false;
         st->sampling = false;
@@ -42,13 +42,13 @@ void tick(volatile TargetScanner* st, long time_millis){
       }
       else{           
         st->_ticksLeftToSample--;
-        Log.traceln("Scan: %d more ticks till scan", st->_ticksLeftToSample);   
+        //Log.traceln("Scan: %d more ticks till scan", st->_ticksLeftToSample);   
       }
     }
     st->lastScanMillis = time_millis;
   }
   else{
-    Log.traceln("Scan: Ignoring Disabled");
+    //Log.traceln("Scan: Ignoring Disabled");
   }
   
 };

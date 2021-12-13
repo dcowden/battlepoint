@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <target.h>
+
 #include <targetscan.h>
 #include <ArduinoLog.h>
 #include <TargetClassifier.h>
@@ -183,7 +184,7 @@ void classifyModel(TargetHitData*  td , volatile int* data){
 //more sophisticated code could check the two targets
 //in parallel, but I dont think that'll be necessary.
 //and if it is, we maybe want to use a separate ADC
-TargetHitData analyze_impact( volatile TargetScanner* scanner, bool printData){
+TargetHitData analyze_impact( volatile TargetScanner* scanner, int hit_threshold,bool printData){
 
     long start = millis();
     TargetHitData td;
@@ -206,8 +207,8 @@ TargetHitData analyze_impact( volatile TargetScanner* scanner, bool printData){
 
     long end = millis() - start;
     Serial.print("analzye impact:");Serial.print(end);Serial.println(" ms");
-    //TODO: temporary
-    if ( td.peak4000 > 8){
+    Log.info("Peaks= %d, Thresh= %d", td.peak4000, hit_threshold);
+    if ( td.peak4000 >= hit_threshold){
       td.hits =1;
     }
     else{
