@@ -43,21 +43,6 @@ void test_owner_no_capture_yet_no_owner(){
     
 }
 
-void test_capture_no_owner(){
-    preTest();    
-    currentState.ownership.capturing=Team::RED;
-    currentState.ownership.owner=Team::NOBODY;
-    currentState.ownership.capture_hits=HITS_TO_CAPTURE;    
-
-    updateOwnership(&currentState,settings,BOGUS_UPDATE_TIME);
-
-    TEST_ASSERT_EQUAL(0,currentState.ownership.capture_hits);
-    TEST_ASSERT_EQUAL(0, currentState.ownership.overtime_remaining_millis);
-    ASSERT_OWNER_AND_CAPTURING(currentState.ownership,Team::RED,Team::NOBODY);
-    ASSERT_RED_AND_BLUE_OWNERSHIP_TIME(currentState.ownership,0,0);
-    
-}
-
 void test_capture_with_current_owner(){
     preTest();
     currentState.ownership.capturing=Team::RED;
@@ -83,7 +68,6 @@ void setup() {
 
     UNITY_BEGIN();
     RUN_TEST(test_owner_no_capture_yet_no_owner);
-    RUN_TEST(test_capture_no_owner);
     RUN_TEST(test_capture_with_current_owner);
 
     UNITY_END();

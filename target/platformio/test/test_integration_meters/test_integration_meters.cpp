@@ -61,12 +61,12 @@ void ASSERT_LEDS_EQUAL(CRGB* expected, CRGB* actual, int num_leds, const char* m
 void red_hit(){
     TargetHitData hd;
     hd.hits=1;
-    applyLeftHits(&gameState,hd,1000);
+    applyLeftHits(&gameState,&gameSettings, hd,1000);
 }
 void blue_hit(){
     TargetHitData hd;
     hd.hits = 1;
-    applyRightHits(&gameState,hd,1000);
+    applyRightHits(&gameState,&gameSettings,hd,1000);
 }
 
 void add_seconds(long seconds){
