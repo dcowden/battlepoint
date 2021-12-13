@@ -53,7 +53,7 @@ void test_capture_with_current_owner(){
 
     TEST_ASSERT_EQUAL(0,currentState.ownership.capture_hits);
     TEST_ASSERT_EQUAL(OVERTIME_CAPTURE_MILLIS, currentState.ownership.overtime_remaining_millis);
-    ASSERT_OWNER_AND_CAPTURING(currentState.ownership,Team::RED,Team::NOBODY);
+    ASSERT_OWNER_AND_CAPTURING(currentState.ownership,Team::RED,Team::BLU);
     ASSERT_RED_AND_BLUE_OWNERSHIP_TIME(currentState.ownership,0,BOGUS_UPDATE_TIME-INITIAL_TIME);
 
 }
