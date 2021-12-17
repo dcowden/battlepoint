@@ -2,7 +2,7 @@
 #include <GameClock.h>
 
 #define SECONDS_PER_MINUTE 60
-
+#define WARNING_TIME_LEFT_SECS 15
 const char* get_state_desc(ClockState state){
     if ( state == COUNTING_TO_START ){
         return "Counting..";
@@ -24,11 +24,11 @@ ClockColor game_clock_color_for_state(GameClockState* clockState){
         return ClockColor::YELLOW;
     }
     else if ( ClockState::IN_PROGRESS  == cs){
-        if ( clockState->game_remaining_secs < 10){
-            return ClockColor::RED;
+        if ( clockState->game_remaining_secs < WARNING_TIME_LEFT_SECS){
+            return ClockColor::YELLOW;
         }
         else{
-            return ClockColor::BLUE;
+            return ClockColor::GREEN;
         }
     }
     else if ( cs == ClockState::OVER ) {

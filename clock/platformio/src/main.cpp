@@ -16,11 +16,14 @@
 #include <menuIO/chainStream.h>
 #include <menuIO/serialIn.h>
 #include <GameClock.h>
-#include "ServoGameClock.h"
-#include "SevenSegmentMap.h"
+//#include "ServoGameClock.h"
+//#include "SevenSegmentMap.h"
 #include <FastLED.h>
 #include "WiFi.h"
+//#include <CheapStepper.h>
 #include <AccelStepper.h>
+#include <Wire.h>
+
 
 #define BATTLEPOINT_VERSION "1.0.3"
 #define BP_MENU "BP v1.0.3"
@@ -45,14 +48,27 @@
 #define POST_INTERVAL_MS 80
 #define TIMER_INTERVAL_MICROSECONDS 1000
 #define HARDWARE_INFO_UPDATE_INTERVAL_MS 1000
-#define GAME_CLOCK_UPDATE_INTERVAL_MS 1000
+#define GAME_CLOCK_UPDATE_INTERVAL_MS 200
+#define POSITION_INTERVAL_MS 1000
 #define ENCODER_UPDATE_INTERVAL_MS 1
+
+#define DIAL_STEPPER_STEPS_PER_REV 4096.0
+#define DIAL_STEPPER_RATIO 1.5
+#define DIAL_MINUTES 20.0
+#define SECONDS_PER_MINUTE 60.0
+#define DIAL_HOMING_MAX_STEPS 4100
+#define DIAL_BACKLASH_STEPS 40 //have to add this many steps when we reverse direction
+#define DIAL_MAX_SPEED 700
+#define CLOCK_SPEED -7 //nomially its 5 steps per second, but this makes sure we stay up to date.
+#define DIAL_HOME_SPEED -700
 
 //the different types of games we can play
 ClockSettings clockSettings;
 GameClockState clockState;
 CRGB pointerLeds[POINTER_LED_SIZE];
-AccelStepper dialStepper (AccelStepper::FULL4WIRE, DIAL_1, DIAL_2, DIAL_3, DIAL_4);
+AccelStepper dialStepper (AccelStepper::HALF4WIRE, DIAL_1, DIAL_3, DIAL_2, DIAL_4,true);
+//CheapStepper dialStepper( DIAL_1, DIAL_2, DIAL_3, DIAL_4);
+
 typedef enum {
     PROGRAM_MODE_GAME=0,
     PROGRAM_MODE_MENU = 1
@@ -74,6 +90,16 @@ void IRAM_ATTR onTimer();
 void stopGameAndReturnToMenu();
 void start();
 void updateGameClockLocal();
+void updateDialPosition();
+void printDialPosition();
+void refreshDisplay();
+
+
+int getStepPositionForSeconds(int sec){
+  const float SECONDS_PER_REV = DIAL_MINUTES * SECONDS_PER_MINUTE;
+  float r = DIAL_STEPPER_STEPS_PER_REV /  SECONDS_PER_REV * sec * DIAL_STEPPER_RATIO;
+  return (int)r;
+}
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
 ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
@@ -100,14 +126,61 @@ void updateDialLeds( CRGB color){
   }
   FastLED.show();
 }
+
+void updateDialPosition(int position_steps, int nominal_speed){
+  int spd = nominal_speed;
+  if ( position_steps < dialStepper.currentPosition()){
+    spd = -spd;
+  }
+  dialStepper.moveTo(position_steps);
+  dialStepper.setSpeed(spd);
+  //Serial.print("SetPosition=");Serial.println(position_steps);
+  //Serial.print("Speed=");Serial.println(dialStepper.speed());  
+}
+
+CRGB getLedColorForClockColor(ClockColor color){
+    if ( color == ClockColor::YELLOW){
+        return CRGB::Yellow;
+    }
+    else if ( color == ClockColor::RED){
+        return CRGB::Red;
+    }
+    else if ( color == ClockColor::BLUE){
+        return CRGB::Blue;
+    }
+    else if ( color == ClockColor::GREEN){
+        return CRGB::Green;
+    }    
+    else{
+      return CRGB::Black;
+    }
+}
+
+
 void updateDialLeds( ClockColor color ){
   CRGB dialColor = getLedColorForClockColor(color);
   updateDialLeds(dialColor);
 }
+
 void updateGameClockLocal(){
+  //TODO: move this logic to different class
+  //assume that we started positoined at delay time plus game time, we're stricktly counting down
+
+
   game_clock_update(&clockState,millis());
   ClockColor cc = game_clock_color_for_state(&clockState);
-  servo_clock_update_time(clockState.time_to_display_secs, cc);
+  //servo_clock_update_time(clockState.time_to_display_secs, cc);
+
+  int secs_to_display = 0;
+  if ( clockState.secs_till_start > 0){
+    secs_to_display = clockState.game_duration_secs + clockState.secs_till_start;
+  }
+  else{
+    secs_to_display = clockState.game_remaining_secs;
+  }
+  
+  int position = getStepPositionForSeconds(secs_to_display);
+  updateDialPosition(position,CLOCK_SPEED);
 
   updateDialLeds(cc);
   if ( clockState.clockState == ClockState::OVER){
@@ -118,14 +191,15 @@ void updateGameClockLocal(){
 Ticker updateOledDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
 Ticker hardwareUpdateDataTimer(updateHardwareInfo, HARDWARE_INFO_UPDATE_INTERVAL_MS);
 Ticker gameClockUpdateTimer(updateGameClockLocal, GAME_CLOCK_UPDATE_INTERVAL_MS);
+Ticker dialPositionTimer(printDialPosition, POSITION_INTERVAL_MS);
 
 void setupLEDs(){
   FastLED.addLeds<NEOPIXEL, Pins::LED_TOP>(pointerLeds, POINTER_LED_SIZE);
 }
 
 void setupDialStepper(){
-    dialStepper.setMaxSpeed(10);
-    dialStepper.setAcceleration(100.0);
+  dialStepper.setMaxSpeed(1000);
+  dialStepper.setAcceleration(1200);
 }
 
 void setupEncoder(){
@@ -140,39 +214,33 @@ void setupEncoder(){
 }
 
 void homeDial(){
-    Log.infoln("Beginning Homing...");
-    for(int i=0;i<4000;i++){
-      dialStepper.move(1);
-      if ( digitalRead(Pins::DIAL_INDEX)){
-        break;
+  updateDialLeds(CRGB::Aqua);
+  Log.infoln("Beginning Homing...");
+  dialStepper.setSpeed(DIAL_HOME_SPEED);
+  while( 1){
+      dialStepper.runSpeed();
+      int home = digitalRead(Pins::DIAL_INDEX);      
+      if ( home == 0){
+         break;
       }
-    }
-    Log.infoln("Dial Homed");
-}
-void count10x(){  
-  for(int i=manualClockSeconds;i>=0;i--){
-     updateDial(i);
-     Serial.println(i);
-     if ( i < 120 ){
-        updateDialLeds(CRGB::Yellow);
-     }     
-     else{
-         updateDialLeds(CRGB::Blue);
-     }
-     delay(100);  
   }
-  updateDialLeds(CRGB::Red);
-}
-void handleChangedDigit(){
-  Serial.println("digit Changed");
-  servo_clock_update_number(manualMenuDigit,ClockColor::YELLOW);
+  dialStepper.setCurrentPosition(0);
+  //take up backlash
+  dialStepper.moveTo(DIAL_BACKLASH_STEPS);
+  dialStepper.runToPosition();
+  dialStepper.setCurrentPosition(0);
+  Log.infoln("Dial Homed");
 }
 
 void handleChangedDialSeconds(){
-   updateDial(manualClockSeconds);
+  int p = getStepPositionForSeconds(manualClockSeconds);
+  updateDialPosition(p, DIAL_MAX_SPEED);
 }
-void handleChangedDialAngle(){
-  updateDialAngle(manualClockAngle);
+
+void handleChangedDigit(){
+  int seconds =  manualMenuDigit * 60;
+  int p = getStepPositionForSeconds(seconds);
+  updateDialPosition(p,DIAL_MAX_SPEED);    
 }
 
 void loadSettings(){
@@ -193,9 +261,10 @@ Menu::result menuaction_loadSavedSettings(){
 }
 
 //FIELD(var.name, title, units, min., max., step size,fine step size, action, events mask, styles)
-SELECT(manualMenuDigit,digitMenu,"Value",handleChangedDigit,Menu::exitEvent  ,Menu::noStyle
+
+SELECT(manualMenuDigit,digitMenu,"Minute",handleChangedDigit,Menu::exitEvent  ,Menu::noStyle
       ,VALUE("0",0,Menu::doNothing,Menu::noEvent)
-      ,VALUE("1",1,Menu::doNothing,Menu::noEvent)
+     ,VALUE("1",1,Menu::doNothing,Menu::noEvent)
       ,VALUE("2",2,Menu::doNothing,Menu::noEvent)
       ,VALUE("3",3,Menu::doNothing,Menu::noEvent)
       ,VALUE("4",4,Menu::doNothing,Menu::noEvent)
@@ -212,14 +281,12 @@ MENU(mainMenu, BP_MENU, menuaction_loadSavedSettings, Menu::enterEvent, Menu::wr
     ,FIELD(clockSettings.start_delay_secs,"Start Delay","",START_DELAY_MIN,START_DELAY_MAX,START_DELAY_BIG_STEP_SIZE,START_DELAY_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(clockSettings.game_secs,"Game Time","s",GAME_TIME_MIN,GAME_TIME_MAX,GAME_TIME_BIG_STEP_SIZE,GAME_TIME_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(manualClockSeconds,"Clock ","s",0,1200,100,10,handleChangedDialSeconds,Menu::exitEvent,Menu::noStyle)
-    ,FIELD(manualClockAngle,"Angle ","d",-90,90,10,1,handleChangedDialAngle,Menu::exitEvent,Menu::noStyle)
     ,SUBMENU(digitMenu)            
-    ,OP("Count10x",count10x, Menu::enterEvent)
+    ,OP("Home",homeDial, Menu::enterEvent)
     ,OP("Start",start, Menu::enterEvent)
 );
 
 Menu::serialIn serial(Serial);
-
 
 //{{disabled normal,disabled selected},{enabled normal,enabled selected, enabled editing}}
 const colorDef<uint8_t> colors[6] MEMMODE={
@@ -245,7 +312,8 @@ MENU_INPUTS(in,&serial);
 
 MENU_OUTPUTS(out,MENU_MAX_DEPTH
   ,U8G2_OUT(oled,colors,fontW,fontH,OFFSET_X,OFFSET_Y,{0,0,charWidth,lineHeight})
-  ,SERIAL_OUT(Serial)
+  //,SERIAL_OUT(Serial)
+  ,NONE
 );
 
 NAVROOT(nav, mainMenu, MENU_MAX_DEPTH, in, out);
@@ -260,16 +328,29 @@ void start(){
   game_clock_configure(&clockState,clockSettings.start_delay_secs,clockSettings.game_secs);
   game_clock_start(&clockState,millis());
   programMode = PROGRAM_MODE_GAME;
+
+  //at this point we need to zip over to the starting position
+  int start_secs = clockState.game_duration_secs + clockState.start_delay_secs;
+  int p = getStepPositionForSeconds(start_secs);
+  dialStepper.moveTo(p+ DIAL_BACKLASH_STEPS);
+  dialStepper.runToPosition();
+  //take up backlash
+  dialStepper.moveTo(p);
+  dialStepper.runToPosition();
+  updateDialLeds(CRGB::Yellow);
 }
 
 void stopGameAndReturnToMenu(){
-  oled.setFont(u8g2_font_7x13_mf); 
   oled.clear();
-  nav.idleOff();  
-  nav.refresh();
+  nav.idleOff();
+  refreshDisplay();  
+  dialStepper.stop();
+  //updateDialLeds(CRGB::Aqua);
   programMode = PROGRAM_MODE_MENU;
+  
 }
 
+/**
 Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
   switch (e) {
     case idleStart:{
@@ -293,15 +374,20 @@ Menu::result menuIdleEvent(menuOut &o, idleEvent e) {
     }
   }
   return proceed;
-}
+} **/
 
 void POST(){
   Log.noticeln("POST...");
-  long DELAY_MS = 1000;
-  servo_clock_blank();
-  updateDialLeds(ClockColor::RED);
+  long DELAY_MS = 500;
+  //servo_clock_blank();
+  updateDialLeds(CRGB::Red);
   delay(DELAY_MS);
-  updateDialLeds(CRGB::Black);
+  updateDialLeds(CRGB::Yellow);
+  delay(DELAY_MS);
+  updateDialLeds(CRGB::Blue);
+  delay(DELAY_MS);
+  updateDialLeds(CRGB::Green);
+
   //updateDialLeds(ClockColor::YELLOW);
   //delay(DELAY_MS);
   //updateDialLeds(CRGB::Black);
@@ -311,51 +397,22 @@ void POST(){
   //delay(DELAY_MS);
   //servo_clock_update_all_digits_to_map_symbol(SEG_CHAR_1,ClockColor::YELLOW);
   
-  servo_clock_blank();
+  //servo_clock_blank();
   //delay(DELAY_MS);
-  homeDial();
+ 
   Log.noticeln("POST COMPLETE");
 }
-
-
-
-void test_dial_counter(){
-    const int INITIAL_SECONDS = 19*60;
-    const int MINUTES_20 = 20*60;
-    const int MINUTES_10 = 10*60;
-    const int MINUTES_0 = 0;
-    updateDial(MINUTES_20);
-    delay(3000);
-
-    updateDial(MINUTES_10);
-    delay(3000);
-
-    updateDial(MINUTES_0);
-    delay(3000);
-
-    for(int i=INITIAL_SECONDS;i>0;i--){
-        Serial.println(i);
-        if ( i < 300 ){
-          updateDialLeds(ClockColor::BLUE);
-        }
-        else{
-          updateDialLeds(ClockColor::RED);
-        }
-      updateDial(i);
-    }
-    delay(100);
-}
-
 
 void setup() {
   setCpuFrequencyMhz(240);
   setupLEDs();
   WiFi.mode(WIFI_OFF);
+  Wire.begin(21,22);
   btStop();
   hardwareInfo.version = BATTLEPOINT_VERSION;
   Serial.begin(115200);
   Serial.setTimeout(500);
-  pinMode(DIAL_INDEX,INPUT_PULLDOWN);
+  pinMode(DIAL_INDEX,INPUT_PULLUP);
   initSettings();
   
   Log.begin(LOG_LEVEL_INFO, &Serial, true);
@@ -365,25 +422,31 @@ void setup() {
   Menu::options->invertFieldKeys = false;
   Log.warningln("Complete.");
   oled.setFont(u8g2_font_7x13_mf);
-  servo_clock_init();  
+  //servo_clock_init();  
   POST();
+  dialPositionTimer.start();
   updateOledDisplayTimer.start();
   gameClockUpdateTimer.start();
-  hardwareUpdateDataTimer.start();
+  //hardwareUpdateDataTimer.start();
   setupDialStepper();
   setupEncoder();
   loadSettings();
-
-  servo_clock_blank();
+  homeDial();
+  //servo_clock_blank();
   //start();
-  //test_dial_counter();
-  
   //updateDialLeds(CRGB::Black);
+  refreshDisplay();
 }
 
+void refreshDisplay(){
+    oled.setFont(u8g2_font_7x13_mf);
+    oled.firstPage();
+    do nav.doOutput(); while (oled.nextPage() );  
+    Serial.println("Refresh!");
+}
 void loop() {  
 
-  hardwareUpdateDataTimer.update();
+  //hardwareUpdateDataTimer.update();
   if ( programMode == PROGRAM_MODE_GAME ){
 
       gameClockUpdateTimer.update();
@@ -396,15 +459,20 @@ void loop() {
   }
   else if ( programMode == PROGRAM_MODE_MENU){
     menuDriver.update();
-    nav.doInput();
-    oled.setFont(u8g2_font_7x13_mf);
-    oled.firstPage();
-    do nav.doOutput(); while (oled.nextPage() );    
+    if (menuDriver.dirty ) {
+       refreshDisplay();
+    }
   }
   else{
       Serial.println("Unknown Program Mode");
   }
-  
+
+  dialStepper.runSpeedToPosition();
+  dialPositionTimer.update();
+}
+
+void printDialPosition(){
+  Serial.print("P=");Serial.print(dialStepper.currentPosition());Serial.print(",W=");Serial.println(dialStepper.speed());
 }
 
 // ESP32 timer

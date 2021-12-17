@@ -7,6 +7,7 @@ class EncoderMenuDriver{
     public:
        EncoderMenuDriver(Menu::navRoot* _nav, ClickEncoder* _encoder); 
        void update();
+       bool dirty;
     private:
         ClickEncoder* encoder;
         Menu::navRoot* nav;

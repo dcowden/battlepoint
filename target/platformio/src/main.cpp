@@ -122,6 +122,7 @@ void localUpdateGame();
 void startSelectedGame();
 void updateLEDs();
 void startDiagnostics();
+void refreshDisplay();
 void stopGameAndReturnToMenu();
 void victoryDance(Team winner);
 void captureDance(Team capture);
@@ -588,6 +589,7 @@ void setup() {
   diagnosticsDataTimer.start();
   loadTargetTestSettings();
   //startSelectedGame();
+  refreshDisplay();
 }
 
 void readTargets(){  
@@ -623,7 +625,12 @@ void readTargets(){
   } 
 }
 
-
+void refreshDisplay(){
+  nav.doInput();
+  oled.setFont(u8g2_font_7x13_mf);
+  oled.firstPage();
+  do nav.doOutput(); while (oled.nextPage() );
+}
 void loop() {  
 
   //diagnosticsDataTimer.update();
@@ -640,11 +647,11 @@ void loop() {
       }
   }
   else if ( programMode == PROGRAM_MODE_MENU){
+    //TODO: package into the driver itself
       menuDriver.update();
-      nav.doInput();
-      oled.setFont(u8g2_font_7x13_mf);
-      oled.firstPage();
-      do nav.doOutput(); while (oled.nextPage() );
+      if ( menuDriver.dirty){
+          refreshDisplay();
+      }
   }
   else{
       Serial.println("Unknown Program Mode");
