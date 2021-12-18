@@ -6,6 +6,7 @@
 #define SECONDS_PER_MINUTE 60
 #define WARNING_TIME_LEFT_SECS 15
 #define MSG_WAIT_DELAY_MS 400
+#define MSG_VICTORY_DELAY_MS 5000
 
 const char* get_state_desc(ClockState state){
     if ( state == COUNTING_TO_START ){
@@ -175,8 +176,7 @@ void game_clock_update(GameClockState* clockState, long current_time_millis){
             //game over
             if ( seconds_since_game_start == clockState->game_duration_secs ){
                 sound_play(SND_SOUNDS_0023_ANNOUNCER_VICTORY);
-                FastLED.delay(MSG_WAIT_DELAY_MS);
-                FastLED.delay(MSG_WAIT_DELAY_MS);
+                FastLED.delay(MSG_VICTORY_DELAY_MS);
             }
             clockState->clockState = ClockState::OVER;
             clockState->secs_till_start = 0;
