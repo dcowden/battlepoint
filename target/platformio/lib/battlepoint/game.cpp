@@ -156,7 +156,7 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
         if ( total_hits  > 0 ){
             setMeterValues(meters->center, game->redHits.hits, total_hits, CRGB::Red, CRGB::Blue);
             setMeterValues(meters->left, game->redHits.hits, total_hits, CRGB::Red, CRGB::Blue);
-            setMeterValues(meters->right, game->bluHits.hits, total_hits, CRGB::Red, CRGB::Blue);
+            setMeterValues(meters->right, game->bluHits.hits, total_hits, CRGB::Blue, CRGB::Red);
         }
         else{
             setMeterValues(meters->center, game->bluHits.hits, total_hits, CRGB::Red, CRGB::Blue);

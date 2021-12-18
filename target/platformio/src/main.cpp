@@ -26,8 +26,8 @@
 #include <target.h>
 #include <Teams.h>
 
-#define BATTLEPOINT_VERSION "1.1.0"
-#define BP_MENU "BP v1.1.0"
+#define BATTLEPOINT_VERSION "1.1.1"
+#define BP_MENU "BP v1.1.1"
 //TODO: organize these into groups
 #define MENU_MAX_DEPTH 4
 #define OFFSET_X 0
@@ -645,6 +645,7 @@ void loop() {
       int b = clickEncoder.getButton();
       if ( b == ClickEncoder::DoubleClicked){
         stopGameAndReturnToMenu();
+        refreshDisplay();
       }
   }
   else if ( programMode == PROGRAM_MODE_MENU){
