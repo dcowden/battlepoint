@@ -1,3 +1,7 @@
+#ifndef __INC_SOUND_H
+#define __INC_SOUND_H
+
+
 #define SND_SOUNDS_0001_ANNOUNCER_ALERT    1 /* sounds/0001_announcer_alert.mp3 */
 #define SND_SOUNDS_0002_ANNOUNCER_ALERT_CENTER_CONTROL_BEING_CONTESTED    2 /* sounds/0002_announcer_alert_center_control_being_contested.mp3 */
 #define SND_SOUNDS_0014_ANNOUNCER_LAST_FLAG   3 /* sounds/0014_announcer_last_flag.mp3 */
@@ -49,5 +53,9 @@
 #define SND_SOUNDS_ANNOUNCER_TIME_ADDED   49 /* sounds/announcer_time_added.mp3 */
 
 
-#define STATE_PLAYING 512
+void sound_init(int rx_pin, int tx_pin);
+void sound_play(int sound_id);
+void play_random_startup();
 
+#define STATE_PLAYING 512
+#endif

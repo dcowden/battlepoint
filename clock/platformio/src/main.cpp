@@ -22,13 +22,10 @@
 #include "WiFi.h"
 #include <AccelStepper.h>
 #include <Wire.h>
-//#include "SoftwareSerial.h"
-#include "HardwareSerial.h"
-#include "DFRobotDFPlayerMini.h"
+#include <sound.h>
 
-
-#define BATTLEPOINT_VERSION "1.0.3"
-#define BP_MENU "BP v1.0.3"
+#define BATTLEPOINT_VERSION "1.1.0"
+#define BP_MENU "BP v1.1.0"
 
 #define MENU_MAX_DEPTH 4
 #define OFFSET_X 0
@@ -50,7 +47,7 @@
 #define POST_INTERVAL_MS 80
 #define TIMER_INTERVAL_MICROSECONDS 1000
 #define HARDWARE_INFO_UPDATE_INTERVAL_MS 1000
-#define GAME_CLOCK_UPDATE_INTERVAL_MS 200
+#define GAME_CLOCK_UPDATE_INTERVAL_MS 1000
 #define POSITION_INTERVAL_MS 1000
 #define ENCODER_UPDATE_INTERVAL_MS 1
 
@@ -69,8 +66,7 @@ ClockSettings clockSettings;
 GameClockState clockState;
 CRGB pointerLeds[POINTER_LED_SIZE];
 AccelStepper dialStepper (AccelStepper::HALF4WIRE, DIAL_1, DIAL_3, DIAL_2, DIAL_4,true);
-HardwareSerial mySoftwareSerial(1);
-DFRobotDFPlayerMini myDFPlayer;
+
 
 typedef enum {
     PROGRAM_MODE_GAME=0,
@@ -216,9 +212,7 @@ void setupEncoder(){
   timerAlarmWrite(timer, TIMER_INTERVAL_MICROSECONDS, true); //units are microseconds
   timerAlarmEnable(timer);
 }
-void playSound(int sound){
-  myDFPlayer.play(sound);
-}
+
 void homeDial(){
   updateDialLeds(CRGB::Aqua);
   Log.infoln("Beginning Homing...");
@@ -249,7 +243,7 @@ void handleChangedDigit(){
   updateDialPosition(p,DIAL_MAX_SPEED);    
 }
 void handleChangedSound(){
-  playSound(soundId);
+  sound_play(soundId);
 }
 void loadSettings(){
   timerAlarmDisable(timer);
@@ -354,7 +348,7 @@ void stopGameAndReturnToMenu(){
   nav.idleOff();
   refreshDisplay();  
   dialStepper.stop();
-  //updateDialLeds(CRGB::Aqua);
+  play_random_startup();
   programMode = PROGRAM_MODE_MENU;
   
 }
@@ -411,35 +405,13 @@ void POST(){
  
   Log.noticeln("POST COMPLETE");
 }
-void setupDfPlayer(){
-  mySoftwareSerial.begin(9600, SERIAL_8N1, Pins::DF_RX, Pins::DF_TX);  // speed, type, RX, TX
-  Serial.begin(115200);
-  
-  Serial.println();
-  Serial.println(F("DFRobot DFPlayer Mini Demo"));
-  Serial.println(F("Initializing DFPlayer ... (May take 3~5 seconds)"));
-  
-  if (!myDFPlayer.begin(mySoftwareSerial)) {  //Use softwareSerial to communicate with mp3.
-    
-    Serial.println(myDFPlayer.readType(),HEX);
-    Serial.println(F("Unable to begin:"));
-    Serial.println(F("1.Please recheck the connection!"));
-    Serial.println(F("2.Please insert the SD card!"));
-    while(true);
-  }
-  Serial.println(F("DFPlayer Mini online."));
-  
-  myDFPlayer.setTimeOut(500); //Set serial communictaion time out 500ms  
-  myDFPlayer.EQ(DFPLAYER_EQ_NORMAL);  
-  myDFPlayer.outputDevice(DFPLAYER_DEVICE_SD);
-  myDFPlayer.play(10);  //Play the first mp3
-}
+
 void setup() {
   setCpuFrequencyMhz(240);
   setupLEDs();
   WiFi.mode(WIFI_OFF);
   Wire.begin(21,22);
-  setupDfPlayer();
+  sound_init(Pins::DF_RX, Pins::DF_TX);
   btStop();
   hardwareInfo.version = BATTLEPOINT_VERSION;
   Serial.begin(115200);
@@ -468,6 +440,7 @@ void setup() {
   //start();
   //updateDialLeds(CRGB::Black);
   refreshDisplay();
+  play_random_startup();
 }
 
 void refreshDisplay(){
@@ -486,6 +459,7 @@ void loop() {
       
       int b = clickEncoder.getButton();
       if ( b == ClickEncoder::DoubleClicked){
+        sound_play(SND_SOUNDS_0028_ENGINEER_SPECIALCOMPLETED10);
         stopGameAndReturnToMenu();
       }
   }

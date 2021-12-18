@@ -46,6 +46,7 @@ uint8_t encode(int d) {
 };
 
 
+/*
 CRGB getLedColorForClockColor(ClockColor color){
     if ( color == ClockColor::YELLOW){
         return CRGB::Yellow;
@@ -56,7 +57,7 @@ CRGB getLedColorForClockColor(ClockColor color){
     else if ( color == ClockColor::BLUE){
         return CRGB::Blue;
     }
-}
+}*/
 
 float getServoAngleFromSeconds(int seconds){
     //zero, 20 is the top
