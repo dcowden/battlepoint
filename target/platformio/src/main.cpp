@@ -26,8 +26,8 @@
 #include <target.h>
 #include <Teams.h>
 
-#define BATTLEPOINT_VERSION "1.0.1"
-#define BP_MENU "BP v1.0.1"
+#define BATTLEPOINT_VERSION "1.1.0"
+#define BP_MENU "BP v1.1.0"
 //TODO: organize these into groups
 #define MENU_MAX_DEPTH 4
 #define OFFSET_X 0
@@ -39,9 +39,9 @@
 #define HARDWARE_INFO_UPDATE_INTERVAL_MS 1000
 
 #define TRIGGER_MIN 100
-#define TRIGGER_MAX 1000
-#define TRIGGER_BIG_STEP_SIZE 100
-#define TRIGGER_LITTLE_STEP_SIZE 10
+#define TRIGGER_MAX 3000
+#define TRIGGER_BIG_STEP_SIZE 500
+#define TRIGGER_LITTLE_STEP_SIZE 100
 
 #define HIT_MIN 1
 #define HIT_MAX 10
@@ -296,15 +296,16 @@ MENU(adSubMenu, "Capture", loadCPSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(gameSettings.capture.hits_to_capture,"HitsToCapture","",1,500,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.hits.victory_margin,"VictMargin","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)        
-    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.timed.max_overtime_seconds,"Overtime","s",1,120,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)   
+    ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.capture.capture_decay_rate_secs_per_hit,"Hit Decay","s",1,100,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)  
     ,OP("Start",startSelectedGame, Menu::enterEvent)
     ,EXIT("<Back")
 );
 
-MENU(testTargetMenu, "TugOWar",  loadTargetTestSettings, Menu::enterEvent, Menu::wrapStyle    
+MENU(testTargetMenu, "TugOWar",  loadTargetTestSettings, Menu::enterEvent, Menu::wrapStyle   
+    ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,OP("Start",startSelectedGame, Menu::enterEvent)

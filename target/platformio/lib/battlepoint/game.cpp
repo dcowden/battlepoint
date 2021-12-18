@@ -151,9 +151,12 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
 
         setMeterValues( meters->left, game->time.elapsed_secs, settings->timed.max_duration_seconds, CRGB::Red, CRGB::Black );
         setMeterValues( meters->right, game->time.elapsed_secs, settings->timed.max_duration_seconds, CRGB::Blue, CRGB::Black );
+
         int total_hits = game->bluHits.hits + game->redHits.hits;
         if ( total_hits  > 0 ){
             setMeterValues(meters->center, game->redHits.hits, total_hits, CRGB::Red, CRGB::Blue);
+            setMeterValues(meters->left, game->redHits.hits, total_hits, CRGB::Red, CRGB::Blue);
+            setMeterValues(meters->right, game->bluHits.hits, total_hits, CRGB::Red, CRGB::Blue);
         }
         else{
             setMeterValues(meters->center, game->bluHits.hits, total_hits, CRGB::Red, CRGB::Blue);
@@ -332,7 +335,7 @@ void applyLeftHits(GameState* current, GameSettings* settings,TargetHitData hitd
     }
     if ( settings->gameType == GAME_TYPE_KOTH_FIRST_TO_OWN_TIME || settings->gameType == GAME_TYPE_KOTH_MOST_OWN_IN_TIME ){
         if ( current->ownership.capturing == Team::RED){
-           
+           current->ownership.capture_hits += hitdata.hits;
         }
     }
     else if (settings->gameType == GAME_TYPE_ATTACK_DEFEND ){
@@ -528,12 +531,12 @@ void updateMostHitsInTimeGame(GameState* current,  GameSettings settings){
 
         METERS          val                 max-val                     fgColor     bgColor
         ----------------------------------------------------------------------------------------
-        left            elapsed_secs        game_duration_seconds       red         black   
+        left            red_hits            red_hits + blu_hits         red         black   
         left-top        10,flashing in OT   10                          red         black
         left-bottom     10,flashing in OT   10                          red         black
         center          red_hits            red_hits + blu_hits         red         blue           ( black/black when no hits yet)
         right-top       10,flashing in OT   10                          blue        black
-        right           elapsed_secs        game_duration_seconds       blue        black
+        right           blu_hits            red_hits + blu_hits         blue        black
         right-bottom    10,flashing in OT   10                          blue        black
 
         
@@ -664,7 +667,6 @@ void updateOwnership(GameState* current,  GameSettings settings, long current_ti
             triggerOvertime(current,settings);
             capture(current,current->ownership.capturing);
         }
-
     }
 
 }
@@ -781,17 +783,17 @@ void updateTargetTestMode(GameState* current,  GameSettings settings, long curre
 
     int red_hits = current->redHits.hits;
     int blu_hits = current->bluHits.hits;
+    int diff = abs(red_hits - blu_hits);
+
     Log.traceln("RedHits=%d, BluHits=%d",red_hits,blu_hits);
 
-    if ( red_hits > settings.hits.to_win ){
-        current->redHits.hits = 0;
+    if ( diff > settings.hits.victory_margin ){
+        endGameWithMostHits(current,red_hits,blu_hits);
     }
-    if ( blu_hits > settings.hits.to_win ){
-        current->bluHits.hits = 0;
-    }    
-
-    //never ends except manually
-    current->status = GameStatus::GAME_STATUS_RUNNING;    
+    else{
+        //never ends except manually
+        current->status = GameStatus::GAME_STATUS_RUNNING;    
+    }
 
 }
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis){

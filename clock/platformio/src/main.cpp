@@ -20,9 +20,11 @@
 //#include "SevenSegmentMap.h"
 #include <FastLED.h>
 #include "WiFi.h"
-//#include <CheapStepper.h>
 #include <AccelStepper.h>
 #include <Wire.h>
+//#include "SoftwareSerial.h"
+#include "HardwareSerial.h"
+#include "DFRobotDFPlayerMini.h"
 
 
 #define BATTLEPOINT_VERSION "1.0.3"
@@ -67,7 +69,8 @@ ClockSettings clockSettings;
 GameClockState clockState;
 CRGB pointerLeds[POINTER_LED_SIZE];
 AccelStepper dialStepper (AccelStepper::HALF4WIRE, DIAL_1, DIAL_3, DIAL_2, DIAL_4,true);
-//CheapStepper dialStepper( DIAL_1, DIAL_2, DIAL_3, DIAL_4);
+HardwareSerial mySoftwareSerial(1);
+DFRobotDFPlayerMini myDFPlayer;
 
 typedef enum {
     PROGRAM_MODE_GAME=0,
@@ -78,6 +81,7 @@ int programMode = ProgramMode::PROGRAM_MODE_MENU;
 int manualMenuDigit  = 0;
 int manualClockSeconds = 0;
 int manualClockAngle = 0;
+int soundId = 0;
 // ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
 // and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
 //portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -212,7 +216,9 @@ void setupEncoder(){
   timerAlarmWrite(timer, TIMER_INTERVAL_MICROSECONDS, true); //units are microseconds
   timerAlarmEnable(timer);
 }
-
+void playSound(int sound){
+  myDFPlayer.play(sound);
+}
 void homeDial(){
   updateDialLeds(CRGB::Aqua);
   Log.infoln("Beginning Homing...");
@@ -242,7 +248,9 @@ void handleChangedDigit(){
   int p = getStepPositionForSeconds(seconds);
   updateDialPosition(p,DIAL_MAX_SPEED);    
 }
-
+void handleChangedSound(){
+  playSound(soundId);
+}
 void loadSettings(){
   timerAlarmDisable(timer);
   loadSetting(&clockSettings);
@@ -264,7 +272,7 @@ Menu::result menuaction_loadSavedSettings(){
 
 SELECT(manualMenuDigit,digitMenu,"Minute",handleChangedDigit,Menu::exitEvent  ,Menu::noStyle
       ,VALUE("0",0,Menu::doNothing,Menu::noEvent)
-     ,VALUE("1",1,Menu::doNothing,Menu::noEvent)
+      ,VALUE("1",1,Menu::doNothing,Menu::noEvent)
       ,VALUE("2",2,Menu::doNothing,Menu::noEvent)
       ,VALUE("3",3,Menu::doNothing,Menu::noEvent)
       ,VALUE("4",4,Menu::doNothing,Menu::noEvent)
@@ -281,6 +289,7 @@ MENU(mainMenu, BP_MENU, menuaction_loadSavedSettings, Menu::enterEvent, Menu::wr
     ,FIELD(clockSettings.start_delay_secs,"Start Delay","",START_DELAY_MIN,START_DELAY_MAX,START_DELAY_BIG_STEP_SIZE,START_DELAY_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(clockSettings.game_secs,"Game Time","s",GAME_TIME_MIN,GAME_TIME_MAX,GAME_TIME_BIG_STEP_SIZE,GAME_TIME_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(manualClockSeconds,"Clock ","s",0,1200,100,10,handleChangedDialSeconds,Menu::exitEvent,Menu::noStyle)
+    ,FIELD(soundId,"PlaySound","",1,120,1,1,handleChangedSound,Menu::exitEvent,Menu::noStyle)
     ,SUBMENU(digitMenu)            
     ,OP("Home",homeDial, Menu::enterEvent)
     ,OP("Start",start, Menu::enterEvent)
@@ -402,12 +411,35 @@ void POST(){
  
   Log.noticeln("POST COMPLETE");
 }
-
+void setupDfPlayer(){
+  mySoftwareSerial.begin(9600, SERIAL_8N1, Pins::DF_RX, Pins::DF_TX);  // speed, type, RX, TX
+  Serial.begin(115200);
+  
+  Serial.println();
+  Serial.println(F("DFRobot DFPlayer Mini Demo"));
+  Serial.println(F("Initializing DFPlayer ... (May take 3~5 seconds)"));
+  
+  if (!myDFPlayer.begin(mySoftwareSerial)) {  //Use softwareSerial to communicate with mp3.
+    
+    Serial.println(myDFPlayer.readType(),HEX);
+    Serial.println(F("Unable to begin:"));
+    Serial.println(F("1.Please recheck the connection!"));
+    Serial.println(F("2.Please insert the SD card!"));
+    while(true);
+  }
+  Serial.println(F("DFPlayer Mini online."));
+  
+  myDFPlayer.setTimeOut(500); //Set serial communictaion time out 500ms  
+  myDFPlayer.EQ(DFPLAYER_EQ_NORMAL);  
+  myDFPlayer.outputDevice(DFPLAYER_DEVICE_SD);
+  myDFPlayer.play(10);  //Play the first mp3
+}
 void setup() {
   setCpuFrequencyMhz(240);
   setupLEDs();
   WiFi.mode(WIFI_OFF);
   Wire.begin(21,22);
+  setupDfPlayer();
   btStop();
   hardwareInfo.version = BATTLEPOINT_VERSION;
   Serial.begin(115200);

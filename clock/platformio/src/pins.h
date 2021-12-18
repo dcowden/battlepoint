@@ -3,7 +3,8 @@
 #define I2C_ADDRESS 0x3C
 
 typedef enum {
-
+    DF_TX = 32,
+    DF_RX = 33,
     DIAL_INDEX = 5,
     LED_TOP=19,
     DIAL_1 = 12, //14
