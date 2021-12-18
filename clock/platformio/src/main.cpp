@@ -50,6 +50,7 @@
 #define GAME_CLOCK_UPDATE_INTERVAL_MS 1000
 #define POSITION_INTERVAL_MS 1000
 #define ENCODER_UPDATE_INTERVAL_MS 1
+#define MSG_DELAY_MS 1000
 
 #define DIAL_STEPPER_STEPS_PER_REV 4096.0
 #define DIAL_STEPPER_RATIO 1.5
@@ -184,7 +185,11 @@ void updateGameClockLocal(){
 
   updateDialLeds(cc);
   if ( clockState.clockState == ClockState::OVER){
+    sound_play(SND_SOUNDS_0023_ANNOUNCER_VICTORY);
+    updateDialLeds(CRGB::Red);
+    FastLED.delay(5000);
     stopGameAndReturnToMenu();
+
   }
 }
 

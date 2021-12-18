@@ -176,7 +176,6 @@ void game_clock_update(GameClockState* clockState, long current_time_millis){
             //game over
             if ( seconds_since_game_start == clockState->game_duration_secs ){
                 sound_play(SND_SOUNDS_0023_ANNOUNCER_VICTORY);
-                FastLED.delay(MSG_VICTORY_DELAY_MS);
             }
             clockState->clockState = ClockState::OVER;
             clockState->secs_till_start = 0;
