@@ -18,6 +18,7 @@ typedef struct {
     int max_duration_seconds;
     int max_overtime_seconds;
     int ownership_time_seconds;
+    int countdown_start_seconds;
 } TimedGame;
 
 typedef enum {
@@ -72,6 +73,7 @@ typedef struct {
 ///  Status Things
 //////////////////////////////////////
 typedef enum {
+    GAME_STATUS_PREGAME='C',
     GAME_STATUS_OVERTIME='O',
     GAME_STATUS_RUNNING = 'R',
     GAME_STATUS_ENDED= 'E'
@@ -88,11 +90,11 @@ typedef struct{
 } MeterSettings;
 
 typedef struct {
-    long start_time_millis=0;
+    long start_time_millis=0; //start of the whole game, including pre-game countdown
     long last_update_millis=0;
     bool timeExpired = false;
     bool overtimeExpired = false;
-    int elapsed_secs = 0;
+    int elapsed_secs = 0; //NOTE: negative indicates pre-game countdown!!!!!
 } GameTime;
 
 typedef struct {
@@ -133,7 +135,6 @@ typedef struct {
     HitTracker bluHits;
     Ownership ownership;
     TargetHitData lastHit;
-    //MeterSettings meters;
 } GameState;
 
 void setDefaultGameSettings(GameSettings* settings  );

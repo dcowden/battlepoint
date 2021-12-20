@@ -34,6 +34,9 @@ const char* getCharForStatus(GameStatus s){
     else if ( s == GameStatus::GAME_STATUS_OVERTIME){
         return "O";
     }
+    else if ( s == GameStatus::GAME_STATUS_PREGAME){
+        return "P";
+    }
     else{
         return "R";
     }
@@ -113,25 +116,8 @@ void setMetersToFlashInterval(MeterSettings* meters, long flashInterval){
     meters->rightTop->flash_interval_millis = flashInterval;
     meters->right->flash_interval_millis = flashInterval;
 }
-void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters){
 
-    /**
-     *  TODO: flashing when close to end of game
-     
-        else if ( closeToWinner != Team::NOBODY){
-            Team aboutToLose = oppositeTeam(closeToWinner);
-            current->status = GameStatus::GAME_STATUS_OVERTIME;
-            setFlashMeterForTeam(closeToWinner, current,FlashInterval::FLASH_SLOW);
-            setFlashMeterForTeam(aboutToLose, current,FlashInterval::FLASH_FAST);
-        }        
-    **/
-
-    if ( game->time.timeExpired){
-        setMetersToFlashInterval(meters, FlashInterval::FLASH_FAST);
-    }
-    else{
-        setMetersToFlashInterval(meters, FlashInterval::FLASH_NONE);
-    }
+void updateMetersForRunningGame(GameState* game, GameSettings* settings, MeterSettings* meters){
     if ( settings->gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
         setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
         setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
@@ -140,7 +126,6 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
         setMeterValues( meters->center, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Black, CRGB::Black ); 
         setMeterValues( meters->left, game->redHits.hits, settings->hits.to_win, CRGB::Red, CRGB::Black );
         setMeterValues( meters->right, game->bluHits.hits, settings->hits.to_win, CRGB::Blue, CRGB::Black );
-
     }
     else if ( settings->gameType == GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME ){
 
@@ -148,7 +133,6 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
         setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
         setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
         setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );  
-
         setMeterValues( meters->left, game->time.elapsed_secs, settings->timed.max_duration_seconds, CRGB::Red, CRGB::Black );
         setMeterValues( meters->right, game->time.elapsed_secs, settings->timed.max_duration_seconds, CRGB::Blue, CRGB::Black );
 
@@ -262,9 +246,35 @@ void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters
             //nothing interesting yet
             setMeterValues( meters->center, 0, 100, CRGB::Black, CRGB::Black );
         }
-    }    
+    }  
+}
+void flashMetersIfTimeIsExpired(GameState* game, GameSettings* settings, MeterSettings* meters){
+    if ( game->time.timeExpired){
+        setMetersToFlashInterval(meters, FlashInterval::FLASH_FAST);
+    }
     else{
-       Log.errorln("UNKNOWN GAME TYPE");
+        setMetersToFlashInterval(meters, FlashInterval::FLASH_NONE);
+    }
+}
+
+void setAllMetersToSolidColor(MeterSettings* meters, CRGB fg, CRGB bg){
+    setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );
+    setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );
+    setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );
+    setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );  
+    setMeterValues( meters->center, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg ); 
+    setMeterValues( meters->left, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );
+    setMeterValues( meters->right, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );   
+}
+
+void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters){
+    flashMetersIfTimeIsExpired(game,settings,meters);
+
+    if ( game->status == GAME_STATUS_PREGAME){
+        setAllMetersToSolidColor(meters,CRGB::Yellow, CRGB::Black);
+    }
+    else {
+        updateMetersForRunningGame(game,settings,meters);
     }
 }
 
@@ -310,7 +320,7 @@ void startGame(GameState* gs, GameSettings* settings, Clock* clock){
     gs->redHits.hits = 0;
     gs->redHits.last_decay_millis = current_time_millis;
     gs->redHits.last_hit_millis = 0;    
-    gs->status = GameStatus::GAME_STATUS_RUNNING;
+    gs->status = GameStatus::GAME_STATUS_PREGAME;
     gs->result.winner = Team::NOBODY;
     gs->ownership.blu_millis = 0;
     gs->ownership.red_millis = 0;
@@ -417,19 +427,27 @@ void applyTestModeHitDecay(GameState* current, GameSettings settings, long curre
 //makes testing easier, so we dont have to set up all those conditions
 void updateGameTime(GameState* current,GameSettings settings, long current_time_millis){
 
-    long elapsed_since_start = (current_time_millis - current->time.start_time_millis)/1000;
+    long second_elapsed_since_start = (current_time_millis - current->time.start_time_millis)/1000;
+    current->time.elapsed_secs = second_elapsed_since_start - settings.timed.countdown_start_seconds; //can be negative
 
     bool isExpired = false;
     bool isOvertimeExpired = false;
-    if ( settings.timed.max_duration_seconds > 0){
-        if ( elapsed_since_start > settings.timed.max_duration_seconds){
-            isExpired =  true;
-        }
-        if ( elapsed_since_start > settings.timed.max_duration_seconds + settings.timed.max_overtime_seconds){
-            isOvertimeExpired = true;
+
+    if ( current->time.elapsed_secs >= 0){
+        current->status = GAME_STATUS_RUNNING;
+        if ( settings.timed.max_duration_seconds > 0){
+            if ( current->time.elapsed_secs > settings.timed.max_duration_seconds){
+                isExpired =  true;
+            }
+            if ( current->time.elapsed_secs > (settings.timed.max_duration_seconds + settings.timed.max_overtime_seconds)){
+                isOvertimeExpired = true;
+            }
         }
     }
-    current->time.elapsed_secs = elapsed_since_start / 1000;
+    else{
+        current->status = GAME_STATUS_PREGAME;
+    }
+
     current->time.timeExpired = isExpired;
     current->time.overtimeExpired = isOvertimeExpired;
     
@@ -451,6 +469,7 @@ void endGameWithMostHits(GameState* current, int red_hits, int blu_hits ){
         endGame(current, Team::TIE);
     }    
 }
+
 void endGameWithMostOwnership(GameState* current){
     if ( current->ownership.blu_millis > current->ownership.red_millis){
         endGame(current, Team::BLU);
@@ -621,6 +640,7 @@ void triggerOvertime(GameState* current,  GameSettings settings){
     Log.infoln("Overtime Triggered!");
     current->ownership.overtime_remaining_millis = settings.capture.capture_overtime_seconds;
 }
+
 void capture(GameState* current,  Team capturingTeam){
     current->ownership.owner = capturingTeam;
     Log.infoln("Control Point has been captured by: %c", teamTextChar(capturingTeam));
@@ -804,29 +824,30 @@ void updateGame(GameState* current,  GameSettings settings, Clock* clock){
 
     updateGameTime(current, settings, clock->milliseconds());
 
-    Log.traceln("After Update, Hits:B=%d,R=%d",current->bluHits.hits, current->redHits.hits);
-    if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
-        updateFirstToHitsGame(current,settings);
+    if ( current->status != GAME_STATUS_PREGAME){
+        Log.traceln("After Update, Hits:B=%d,R=%d",current->bluHits.hits, current->redHits.hits);
+        if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
+            updateFirstToHitsGame(current,settings);
+        }
+        else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME){
+            updateMostHitsInTimeGame(current,settings);
+        }
+        else if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_OWN_TIME){
+            updateFirstToOwnTimeGame(current,settings,clock->milliseconds());
+        }
+        else if ( settings.gameType == GameType::GAME_TYPE_ATTACK_DEFEND){
+            updateAttackDefendGame(current,settings,clock->milliseconds());
+        }
+        else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_OWN_IN_TIME){
+            updateMostOwnInTimeGame(current,settings,clock->milliseconds());
+        }
+        else if ( settings.gameType == GameType::GAME_TYPE_TARGET_TEST){
+            updateTargetTestMode(current,settings,clock->milliseconds());
+        }
+        else{
+            Log.errorln("Unknown Game Type: %d", settings.gameType);
+        }
     }
-    else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME){
-        updateMostHitsInTimeGame(current,settings);
-    }
-    else if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_OWN_TIME){
-        updateFirstToOwnTimeGame(current,settings,clock->milliseconds());
-    }
-    else if ( settings.gameType == GameType::GAME_TYPE_ATTACK_DEFEND){
-        updateAttackDefendGame(current,settings,clock->milliseconds());
-    }
-    else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_OWN_IN_TIME){
-        updateMostOwnInTimeGame(current,settings,clock->milliseconds());
-    }
-    else if ( settings.gameType == GameType::GAME_TYPE_TARGET_TEST){
-        updateTargetTestMode(current,settings,clock->milliseconds());
-    }
-    else{
-        Log.errorln("Unknown Game Type: %d", settings.gameType);
-    }
-
     //very last to make sure everyone can see the time delta during update
     current->time.last_update_millis = clock->milliseconds();
 }
