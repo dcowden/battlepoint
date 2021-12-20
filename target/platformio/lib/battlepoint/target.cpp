@@ -207,7 +207,7 @@ TargetHitData analyze_impact( volatile TargetScanner* scanner, int hit_threshold
 
     long end = millis() - start;
     //Serial.print("analzye impact:");Serial.print(end);Serial.println(" ms");
-    Log.info("Peaks= %d, Thresh= %d", td.peak4000, hit_threshold);
+    Log.traceln("Peaks= %d, Thresh= %d", td.peak4000, hit_threshold);
     if ( td.peak4000 >= hit_threshold){
       td.hits =1;
     }

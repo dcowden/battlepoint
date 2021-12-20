@@ -1,31 +1,9 @@
 #include <game.h>
 #include <Teams.h>
-#include <Clock.h>
 #include <math.h>
 #include <target.h>
 #include <LedMeter.h>
 #include <ArduinoLog.h>
-
-
-void setDefaultGameSettings(GameSettings* gs){
-
-    gs->hits.to_win = 1;
-    gs->hits.victory_margin=1;
-    gs->gameType = GameType::GAME_TYPE_UNSELECTED;
-    gs->capture.capture_cooldown_seconds=10;
-    gs->capture.capture_decay_rate_secs_per_hit=1;
-    gs->capture.capture_overtime_seconds = 30;
-    gs->capture.hits_to_capture = 10;
-    
-    gs->timed.max_duration_seconds=120;
-    gs->timed.ownership_time_seconds=120;
-    gs->timed.max_overtime_seconds=60;
-
-    gs->target.hit_energy_threshold = 5000;
-    gs->target.last_hit_millis=0;
-    gs->target.trigger_threshold=100;
-
-}
 
 const char* getCharForStatus(GameStatus s){
     if ( s == GameStatus::GAME_STATUS_ENDED){
@@ -257,21 +235,22 @@ void flashMetersIfTimeIsExpired(GameState* game, GameSettings* settings, MeterSe
     }
 }
 
-void setAllMetersToSolidColor(MeterSettings* meters, CRGB fg, CRGB bg){
-    setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );
-    setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );
-    setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );
-    setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );  
-    setMeterValues( meters->center, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg ); 
-    setMeterValues( meters->left, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );
-    setMeterValues( meters->right, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, fg, bg );   
+void updateMetersDuringPregame(GameState* game, GameSettings* settings, MeterSettings* meters){
+    setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Yellow, CRGB::Black );
+    setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Yellow, CRGB::Black );
+    setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Yellow, CRGB::Black);
+    setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Yellow, CRGB::Black );  
+
+    setMeterValues( meters->center, -game->time.remaining_secs, settings->timed.countdown_start_seconds, CRGB::Yellow, CRGB::Black ); 
+    setMeterValues( meters->left, -game->time.remaining_secs, settings->timed.countdown_start_seconds, CRGB::Yellow, CRGB::Black );
+    setMeterValues( meters->right, -game->time.remaining_secs, settings->timed.countdown_start_seconds, CRGB::Yellow, CRGB::Black ); 
 }
 
 void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters){
     flashMetersIfTimeIsExpired(game,settings,meters);
 
     if ( game->status == GAME_STATUS_PREGAME){
-        setAllMetersToSolidColor(meters,CRGB::Yellow, CRGB::Black);
+        updateMetersDuringPregame(game,settings,meters);
     }
     else {
         updateMetersForRunningGame(game,settings,meters);
@@ -311,8 +290,7 @@ void setupMeters(GameState* gs, GameSettings* settings, MeterSettings* meters){
     }
 }
 
-void startGame(GameState* gs, GameSettings* settings, Clock* clock){
-    long current_time_millis = clock->milliseconds();
+void startGame(GameState* gs, GameSettings* settings, long current_time_millis){
     gs->time.start_time_millis = current_time_millis;
     gs->bluHits.hits = 0;
     gs->bluHits.last_decay_millis = current_time_millis;
@@ -327,7 +305,6 @@ void startGame(GameState* gs, GameSettings* settings, Clock* clock){
     gs->ownership.owner = Team::NOBODY;
     gs->ownership.capturing = Team::NOBODY;
     gs->ownership.capture_hits = 0;
-
     if ( settings->gameType == GAME_TYPE_ATTACK_DEFEND){
         gs->ownership.capturing = Team::BLU;  
     }
@@ -428,18 +405,26 @@ void applyTestModeHitDecay(GameState* current, GameSettings settings, long curre
 void updateGameTime(GameState* current,GameSettings settings, long current_time_millis){
 
     long second_elapsed_since_start = (current_time_millis - current->time.start_time_millis)/1000;
-    current->time.elapsed_secs = second_elapsed_since_start - settings.timed.countdown_start_seconds; //can be negative
+    long elapsed_sec = second_elapsed_since_start - settings.timed.countdown_start_seconds;
+    current->time.elapsed_secs= elapsed_sec;
+    if ( elapsed_sec < 0 ){
+        current->time.remaining_secs = elapsed_sec;
+    }
+    else{
+        //game has started. 
+        current->time.remaining_secs =(settings.timed.max_duration_seconds - elapsed_sec);
+    }
 
     bool isExpired = false;
     bool isOvertimeExpired = false;
 
-    if ( current->time.elapsed_secs >= 0){
+    if ( elapsed_sec >= 0){
         current->status = GAME_STATUS_RUNNING;
         if ( settings.timed.max_duration_seconds > 0){
-            if ( current->time.elapsed_secs > settings.timed.max_duration_seconds){
+            if ( elapsed_sec > settings.timed.max_duration_seconds){
                 isExpired =  true;
             }
-            if ( current->time.elapsed_secs > (settings.timed.max_duration_seconds + settings.timed.max_overtime_seconds)){
+            if ( elapsed_sec > (settings.timed.max_duration_seconds + settings.timed.max_overtime_seconds)){
                 isOvertimeExpired = true;
             }
         }
@@ -528,9 +513,6 @@ void updateFirstToHitsGame(GameState* current,  GameSettings settings){
     else if ( closeToWinner != Team::NOBODY){
         current->status = GameStatus::GAME_STATUS_OVERTIME;
     }
-    else{
-        current->status = GameStatus::GAME_STATUS_RUNNING;    
-    }
 
 }
 
@@ -581,9 +563,6 @@ void updateMostHitsInTimeGame(GameState* current,  GameSettings settings){
             current->status = GameStatus::GAME_STATUS_OVERTIME;    
         }
     }
-    else{
-        current->status = GameStatus::GAME_STATUS_RUNNING;
-    }
 
 }
 
@@ -631,10 +610,7 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings, long cur
         else{
             endGame(current, Team::RED);
         }
-    }
-    else {
-        current->status = GameStatus::GAME_STATUS_RUNNING;
-    }   
+    } 
 }
 void triggerOvertime(GameState* current,  GameSettings settings){
     Log.infoln("Overtime Triggered!");
@@ -783,11 +759,6 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
             endGame(current,Team::RED);
         }
     }
-    else {
-        Log.infoln("nothing interesting going on.");
-        current->status = GameStatus::GAME_STATUS_RUNNING;
-    }   
-
      
 }
 
@@ -810,20 +781,14 @@ void updateTargetTestMode(GameState* current,  GameSettings settings, long curre
     if ( diff > settings.hits.victory_margin ){
         endGameWithMostHits(current,red_hits,blu_hits);
     }
-    else{
-        //never ends except manually
-        current->status = GameStatus::GAME_STATUS_RUNNING;    
-    }
-
 }
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis){
     endGame(current, Team::NOBODY);
 }
 
-void updateGame(GameState* current,  GameSettings settings, Clock* clock){
+void updateGame(GameState* current,  GameSettings settings, long current_time_millis){
 
-    updateGameTime(current, settings, clock->milliseconds());
-
+    updateGameTime(current, settings, current_time_millis);
     if ( current->status != GAME_STATUS_PREGAME){
         Log.traceln("After Update, Hits:B=%d,R=%d",current->bluHits.hits, current->redHits.hits);
         if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
@@ -833,23 +798,23 @@ void updateGame(GameState* current,  GameSettings settings, Clock* clock){
             updateMostHitsInTimeGame(current,settings);
         }
         else if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_OWN_TIME){
-            updateFirstToOwnTimeGame(current,settings,clock->milliseconds());
+            updateFirstToOwnTimeGame(current,settings,current_time_millis);
         }
         else if ( settings.gameType == GameType::GAME_TYPE_ATTACK_DEFEND){
-            updateAttackDefendGame(current,settings,clock->milliseconds());
+            updateAttackDefendGame(current,settings,current_time_millis);
         }
         else if ( settings.gameType == GameType::GAME_TYPE_KOTH_MOST_OWN_IN_TIME){
-            updateMostOwnInTimeGame(current,settings,clock->milliseconds());
+            updateMostOwnInTimeGame(current,settings,current_time_millis);
         }
         else if ( settings.gameType == GameType::GAME_TYPE_TARGET_TEST){
-            updateTargetTestMode(current,settings,clock->milliseconds());
+            updateTargetTestMode(current,settings,current_time_millis);
         }
         else{
             Log.errorln("Unknown Game Type: %d", settings.gameType);
         }
     }
     //very last to make sure everyone can see the time delta during update
-    current->time.last_update_millis = clock->milliseconds();
+    current->time.last_update_millis = current_time_millis;
 }
 
 

@@ -32,6 +32,7 @@ void setup_sound_triggers(){
     soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_7SEC].game_secs_trigger = 7;
     soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_8SEC].game_secs_trigger = 8;
     soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_9SEC].game_secs_trigger = 9;
+   
 }
 
 void _init_dfplayer(int rx_pin, int tx_pin){
@@ -93,7 +94,7 @@ bool ready_to_play(long current_time_millis){
 }
 
 void _log_sound_played(int sound_id, long current_time_millis){
-  //Serial.print(sound_id);Serial.println(":played");
+  Serial.print(sound_id);Serial.println(":played");
   soundState.sound_config[sound_id].last_played_ms = current_time_millis;
   soundState.last_sound_played_time_ms = current_time_millis;
   soundState.sound_config[sound_id].times_played += 1;

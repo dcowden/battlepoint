@@ -3,7 +3,7 @@
 #include <ArduinoLog.h>
 #include <game.h>
 
-#define BP_CURRENT_SETTINGS_VERSION 207
+#define BP_CURRENT_SETTINGS_VERSION 208
 #define EEPROM_SIZE 320
 
 void initSettings(){

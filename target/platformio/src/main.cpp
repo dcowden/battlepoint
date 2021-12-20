@@ -3,7 +3,6 @@
 #include <U8g2lib.h>
 #include <FastLED.h>
 #include <target.h>
-#include <Clock.h>
 #include <LedMeter.h>
 #include <game.h>
 #include "EncoderMenuDriver.h"
@@ -25,6 +24,7 @@
 #include <targetscan.h>
 #include <target.h>
 #include <Teams.h>
+#include <sound.h>
 
 #define BATTLEPOINT_VERSION "1.1.1"
 #define BP_MENU "BP v1.1.1"
@@ -35,7 +35,7 @@
 #define DISPLAY_UPDATE_INTERVAL_MS 100
 #define VERTICAL_LED_SIZE 16
 #define HORIONTAL_LED_SIZE 12
-#define GAME_UPDATE_INTERVAL_MS 20
+#define GAME_UPDATE_INTERVAL_MS 200
 #define HARDWARE_INFO_UPDATE_INTERVAL_MS 1000
 
 #define TRIGGER_MIN 100
@@ -62,6 +62,11 @@
 #define VICTORY_HITS_MAX 100
 #define VICTORY_HITS_BIG_STEP_SIZE 5
 #define VICTORY_HITS_LITTLE_STEP_SIZE 1
+
+#define DURATION_SECS_MIN 1
+#define DURATION_SECS_MAX 500
+#define DURATION_SECS_BIG_STEP_SIZE 10
+#define DURATION_SECS_LITTLE_STEP_SIZE 1
 
 
 #define ENCODER_SERVICE_PRESCALER 5
@@ -162,8 +167,11 @@ void updateDisplayLocal(){
 }
 
 void localUpdateGame(){  
-  updateGame(&gameState, gameSettings, (Clock*)(&gameClock));
-  
+  long current_time_millis = millis();
+  updateGame(&gameState, gameSettings, current_time_millis);
+
+  sound_gametime_update(gameState.time.remaining_secs,current_time_millis);
+
   if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
       gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;
   }
@@ -173,9 +181,24 @@ void localUpdateGame(){
      gameState.ownership.just_captured = Team::NOBODY;
   }
 
+  if ( gameState.status == GAME_STATUS_OVERTIME ){
+    sound_play_once_in_game(SND_SOUNDS_0016_ANNOUNCER_OVERTIME,current_time_millis);
+  }
+  if ( gameState.status == GAME_STATUS_RUNNING ){
+    sound_play_once_in_game(SND_SOUNDS_0022_ANNOUNCER_TOURNAMENT_STARTED4,current_time_millis);
+  }
+
   if ( gameState.status == GameStatus::GAME_STATUS_ENDED ){
     Log.warning("Game Over!");
+    
     Log.warning("Winner=");
+    if ( gameState.result.winner == Team::RED ||  gameState.result.winner == Team::BLU){
+      sound_play(SND_SOUNDS_0023_ANNOUNCER_VICTORY,current_time_millis);
+    }
+    else{
+      sound_play(SND_SOUNDS_0018_ANNOUNCER_SD_MONKEYNAUT_END_CRASH02,current_time_millis);
+    }
+    
     victoryDance(gameState.result.winner);
     gameOverDisplay(gameState);
     stopGameAndReturnToMenu();
@@ -248,22 +271,22 @@ Menu::result loadCPSettings(){
 Menu::result loadTargetTestSettings(){
   gameSettings.gameType = GameType::GAME_TYPE_TARGET_TEST;
   loadSettingsForSelectedGameType();
-  gameSettings.hits.to_win = 16;
-  gameSettings.timed.max_duration_seconds=999;
-  gameSettings.capture.capture_decay_rate_secs_per_hit = 10;  
-  gameSettings.target.trigger_threshold = 2000;
   printTargetDataHeaders();
-
   return Menu::proceed;
 }
+
+#define DURATION_SECS_MIN 1
+#define DURATION_SECS_MAX 500
+#define DURATION_SECS_BIG_STEP_SIZE 10
+#define DURATION_SECS_LITTLE_STEP_SIZE 1
 
 //FIELD(var.name, title, units, min., max., step size,fine step size, action, events mask, styles)
 MENU(mostHitsSubMenu, "MostHits", loadMostHitsSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(gameSettings.hits.to_win,"HitsToWin","",1,100,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
     ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)                
-    ,FIELD(gameSettings.timed.max_overtime_seconds,"Overtime","s",1,120,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.timed.countdown_start_seconds,"StartDelay","s",1,120,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)        
+    ,FIELD(gameSettings.timed.max_overtime_seconds,"Overtime","s",DURATION_SECS_MIN,DURATION_SECS_MAX,DURATION_SECS_BIG_STEP_SIZE,DURATION_SECS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.timed.countdown_start_seconds,"StartDelay","s",DURATION_SECS_MIN,DURATION_SECS_MAX,DURATION_SECS_BIG_STEP_SIZE,DURATION_SECS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)        
     ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
     ,OP("Start",startSelectedGame, Menu::enterEvent)
@@ -273,9 +296,9 @@ MENU(mostHitsSubMenu, "MostHits", loadMostHitsSettings, Menu::enterEvent, Menu::
 MENU(firstToHitsSubMenu, "FirstToHits", loadFirstToHitsSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(gameSettings.hits.victory_margin,"Win By Hits","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
     ,FIELD(gameSettings.hits.to_win,"HitsToWin","",VICTORY_HITS_MIN,VICTORY_HITS_MAX,VICTORY_HITS_BIG_STEP_SIZE,VICTORY_HITS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.timed.max_overtime_seconds,"Overtime","s",1,120,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)    
     ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)                
-    ,FIELD(gameSettings.timed.countdown_start_seconds,"StartDelay","s",1,120,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
+    ,FIELD(gameSettings.timed.max_overtime_seconds,"Overtime","s",DURATION_SECS_MIN,DURATION_SECS_MAX,DURATION_SECS_BIG_STEP_SIZE,DURATION_SECS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.timed.countdown_start_seconds,"StartDelay","s",DURATION_SECS_MIN,DURATION_SECS_MAX,DURATION_SECS_BIG_STEP_SIZE,DURATION_SECS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)       
     ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,OP("Start",startSelectedGame, Menu::enterEvent)
@@ -287,8 +310,9 @@ MENU(ozSubMenu, "OwnZone", loadOwnZoneSettings, Menu::enterEvent, Menu::wrapStyl
     ,FIELD(gameSettings.capture.capture_decay_rate_secs_per_hit,"Hit Decay","s",1,100,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.capture.hits_to_capture,"HitsToCapture","",1,500,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.timed.ownership_time_seconds,"OwnTimeToWin","s",1,200,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
-    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)        
-    ,FIELD(gameSettings.timed.countdown_start_seconds,"StartDelay","s",1,120,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)                
+    ,FIELD(gameSettings.timed.max_overtime_seconds,"Overtime","s",DURATION_SECS_MIN,DURATION_SECS_MAX,DURATION_SECS_BIG_STEP_SIZE,DURATION_SECS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.timed.countdown_start_seconds,"StartDelay","s",DURATION_SECS_MIN,DURATION_SECS_MAX,DURATION_SECS_BIG_STEP_SIZE,DURATION_SECS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)   
     ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,OP("Start",startSelectedGame, Menu::enterEvent)
@@ -298,9 +322,9 @@ MENU(ozSubMenu, "OwnZone", loadOwnZoneSettings, Menu::enterEvent, Menu::wrapStyl
 MENU(adSubMenu, "Capture", loadCPSettings, Menu::enterEvent, Menu::wrapStyle
     ,FIELD(gameSettings.capture.hits_to_capture,"HitsToCapture","",1,500,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.hits.victory_margin,"VictMargin","",VICTORY_MARGIN_MIN,VICTORY_MARGIN_MAX,VICTORY_MARGIN_BIG_STEP_SIZE,VICTORY_MARGIN_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
-    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)        
-    ,FIELD(gameSettings.timed.max_overtime_seconds,"Overtime","s",1,120,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)   
-    ,FIELD(gameSettings.timed.countdown_start_seconds,"StartDelay","s",1,120,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)     
+    ,FIELD(gameSettings.timed.max_duration_seconds,"Time Limit","s",TIME_LIMIT_MIN,TIME_LIMIT_MAX,TIME_LIMIT_BIG_STEP_SIZE,TIME_LIMIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)                
+    ,FIELD(gameSettings.timed.max_overtime_seconds,"Overtime","s",DURATION_SECS_MIN,DURATION_SECS_MAX,DURATION_SECS_BIG_STEP_SIZE,DURATION_SECS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)
+    ,FIELD(gameSettings.timed.countdown_start_seconds,"StartDelay","s",DURATION_SECS_MIN,DURATION_SECS_MAX,DURATION_SECS_BIG_STEP_SIZE,DURATION_SECS_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle)      
     ,FIELD(gameSettings.target.hit_energy_threshold,"Hit Thresh","",HIT_MIN,HIT_MAX,HIT_BIG_STEP_SIZE,HIT_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.target.trigger_threshold,"Trig Thresh","",TRIGGER_MIN,TRIGGER_MAX,TRIGGER_BIG_STEP_SIZE,TRIGGER_LITTLE_STEP_SIZE,Menu::doNothing,Menu::noEvent,Menu::noStyle) 
     ,FIELD(gameSettings.capture.capture_decay_rate_secs_per_hit,"Hit Decay","s",1,100,10,1,Menu::doNothing,Menu::noEvent,Menu::noStyle)  
@@ -380,7 +404,7 @@ void setupMeters(){
 }
 
 void startSelectedGame(){  
-
+  long current_time_millis = millis();
   Log.noticeln("Starting Game. Type= %d", gameSettings.gameType);
   Log.warningln("Target Threshold= %l", gameSettings.target.trigger_threshold);
   saveSettingsForSelectedGameType();
@@ -391,8 +415,8 @@ void startSelectedGame(){
   enable(&leftScanner);
   enable(&rightScanner);
 
-  startGame(&gameState, &gameSettings, &gameClock);
-
+  startGame(&gameState, &gameSettings,current_time_millis);
+  sound_play_once_in_game(SND_SOUNDS_0021_ANNOUNCER_TIME_ADDED,current_time_millis);
   Log.traceln("Meter States:");
   oled.clear();
   nav.idleOn();
@@ -570,7 +594,7 @@ void setup() {
   Serial.begin(115200);
   Serial.setTimeout(500);
   initSettings();
-  Log.begin(LOG_LEVEL_SILENT, &Serial, true);
+  Log.begin(LOG_LEVEL_INFO, &Serial, true);
   Log.warning("Starting...");
   initDisplay();
   displayWelcomeBanner(hardwareInfo.version);
@@ -594,6 +618,7 @@ void setup() {
   gameUpdateTimer.start();
   diagnosticsDataTimer.start();
   loadTargetTestSettings();
+  sound_init_for_testing();
   //startSelectedGame();
   refreshDisplay();
 }
@@ -651,6 +676,8 @@ void loop() {
       if ( b == ClickEncoder::DoubleClicked){
         stopGameAndReturnToMenu();
         refreshDisplay();
+        setAllMeterColors(CRGB::Black, CRGB::Black);
+        setAllMetersToValue(0);
       }
   }
   else if ( programMode == PROGRAM_MODE_MENU){

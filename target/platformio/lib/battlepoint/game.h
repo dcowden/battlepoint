@@ -1,7 +1,6 @@
 #ifndef __INC_GAME_H
 #define __INC_GAME_H
 #include <Teams.h>
-#include <Clock.h>
 #include <LedMeter.h>
 #include <target.h>
 #include <targetscan.h>
@@ -15,10 +14,10 @@
 //Settings Things
 //////////////////////////////////////
 typedef struct {
-    int max_duration_seconds;
-    int max_overtime_seconds;
-    int ownership_time_seconds;
-    int countdown_start_seconds;
+    int max_duration_seconds = 200;
+    int max_overtime_seconds = 30;
+    int ownership_time_seconds = 30;
+    int countdown_start_seconds = 20;
 } TimedGame;
 
 typedef enum {
@@ -42,26 +41,26 @@ typedef enum {
 } GameType;
 
 typedef struct {
-    int to_win;
-    int victory_margin;
+    int to_win = 10;
+    int victory_margin = 2;
 } HitCounts;
 
 typedef struct{
-    int hits_to_capture;
-    int capture_cooldown_seconds;
-    int capture_decay_rate_secs_per_hit;
-    int capture_overtime_seconds;
+    int hits_to_capture = 10;
+    int capture_cooldown_seconds = 5;
+    int capture_decay_rate_secs_per_hit = 5;
+    int capture_overtime_seconds= 30;
 } CaptureSettings;
 
 typedef struct {
-    long last_hit_millis;
-    long trigger_threshold;
-    long hit_energy_threshold;
+    long last_hit_millis = 0;
+    long trigger_threshold = 2000;
+    long hit_energy_threshold = 7;
 } TargetSettings;
 
 typedef struct {    
     int BP_VERSION;
-    GameType gameType;
+    GameType gameType = GAME_TYPE_UNSELECTED;
     TargetSettings target;
     TimedGame timed;
     CaptureSettings capture;
@@ -94,7 +93,8 @@ typedef struct {
     long last_update_millis=0;
     bool timeExpired = false;
     bool overtimeExpired = false;
-    int elapsed_secs = 0; //NOTE: negative indicates pre-game countdown!!!!!
+    int remaining_secs = 0; //time left in the game if the game has startedd. time left till game start in the pregame  
+    int elapsed_secs =  0; //time relative to game start. <0 means pre-game countdown. 
 } GameTime;
 
 typedef struct {
@@ -138,7 +138,7 @@ typedef struct {
 } GameState;
 
 void setDefaultGameSettings(GameSettings* settings  );
-void startGame(GameState* gs, GameSettings* settings, Clock* clock);
+void startGame(GameState* gs, GameSettings* settings, long current_time_millis);
 
 //exposed for testing
 void updateGameTime(GameState* current,GameSettings settings, long current_time_millis);
@@ -152,7 +152,7 @@ void updateMostHitsInTimeGame(GameState* current,  GameSettings settings);
 void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateAttackDefendGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
-void updateGame(GameState* game, GameSettings settings, Clock* clock);
+void updateGame(GameState* game, GameSettings settings, long current_time_millis);
 void updateLeds(MeterSettings* meters, long current_time_millis );
 void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters);
 

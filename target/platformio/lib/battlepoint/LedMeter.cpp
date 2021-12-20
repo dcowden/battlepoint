@@ -42,11 +42,11 @@ bool isOn ( LedMeter* meter, long current_time_millis){
 
        meter->last_flash_millis = current_time_millis;
        if ( meter->flash_state == 0 ){
-         Log.infoln("Flash:on=true");
+         Log.traceln("Flash:on=true");
          return true;
        }
        else{
-         Log.infoln("Flash:on=false");
+         Log.traceln("Flash:on=false");
          return false;
        }
      }

@@ -30,7 +30,7 @@ GameState gameState;
 GameSettings gameSettings;
 //SensorState sensorState;
 
-TestClock gameClock = TestClock();
+long current_time_millis = 0;
 
 //top and bottom leds share one LED strip, in different segments
 CRGB leftLeds[VERTICAL_LED_SIZE];
@@ -61,24 +61,22 @@ void ASSERT_LEDS_EQUAL(CRGB* expected, CRGB* actual, int num_leds, const char* m
 void red_hit(){
     TargetHitData hd;
     hd.hits=1;
-    applyLeftHits(&gameState,&gameSettings, hd,1000);
+    applyLeftHits(&gameState,&gameSettings, hd,current_time_millis);
 }
 void blue_hit(){
     TargetHitData hd;
     hd.hits = 1;
-    applyRightHits(&gameState,&gameSettings,hd,1000);
+    applyRightHits(&gameState,&gameSettings,hd,current_time_millis);
 }
 
 void add_seconds(long seconds){
-    gameClock.addSeconds(seconds);
+    current_time_millis += (seconds*1000);
 }
 void update(){
-    updateGame(&gameState, gameSettings, (Clock*)(&gameClock));
-    updateMeters(&gameState, &gameSettings, &meters);
-    long current_time_millis = gameClock.milliseconds();
-    updateLeds(&meters,current_time_millis);
 
- 
+    updateGame(&gameState, gameSettings, current_time_millis);
+    updateMeters(&gameState, &gameSettings, &meters);
+    updateLeds(&meters,current_time_millis);
 }
 
 void setupMeters(){
@@ -106,8 +104,8 @@ void setup_game(GameType gt){
     gameSettings.hits.victory_margin =2;
     gameSettings.timed.max_duration_seconds= 60;
     gameSettings.timed.max_overtime_seconds = 20;
-    startGame(&gameState, &gameSettings, &gameClock);
-    gameClock.setTime(0);
+    startGame(&gameState, &gameSettings, current_time_millis);
+    current_time_millis = 0;
     update();
 }
 void test_game_setup(){

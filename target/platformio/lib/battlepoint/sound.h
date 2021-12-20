@@ -73,6 +73,7 @@ void sound_init(int rx_pin, int tx_pin);
 void sound_init_for_testing();
 void reset_sounds_for_new_game();
 void sound_play(int sound_id,long current_time_millis);
+void sound_play_once_in_game(int sound_id, long current_time_millis);
 void play_random_startup(long current_time_millis);
 void sound_gametime_update ( int seconds_remaining, long current_time_millis ); //intended to be called every 200 ms or so
 #define STATE_PLAYING 512
