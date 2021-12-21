@@ -131,11 +131,21 @@ void refreshDisplay();
 void stopGameAndReturnToMenu();
 void victoryDance(Team winner);
 void captureDance(Team capture);
+
+/*
+void handle_game_capture(Team t);
+void handle_game_ended(Team t);
+void handle_game_cancel();
+void handle_game_overtime();
+void handle_game_started(GameStatus status);
+void handle_game_contested();
+void handle_game_remainingsecs(int remaining_secs, GameStatus status);
+*/
 void IRAM_ATTR onTimer();
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
 ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC_BUTTON, 2,true);
-//ClickEncoderStream encStream(clickEncoder, 1); 
+
 
 double getBatteryVoltage(){
   int r = analogRead(Pins::VBATT);
@@ -175,31 +185,15 @@ void localUpdateGame(){
   if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
       gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;
   }
-     
-  if ( gameState.ownership.just_captured != Team::NOBODY){
-     captureDance(gameState.ownership.just_captured);
-     gameState.ownership.just_captured = Team::NOBODY;
-  }
-
-  if ( gameState.status == GAME_STATUS_OVERTIME ){
-    sound_play_once_in_game(SND_SOUNDS_0016_ANNOUNCER_OVERTIME,current_time_millis);
-  }
-  if ( gameState.status == GAME_STATUS_RUNNING ){
-    sound_play_once_in_game(SND_SOUNDS_0022_ANNOUNCER_TOURNAMENT_STARTED4,current_time_millis);
-  }
 
   if ( gameState.status == GameStatus::GAME_STATUS_ENDED ){
-    Log.warning("Game Over!");
-    
-    Log.warning("Winner=");
+    Log.warning("Game Over!");    
     if ( gameState.result.winner == Team::RED ||  gameState.result.winner == Team::BLU){
       sound_play(SND_SOUNDS_0023_ANNOUNCER_VICTORY,current_time_millis);
     }
     else{
       sound_play(SND_SOUNDS_0018_ANNOUNCER_SD_MONKEYNAUT_END_CRASH02,current_time_millis);
     }
-    
-    victoryDance(gameState.result.winner);
     gameOverDisplay(gameState);
     stopGameAndReturnToMenu();
   }
@@ -209,6 +203,8 @@ void localUpdateGame(){
 TickTwo updateDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
 TickTwo gameUpdateTimer(localUpdateGame, GAME_UPDATE_INTERVAL_MS );
 TickTwo diagnosticsDataTimer(updateHardwareInfo, HARDWARE_INFO_UPDATE_INTERVAL_MS);
+
+
 
 void setupLEDs(){
   FastLED.addLeds<NEOPIXEL, Pins::LED_TOP>(topLeds, 2* HORIONTAL_LED_SIZE);
@@ -275,10 +271,57 @@ Menu::result loadTargetTestSettings(){
   return Menu::proceed;
 }
 
-#define DURATION_SECS_MIN 1
-#define DURATION_SECS_MAX 500
-#define DURATION_SECS_BIG_STEP_SIZE 10
-#define DURATION_SECS_LITTLE_STEP_SIZE 1
+void handle_game_capture(Team t){
+  if ( t != Team::NOBODY){
+    captureDance(t);
+    sound_play(SND_SOUNDS_0025_ANNOUNCER_WE_CAPTURED_CONTROL,millis());
+  }
+}
+
+void handle_game_ended(Team winner){
+    if ( winner == Team::RED ||  winner == Team::BLU){
+      sound_play(SND_SOUNDS_0023_ANNOUNCER_VICTORY,millis());
+      victoryDance(winner);
+    }
+    else{
+      sound_play(SND_SOUNDS_0018_ANNOUNCER_SD_MONKEYNAUT_END_CRASH02,millis());
+    }
+}
+
+void handle_game_cancel(){
+  sound_play(SND_SOUNDS_0028_ENGINEER_SPECIALCOMPLETED10,millis() );
+}
+
+void handle_game_overtime(){
+  sound_play(SND_SOUNDS_0016_ANNOUNCER_OVERTIME,millis() );
+}
+
+void handle_game_started(GameStatus status){
+  if ( status == GAME_STATUS_PREGAME){
+    sound_play(SND_SOUNDS_0021_ANNOUNCER_TIME_ADDED,millis() );
+  }
+  else if ( status == GAME_STATUS_RUNNING){
+    sound_play(SND_SOUNDS_0022_ANNOUNCER_TOURNAMENT_STARTED4,millis() );
+  }
+}
+void handle_game_contested(){
+  sound_play(SND_SOUNDS_0002_ANNOUNCER_ALERT_CENTER_CONTROL_BEING_CONTESTED,millis() );
+}
+
+void handle_game_remainingsecs(int secs_remaining, GameStatus status){
+  sound_gametime_update(secs_remaining, millis() );
+}
+
+void setupEventHandlers(){
+  gamestate_init(&gameState);
+  gameState.eventHandler.CapturedHandler = handle_game_capture;
+  gameState.eventHandler.ContestedHandler = handle_game_contested;
+  gameState.eventHandler.EndedHandler = handle_game_ended;
+  gameState.eventHandler.OvertimeHandler =  handle_game_overtime;
+  gameState.eventHandler.StartedHandler = handle_game_started;
+  gameState.eventHandler.CancelledHandler = handle_game_cancel;
+  gameState.eventHandler.RemainingSecsHandler = handle_game_remainingsecs;
+} 
 
 //FIELD(var.name, title, units, min., max., step size,fine step size, action, events mask, styles)
 MENU(mostHitsSubMenu, "MostHits", loadMostHitsSettings, Menu::enterEvent, Menu::wrapStyle
@@ -608,7 +651,7 @@ void setup() {
   Menu::options->invertFieldKeys = false;
   Log.warningln("Complete.");
   oled.setFont(u8g2_font_7x13_mf);
-  
+  setupEventHandlers();
   setupMeters();
   POST();
   setupTargetScanners();  
@@ -619,7 +662,6 @@ void setup() {
   diagnosticsDataTimer.start();
   loadTargetTestSettings();
   sound_init_for_testing();
-  //startSelectedGame();
   refreshDisplay();
 }
 

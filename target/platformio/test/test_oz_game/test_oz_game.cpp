@@ -21,7 +21,7 @@ void test_in_progress_no_capture_yet(){
     state.time.timeExpired=false;
     state.time.overtimeExpired=false;
     updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
-    TEST_ASSERT_EQUAL(GameStatus::GAME_STATUS_RUNNING, state.status );    
+    TEST_ASSERT_EQUAL(GameStatus::GAME_STATUS_PREGAME, state.status );    
 }
 
 void test_in_progress_one_team_has_some_time(){
@@ -33,7 +33,7 @@ void test_in_progress_one_team_has_some_time(){
     state.time.timeExpired=false;
     state.time.overtimeExpired=false;
     updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
-    TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_RUNNING,state.status);    
+    TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_PREGAME,state.status);    
 }
 
 void test_clear_victory(){
@@ -115,7 +115,7 @@ void preTest(){
 }
 
 void setup() {
-    
+    gamestate_init(&state);
     delay(1000);
     Serial.begin(115200);
     Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);

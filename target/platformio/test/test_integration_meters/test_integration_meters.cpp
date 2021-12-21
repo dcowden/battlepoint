@@ -98,14 +98,15 @@ void setupMeters(){
   initMeter(meters.right,"right",rightLeds,0,7);
 }
 void setup_game(GameType gt){
-
+    gameSettings.timed.max_duration_seconds=20;
+    gameSettings.timed.countdown_start_seconds=1;
     gameSettings.gameType = gt;
     gameSettings.hits.to_win = 8;
     gameSettings.hits.victory_margin =2;
     gameSettings.timed.max_duration_seconds= 60;
     gameSettings.timed.max_overtime_seconds = 20;
     startGame(&gameState, &gameSettings, current_time_millis);
-    current_time_millis = 0;
+    current_time_millis = 2000;
     update();
 }
 void test_game_setup(){
@@ -193,6 +194,7 @@ void test_one_team_overtime(){
 }
 
 void setup() {
+    gamestate_init(&gameState);
     setupMeters();
     delay(1000);
     Serial.begin(115200);

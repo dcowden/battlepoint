@@ -61,7 +61,7 @@ void test_capture_with_current_owner(){
 
 
 void setup() {
-    
+    gamestate_init(&currentState);
     delay(1000);
     Serial.begin(115200);
     Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);

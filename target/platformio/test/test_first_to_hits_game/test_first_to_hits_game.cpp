@@ -20,7 +20,7 @@ void test_in_progress(){
     state.time.overtimeExpired=false;    
     updateFirstToHitsGame(&state,settings);
 
-    TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_RUNNING, state.status);    
+    TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_PREGAME, state.status);    
 
 }
 
@@ -77,7 +77,7 @@ void preTest(){
 }
 
 void setup() {
-    
+    gamestate_init(&state);
     delay(1000);
     Serial.begin(115200);
     Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);

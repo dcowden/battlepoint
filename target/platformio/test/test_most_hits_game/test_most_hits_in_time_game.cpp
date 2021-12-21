@@ -20,7 +20,7 @@ void test_in_progress(){
     state.time.overtimeExpired=false;
     updateMostHitsInTimeGame(&state,settings);
 
-    TEST_ASSERT_EQUAL( state.status, GameStatus::GAME_STATUS_RUNNING);    
+    TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_PREGAME, state.status);    
 
 }
 void test_in_progress_tied(){
@@ -32,7 +32,7 @@ void test_in_progress_tied(){
     state.time.overtimeExpired=false;
     updateMostHitsInTimeGame(&state,settings);
 
-    TEST_ASSERT_EQUAL( state.status, GameStatus::GAME_STATUS_RUNNING);    
+    TEST_ASSERT_EQUAL(  GameStatus::GAME_STATUS_PREGAME,state.status);    
 
 }
 void test_end_in_time(){
@@ -44,7 +44,7 @@ void test_end_in_time(){
     state.time.overtimeExpired=false;
     updateMostHitsInTimeGame(&state,settings);
     
-    TEST_ASSERT_EQUAL( state.status, GameStatus::GAME_STATUS_OVERTIME);    
+    TEST_ASSERT_EQUAL(GameStatus::GAME_STATUS_OVERTIME,state.status);    
 
 }
 
@@ -85,7 +85,7 @@ void preTest(){
 }
 
 void setup() {
-    
+    gamestate_init(&state);
     delay(1000);
     Serial.begin(115200);
     Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);

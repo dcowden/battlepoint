@@ -29,6 +29,7 @@ typedef enum {
 } GameSettingSlot;
 
 
+
 typedef enum {
     GAME_TYPE_KOTH_FIRST_TO_HITS=0,
     GAME_TYPE_KOTH_MOST_HITS_IN_TIME=1,
@@ -37,7 +38,6 @@ typedef enum {
     GAME_TYPE_ATTACK_DEFEND=4,
     GAME_TYPE_TARGET_TEST=5,
     GAME_TYPE_UNSELECTED=6,
-
 } GameType;
 
 typedef struct {
@@ -66,6 +66,7 @@ typedef struct {
     CaptureSettings capture;
     HitCounts hits;
 } GameSettings;
+
 
 
 //////////////////////////////////////
@@ -119,10 +120,27 @@ typedef struct {
     long overtime_remaining_millis = 0;
     long last_hit_millis=0;
     long last_decay_millis=0;
-
-    //TODO: this is a poor-mans event. its done this way so the display can update
-    Team just_captured=Team::NOBODY;
 } Ownership;
+
+typedef   void (*endedHandler)(Team);
+typedef   void (*startedHandler)(GameStatus);
+typedef   void (*overtimeHandler)(void);
+typedef   void (*capturedHandler)(Team);
+typedef   void (*contestedHandler)(void);
+typedef   void (*cancelledHandler)(void);
+typedef   void (*remainingsecsHandler)(int,GameStatus);
+
+
+typedef struct {
+   endedHandler EndedHandler;
+   startedHandler StartedHandler;
+   overtimeHandler OvertimeHandler;
+   capturedHandler CapturedHandler;
+   contestedHandler ContestedHandler;
+   cancelledHandler CancelledHandler;
+   remainingsecsHandler RemainingSecsHandler;
+} EventHandler;
+
 
 //TODO: making hit tracker separate objects would make it easier to factor
 //red/blu functions into single methods, vs left/right versions
@@ -135,10 +153,12 @@ typedef struct {
     HitTracker bluHits;
     Ownership ownership;
     TargetHitData lastHit;
+    EventHandler eventHandler;
 } GameState;
 
-void setDefaultGameSettings(GameSettings* settings  );
+void setDefaultGameSettings(GameSettings* settings );
 void startGame(GameState* gs, GameSettings* settings, long current_time_millis);
+void gamestate_init(GameState* state);
 
 //exposed for testing
 void updateGameTime(GameState* current,GameSettings settings, long current_time_millis);

@@ -37,6 +37,47 @@ const char* getCharForGameType(GameType t){
     }
 }
 
+void default_handle_game_capture(Team t){}
+void default_handle_game_ended(Team winner){}
+void default_handle_game_cancel(){}
+void default_handle_game_overtime(){}
+void default_handle_game_started(GameStatus status){}
+void default_handle_game_contested(){}
+void default_handle_game_remainingsecs(int secs_remaining, GameStatus status){}
+
+void gamestate_init(GameState* state){
+    state->time.elapsed_secs=0;
+    state->time.last_update_millis=0;
+    state->time.start_time_millis = 0;
+    state->time.remaining_secs=0;
+    state->time.timeExpired=false;
+    state->time.overtimeExpired=false;
+    state->bluHits.hits = 0;
+    state->bluHits.last_decay_millis = 0;
+    state->bluHits.last_hit_millis = 0;
+    state->redHits.hits = 0;
+    state->redHits.last_decay_millis = 0;
+    state->redHits.last_hit_millis = 0;    
+    state->status = GameStatus::GAME_STATUS_PREGAME;
+    state->result.winner = Team::NOBODY;
+    state->ownership.blu_millis = 0;
+    state->ownership.red_millis = 0;
+    state->ownership.owner = Team::NOBODY;
+    state->ownership.capturing = Team::NOBODY;
+    state->ownership.capture_hits = 0;
+    state->ownership.overtime_remaining_millis=0;
+    state->ownership.last_decay_millis=0;
+    state->ownership.last_hit_millis=0;
+    
+    state->eventHandler.CapturedHandler = default_handle_game_capture;
+    state->eventHandler.ContestedHandler = default_handle_game_contested;
+    state->eventHandler.EndedHandler = default_handle_game_ended;
+    state->eventHandler.OvertimeHandler =  default_handle_game_overtime;
+    state->eventHandler.StartedHandler = default_handle_game_started;
+    state->eventHandler.CancelledHandler = default_handle_game_cancel;
+    state->eventHandler.RemainingSecsHandler = default_handle_game_remainingsecs;     
+}
+
 Team getWinnerByHitsWithVictoryMargin(int red_hits, int blu_hits, int hits_to_win, int victory_margin){
     bool redWins = (red_hits >= hits_to_win ) && (red_hits >= (blu_hits + victory_margin));
     bool bluWins = (blu_hits >= hits_to_win ) && (blu_hits >= (red_hits + victory_margin));
@@ -308,6 +349,7 @@ void startGame(GameState* gs, GameSettings* settings, long current_time_millis){
     if ( settings->gameType == GAME_TYPE_ATTACK_DEFEND){
         gs->ownership.capturing = Team::BLU;  
     }
+    gs->eventHandler.StartedHandler(GAME_STATUS_PREGAME);
 
 }
 
@@ -406,19 +448,15 @@ void updateGameTime(GameState* current,GameSettings settings, long current_time_
 
     long second_elapsed_since_start = (current_time_millis - current->time.start_time_millis)/1000;
     long elapsed_sec = second_elapsed_since_start - settings.timed.countdown_start_seconds;
-    current->time.elapsed_secs= elapsed_sec;
-    if ( elapsed_sec < 0 ){
-        current->time.remaining_secs = elapsed_sec;
-    }
-    else{
-        //game has started. 
-        current->time.remaining_secs =(settings.timed.max_duration_seconds - elapsed_sec);
-    }
-
+    current->time.elapsed_secs= elapsed_sec;   
     bool isExpired = false;
     bool isOvertimeExpired = false;
 
     if ( elapsed_sec >= 0){
+        current->time.remaining_secs =(settings.timed.max_duration_seconds - elapsed_sec);
+        if ( current->status == GAME_STATUS_PREGAME){
+            current->eventHandler.StartedHandler(GAME_STATUS_RUNNING);
+        }
         current->status = GAME_STATUS_RUNNING;
         if ( settings.timed.max_duration_seconds > 0){
             if ( elapsed_sec > settings.timed.max_duration_seconds){
@@ -430,17 +468,19 @@ void updateGameTime(GameState* current,GameSettings settings, long current_time_
         }
     }
     else{
+        current->time.remaining_secs = elapsed_sec;
         current->status = GAME_STATUS_PREGAME;
     }
-
+    current->eventHandler.RemainingSecsHandler(current->time.remaining_secs,current->status);
     current->time.timeExpired = isExpired;
     current->time.overtimeExpired = isOvertimeExpired;
-    
 }
 
 void endGame( GameState* current, Team winner){
     current->result.winner = winner;
     current->status = GameStatus::GAME_STATUS_ENDED;
+    Log.infoln("Ending Game");
+    current->eventHandler.EndedHandler(winner);
 }
 
 void endGameWithMostHits(GameState* current, int red_hits, int blu_hits ){
@@ -467,6 +507,12 @@ void endGameWithMostOwnership(GameState* current){
     }
 }
 
+void triggerOvertime(GameState* current,  GameSettings settings){
+    current->status = GameStatus::GAME_STATUS_OVERTIME;
+    Log.infoln("Overtime Triggered!");
+    current->ownership.overtime_remaining_millis = settings.capture.capture_overtime_seconds;
+    current->eventHandler.OvertimeHandler();
+}
 
 void updateFirstToHitsGame(GameState* current,  GameSettings settings){
 
@@ -511,7 +557,7 @@ void updateFirstToHitsGame(GameState* current,  GameSettings settings){
         endGameWithMostHits(current,red_hits, blu_hits);
     }
     else if ( closeToWinner != Team::NOBODY){
-        current->status = GameStatus::GAME_STATUS_OVERTIME;
+        triggerOvertime(current,settings);
     }
 
 }
@@ -555,12 +601,9 @@ void updateMostHitsInTimeGame(GameState* current,  GameSettings settings){
     else if ( current->time.timeExpired ){
         if ( winner != Team::NOBODY){
             endGame(current, winner);
-        }
-        else if ( closeToWinner != Team::NOBODY){
-            current->status = GameStatus::GAME_STATUS_OVERTIME;
-        }        
+        }     
         else{
-            current->status = GameStatus::GAME_STATUS_OVERTIME;    
+            triggerOvertime(current,settings);    
         }
     }
 
@@ -593,11 +636,12 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings, long cur
     */
 
     applyHitDecay(current, settings,current_time_millis);
-
+    Log.infoln("Applying Hits");
     int total_hits = current->ownership.capture_hits;
     int hits_to_capture = settings.capture.hits_to_capture;
 
     if ( total_hits >= hits_to_capture){
+        Log.infoln("AD: %d/%d hits, game over!", total_hits, hits_to_capture);
         endGame(current, Team::BLU);
     }
     else if ( current->time.overtimeExpired){
@@ -605,24 +649,21 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings, long cur
     }
     else if ( current->time.timeExpired ){
         if ( total_hits > (hits_to_capture - settings.hits.victory_margin) ){
-            current->status = GameStatus::GAME_STATUS_OVERTIME;
+            triggerOvertime(current,settings);
         }
         else{
             endGame(current, Team::RED);
         }
     } 
 }
-void triggerOvertime(GameState* current,  GameSettings settings){
-    Log.infoln("Overtime Triggered!");
-    current->ownership.overtime_remaining_millis = settings.capture.capture_overtime_seconds;
-}
+
 
 void capture(GameState* current,  Team capturingTeam){
     current->ownership.owner = capturingTeam;
     Log.infoln("Control Point has been captured by: %c", teamTextChar(capturingTeam));
     current->ownership.capturing = oppositeTeam(capturingTeam);      
-    current->ownership.just_captured = capturingTeam;
     current->ownership.capture_hits = 0;
+    current->eventHandler.CapturedHandler(capturingTeam);
 }
 
 void updateOwnership(GameState* current,  GameSettings settings, long current_time_millis){
@@ -732,7 +773,7 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
     else if ( isTimeExpired ){
         if ( isContested){
             Log.infoln("Time is expired, but point is still contested.");
-            current->status = GameStatus::GAME_STATUS_OVERTIME;
+            triggerOvertime(current,settings);
         }
         else{
             Log.infoln("Time is expired, ending with most ownership");
@@ -742,7 +783,7 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
     else if ( blue_time_complete ){
         if ( isContested ){
             Log.infoln("Blue is about to win, but we are in overtime");
-            current->status = GameStatus::GAME_STATUS_OVERTIME;
+            triggerOvertime(current,settings);
         }
         else{
             Log.infoln("Blue wins");
@@ -752,7 +793,7 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
     else if ( red_time_complete ){
         if ( isContested ){
             Log.infoln("Red is about to win, but we are in overtime");
-            current->status = GameStatus::GAME_STATUS_OVERTIME;
+            triggerOvertime(current,settings);
         }
         else{
             Log.infoln("Red wins");

@@ -55,7 +55,7 @@ void test_no_decay_with_zero_decay_rate(){
 
 
 void setup() {
-    
+    gamestate_init(&currentState);
     delay(1000);
     Serial.begin(115200);
     Log.begin(LOG_LEVEL_INFO, &Serial, true);
