@@ -142,9 +142,7 @@ typedef struct {
 } EventHandler;
 
 
-//TODO: making hit tracker separate objects would make it easier to factor
-//red/blu functions into single methods, vs left/right versions
-//see applyLeftHits, applyRightHits, etc
+
 typedef struct {
     GameStatus status;
     GameResult result;
