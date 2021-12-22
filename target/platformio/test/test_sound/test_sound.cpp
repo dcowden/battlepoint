@@ -8,9 +8,6 @@ void test_init(void){
     sound_init_for_testing();
 }
 
-int timesPlayed(int sound_id){
-   return soundState.sound_config[sound_id].times_played;
-}
 void test_game_sounds_trigger(void){
     sound_init_for_testing();
     
@@ -33,13 +30,13 @@ void test_game_sounds_trigger(void){
         current_time_millis += UPDATE_INTERVAL_MS;        
     }
 
-    TEST_ASSERT_TRUE(timesPlayed(SND_SOUNDS_ANNOUNCER_ENDS_10SEC) == 1);
-    TEST_ASSERT_TRUE(timesPlayed(SND_SOUNDS_ANNOUNCER_ENDS_20SEC) == 1);    
-    TEST_ASSERT_TRUE(timesPlayed(SND_SOUNDS_ANNOUNCER_ENDS_2MIN) == 0);
-    TEST_ASSERT_TRUE(timesPlayed(SND_SOUNDS_ANNOUNCER_ENDS_20SEC) == 1);
-    TEST_ASSERT_TRUE(timesPlayed(SND_SOUNDS_ANNOUNCER_ENDS_30SEC) == 1);
-    TEST_ASSERT_TRUE(timesPlayed(SND_SOUNDS_ANNOUNCER_ENDS_5SEC) == 1);
-    TEST_ASSERT_TRUE(timesPlayed(SND_SOUNDS_ANNOUNCER_ENDS_6SEC) == 1);        
+    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_10SEC) == 1);
+    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_20SEC) == 1);    
+    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_2MIN) == 0);
+    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_20SEC) == 1);
+    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_30SEC) == 1);
+    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_5SEC) == 1);
+    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_6SEC) == 1);        
 }
 
 void setup() {

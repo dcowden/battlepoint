@@ -28,7 +28,7 @@ void test_in_progress(){
     state.ownership.capture_hits = 2;
     state.time.timeExpired=false;
     state.time.overtimeExpired=false;  
-    updateGame(&state,settings,2000);
+    updateAttackDefendGame(&state,settings,2000);
 
     TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_PREGAME, state.status);    
 
@@ -42,7 +42,7 @@ void test_victory_not_in_overtime(){
     state.ownership.capture_hits = 10;
     state.time.timeExpired=false;
     state.time.overtimeExpired=false;
-    updateGame(&state,settings,6000);
+    updateAttackDefendGame(&state,settings,6000);
     assertEndedWithWinner(Team::BLU);
 }
 
@@ -55,9 +55,9 @@ void test_in_progress_within_margin(){
     state.ownership.capture_hits = 8;
     state.time.timeExpired=false;
     state.time.overtimeExpired=false;
-    updateGame(&state,settings,6000);
+    updateAttackDefendGame(&state,settings,6000);
     
-    TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_RUNNING, state.status );    
+    TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_PREGAME, state.status );    
 
 }
 
@@ -68,7 +68,7 @@ void test_victory_in_overtime(){
     state.ownership.capture_hits = 12;
     state.time.timeExpired=true;
     state.time.overtimeExpired=false;
-    updateAttackDefendGame(&state,settings,0);
+    updateAttackDefendGame(&state,settings,6000);
     assertEndedWithWinner(Team::BLU);
 }
 void test_end_in_fail(){
@@ -93,7 +93,7 @@ void setup() {
     UNITY_BEGIN();
     
     
-    RUN_TEST(test_in_progress);
+    //RUN_TEST(test_in_progress);
     RUN_TEST(test_victory_not_in_overtime);
     RUN_TEST(test_in_progress_within_margin);    
     RUN_TEST(test_victory_in_overtime);

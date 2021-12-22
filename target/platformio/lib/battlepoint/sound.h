@@ -1,6 +1,6 @@
 #ifndef __INC_SOUND_H
 #define __INC_SOUND_H
-
+#include <Teams.h>
 
 #define SND_SOUNDS_0001_ANNOUNCER_ALERT    1 /* sounds/0001_announcer_alert.mp3 */
 #define SND_SOUNDS_0002_ANNOUNCER_ALERT_CENTER_CONTROL_BEING_CONTESTED    2 /* sounds/0002_announcer_alert_center_control_being_contested.mp3 */
@@ -69,11 +69,13 @@ typedef struct {
     SoundConfig  sound_config[NUM_SOUNDS];
 } SoundState;
 
+int sound_times_played(int sound_id);
 void sound_init(int rx_pin, int tx_pin);
 void sound_init_for_testing();
 void reset_sounds_for_new_game();
 void sound_play(int sound_id,long current_time_millis);
 void sound_play_once_in_game(int sound_id, long current_time_millis);
+void sound_play_victory(Team winner,long current_time_millis);
 void play_random_startup(long current_time_millis);
 void sound_gametime_update ( int seconds_remaining, long current_time_millis ); //intended to be called every 200 ms or so
 #define STATE_PLAYING 512

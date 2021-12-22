@@ -5,7 +5,7 @@
 #include <FastLED.h>
 #include <Clock.h>
 #include <ArduinoLog.h>
-
+#include <sound.h> 
 /**
  * In this integration test, the game logic, update loop, and meter updates are tested
  * the only thing not included is the target scanning.
@@ -28,7 +28,6 @@ CRGB TEAM_COLORS[VERTICAL_LED_SIZE] = {CRGB::Red, CRGB::Red,CRGB::Red, CRGB::Red
 
 GameState gameState;
 GameSettings gameSettings;
-//SensorState sensorState;
 
 long current_time_millis = 0;
 
@@ -79,6 +78,29 @@ void update(){
     updateLeds(&meters,current_time_millis);
 }
 
+void handle_game_start(GameStatus status){
+    if ( status == GameStatus::GAME_STATUS_PREGAME){
+        sound_play(SND_SOUNDS_0021_ANNOUNCER_TIME_ADDED,current_time_millis);
+    }
+    else{
+        sound_play(SND_SOUNDS_0022_ANNOUNCER_TOURNAMENT_STARTED4,current_time_millis);
+    }
+    
+}
+void handle_game_end(Team winner){
+    sound_play_victory(winner,current_time_millis);
+}
+
+void handle_game_seconds_update(int secs, GameStatus status){
+    sound_gametime_update(secs,current_time_millis);
+}
+
+void setupHandlers(){
+    gameState.eventHandler.RemainingSecsHandler=handle_game_seconds_update;
+    gameState.eventHandler.StartedHandler=handle_game_start;
+    gameState.eventHandler.EndedHandler=handle_game_end;
+}
+
 void setupMeters(){
   //probably this should be factored, since is necessary for both the tests and any reasonable user
   meters.leftTop = &leftTopMeter;
@@ -99,7 +121,7 @@ void setupMeters(){
 }
 void setup_game(GameType gt){
     gameSettings.timed.max_duration_seconds=20;
-    gameSettings.timed.countdown_start_seconds=1;
+    gameSettings.timed.countdown_start_seconds=2;
     gameSettings.gameType = gt;
     gameSettings.hits.to_win = 8;
     gameSettings.hits.victory_margin =2;
@@ -119,6 +141,35 @@ void test_game_setup(){
     ASSERT_LEDS_EQUAL(TEAM_COLORS,bottomLeds,VERTICAL_LED_SIZE,"bottom team colors");
 }
 
+void test_game_time_progression(){
+    current_time_millis=1000;
+    gameSettings.timed.max_duration_seconds=20;
+    gameSettings.timed.max_overtime_seconds=5;
+    gameSettings.timed.ownership_time_seconds=5;
+    gameSettings.timed.countdown_start_seconds=6;
+    gameSettings.gameType =  GameType::GAME_TYPE_ATTACK_DEFEND;
+    startGame(&gameState,&gameSettings,current_time_millis);
+    for ( int i=0;i<80;i++){
+        current_time_millis += 500;
+        update();
+    }
+    TEST_ASSERT_EQUAL(GameStatus::GAME_STATUS_ENDED, gameState.status);
+    TEST_ASSERT_EQUAL(Team::RED, gameState.result.winner);
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_0021_ANNOUNCER_TIME_ADDED));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_ANNOUNCER_BEGINS_5SEC));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_ANNOUNCER_BEGINS_4SEC));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_ANNOUNCER_BEGINS_3SEC));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_ANNOUNCER_BEGINS_2SEC));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_ANNOUNCER_BEGINS_1SEC));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_0022_ANNOUNCER_TOURNAMENT_STARTED4));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_10SEC));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_5SEC));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_4SEC));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_3SEC));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_2SEC));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_1SEC));
+    TEST_ASSERT_EQUAL(1, sound_times_played(SND_SOUNDS_0023_ANNOUNCER_VICTORY));
+}
 void test_one_team_wins_no_ot(){
 
     setup_game(GameType::GAME_TYPE_KOTH_FIRST_TO_HITS);
@@ -159,6 +210,7 @@ void test_one_team_wins_no_ot(){
 void test_one_team_overtime(){
 
     setup_game(GameType::GAME_TYPE_KOTH_FIRST_TO_HITS);
+
     Log.traceln("Setup Complete");
 
     for(int i=0;i<7;i++){
@@ -192,18 +244,28 @@ void test_one_team_overtime(){
     TEST_ASSERT_EQUAL_MESSAGE(meters.leftBottom->flash_interval_millis, FLASH_SLOW,"leftBottom should flash fast");
     TEST_ASSERT_EQUAL_MESSAGE(meters.leftTop->flash_interval_millis, FLASH_SLOW,"leftTop should flash fast");    
 }
+void preTest(){
+    current_time_millis = 0;
+    gamestate_init(&gameState);
+    setupHandlers();
+    reset_sounds_for_new_game();
+}
 
 void setup() {
-    gamestate_init(&gameState);
+    sound_init_for_testing();
+    setupHandlers();
     setupMeters();
     delay(1000);
     Serial.begin(115200);
-    Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
+    Log.begin(LOG_LEVEL_INFO, &Serial, true);
     UNITY_BEGIN();
 
     //simple meter tests
+    //preTest();
     //RUN_TEST(test_game_setup);
-    RUN_TEST(test_one_team_wins_no_ot);
+    preTest();
+    RUN_TEST(test_game_time_progression);
+    //RUN_TEST(test_one_team_wins_no_ot);
     //RUN_TEST(test_one_team_overtime);
 
     UNITY_END();

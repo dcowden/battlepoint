@@ -1,6 +1,7 @@
 #include <sound.h>
 #include "HardwareSerial.h"
 #include "DFRobotDFPlayerMini.h"
+#include <Teams.h>
 
 HardwareSerial mySoftwareSerial(1);
 DFRobotDFPlayerMini myDFPlayer;
@@ -33,6 +34,10 @@ void setup_sound_triggers(){
     soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_8SEC].game_secs_trigger = 8;
     soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_9SEC].game_secs_trigger = 9;
    
+}
+
+int sound_times_played(int sound_id){
+   return soundState.sound_config[sound_id].times_played;
 }
 
 void _init_dfplayer(int rx_pin, int tx_pin){
@@ -128,6 +133,15 @@ void sound_gametime_update ( int game_seconds_remaining , long current_time_mill
           sound_play_once_in_game(i,current_time_millis);
        }
    }   
+}
+
+void sound_play_victory(Team winner,long current_time_millis){
+    if ( winner == Team::BLU || winner == Team::RED){
+        sound_play(SND_SOUNDS_0023_ANNOUNCER_VICTORY,current_time_millis);
+    }  
+    else{
+        sound_play(SND_SOUNDS_0028_ENGINEER_SPECIALCOMPLETED10,current_time_millis);
+    }
 }
 
 void play_random_startup(long current_time_millis){
