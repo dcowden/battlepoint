@@ -120,6 +120,9 @@ void setupMeters(){
   initMeter(meters.right,"right",rightLeds,0,7);
 }
 void setup_game(GameType gt){
+    gamestate_init(&gameState);
+    setupHandlers();
+    reset_sounds_for_new_game();    
     gameSettings.timed.max_duration_seconds=20;
     gameSettings.timed.countdown_start_seconds=2;
     gameSettings.gameType = gt;
@@ -129,20 +132,11 @@ void setup_game(GameType gt){
     gameSettings.timed.max_overtime_seconds = 20;
     startGame(&gameState, &gameSettings, current_time_millis);
     current_time_millis = 2000;
-    update();
-}
-void test_game_setup(){
-
-    setup_game(GameType::GAME_TYPE_KOTH_FIRST_TO_HITS);
-    ASSERT_LEDS_EQUAL(ALL_BLACK,leftLeds,VERTICAL_LED_SIZE,"Left Black");
-    ASSERT_LEDS_EQUAL(ALL_BLACK,rightLeds,VERTICAL_LED_SIZE,"Right Black");
-    ASSERT_LEDS_EQUAL(ALL_BLACK,centerLeds,VERTICAL_LED_SIZE,"Center Black");
-    ASSERT_LEDS_EQUAL(TEAM_COLORS,topLeds,VERTICAL_LED_SIZE,"top Team Colors");
-    ASSERT_LEDS_EQUAL(TEAM_COLORS,bottomLeds,VERTICAL_LED_SIZE,"bottom team colors");
+    Log.traceln("Setup Complete");    
 }
 
 void test_game_time_progression(){
-    current_time_millis=1000;
+    setup_game(GameType::GAME_TYPE_KOTH_FIRST_TO_HITS);
     gameSettings.timed.max_duration_seconds=20;
     gameSettings.timed.max_overtime_seconds=5;
     gameSettings.timed.ownership_time_seconds=5;
@@ -173,7 +167,12 @@ void test_game_time_progression(){
 void test_one_team_wins_no_ot(){
 
     setup_game(GameType::GAME_TYPE_KOTH_FIRST_TO_HITS);
-    Log.traceln("Setup Complete");
+    gameSettings.timed.max_duration_seconds=200;
+    gameSettings.timed.max_overtime_seconds=30;
+    gameSettings.timed.ownership_time_seconds=30;
+    gameSettings.timed.countdown_start_seconds=20;
+    gameSettings.gameType =  GameType::GAME_TYPE_ATTACK_DEFEND;
+    startGame(&gameState,&gameSettings,current_time_millis);
 
     add_seconds(5);
     red_hit();
@@ -211,8 +210,6 @@ void test_one_team_overtime(){
 
     setup_game(GameType::GAME_TYPE_KOTH_FIRST_TO_HITS);
 
-    Log.traceln("Setup Complete");
-
     for(int i=0;i<7;i++){
         add_seconds(5);
         red_hit();
@@ -241,15 +238,10 @@ void test_one_team_overtime(){
 
     TEST_ASSERT_EQUAL_MESSAGE(meters.rightBottom->flash_interval_millis, FLASH_FAST,"rightBottom should flash slow");
     TEST_ASSERT_EQUAL_MESSAGE(meters.rightTop->flash_interval_millis, FLASH_FAST,"rightTop should flash");
-    TEST_ASSERT_EQUAL_MESSAGE(meters.leftBottom->flash_interval_millis, FLASH_SLOW,"leftBottom should flash fast");
+    TEST_ASSERT_EQUAL_MESSAGE(meters.leftBottom->flash_interval_millis, FLASH_SLOW,"leftBottom should flash slow");
     TEST_ASSERT_EQUAL_MESSAGE(meters.leftTop->flash_interval_millis, FLASH_SLOW,"leftTop should flash fast");    
 }
-void preTest(){
-    current_time_millis = 0;
-    gamestate_init(&gameState);
-    setupHandlers();
-    reset_sounds_for_new_game();
-}
+
 
 void setup() {
     sound_init_for_testing();
@@ -259,15 +251,9 @@ void setup() {
     Serial.begin(115200);
     Log.begin(LOG_LEVEL_INFO, &Serial, true);
     UNITY_BEGIN();
-
-    //simple meter tests
-    //preTest();
-    //RUN_TEST(test_game_setup);
-    preTest();
     RUN_TEST(test_game_time_progression);
     //RUN_TEST(test_one_team_wins_no_ot);
     //RUN_TEST(test_one_team_overtime);
-
     UNITY_END();
 
 }
