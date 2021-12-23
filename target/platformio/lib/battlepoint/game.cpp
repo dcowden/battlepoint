@@ -45,21 +45,51 @@ void default_handle_game_started(GameStatus status){}
 void default_handle_game_contested(){}
 void default_handle_game_remainingsecs(int secs_remaining, GameStatus status){}
 
-void gamestate_init(GameState* state){
+void supplyDefaultHandlers(GameState* state){
+    if ( state->eventHandler.CapturedHandler == 0 ){
+        state->eventHandler.CapturedHandler = default_handle_game_capture;
+    }
+    if ( state->eventHandler.ContestedHandler == 0 ){
+        state->eventHandler.ContestedHandler = default_handle_game_contested;
+    }
+    if ( state->eventHandler.EndedHandler == 0 ){
+        state->eventHandler.EndedHandler = default_handle_game_ended;
+    }
+    if ( state->eventHandler.OvertimeHandler == 0 ){
+        state->eventHandler.OvertimeHandler = default_handle_game_overtime;
+    }
+    if ( state->eventHandler.StartedHandler == 0 ){
+        state->eventHandler.StartedHandler = default_handle_game_started;
+    }
+    if ( state->eventHandler.CancelledHandler == 0 ){
+        state->eventHandler.CancelledHandler = default_handle_game_cancel;
+    }
+    if ( state->eventHandler.RemainingSecsHandler == 0 ){
+        state->eventHandler.RemainingSecsHandler = default_handle_game_remainingsecs;
+    }
+}
+
+void resetGame(GameState* state){
+    state->status = GameStatus::GAME_STATUS_PREGAME;
+
     state->time.elapsed_secs=0;
     state->time.last_update_millis=0;
     state->time.start_time_millis = 0;
     state->time.remaining_secs=0;
     state->time.timeExpired=false;
     state->time.overtimeExpired=false;
+    
+    state->result.winner = Team::NOBODY;
+
     state->bluHits.hits = 0;
     state->bluHits.last_decay_millis = 0;
     state->bluHits.last_hit_millis = 0;
+    state->bluHits.last_hit_energy = 0;
     state->redHits.hits = 0;
     state->redHits.last_decay_millis = 0;
     state->redHits.last_hit_millis = 0;    
-    state->status = GameStatus::GAME_STATUS_PREGAME;
-    state->result.winner = Team::NOBODY;
+    state->redHits.last_hit_energy = 0;
+    
     state->ownership.blu_millis = 0;
     state->ownership.red_millis = 0;
     state->ownership.owner = Team::NOBODY;
@@ -67,15 +97,21 @@ void gamestate_init(GameState* state){
     state->ownership.capture_hits = 0;
     state->ownership.overtime_remaining_millis=0;
     state->ownership.last_decay_millis=0;
-    state->ownership.last_hit_millis=0;
-    
-    state->eventHandler.CapturedHandler = default_handle_game_capture;
-    state->eventHandler.ContestedHandler = default_handle_game_contested;
-    state->eventHandler.EndedHandler = default_handle_game_ended;
-    state->eventHandler.OvertimeHandler =  default_handle_game_overtime;
-    state->eventHandler.StartedHandler = default_handle_game_started;
-    state->eventHandler.CancelledHandler = default_handle_game_cancel;
-    state->eventHandler.RemainingSecsHandler = default_handle_game_remainingsecs;     
+    state->ownership.last_hit_millis=0; 
+}
+
+void startGame(GameState* gs, GameSettings* settings, long current_time_millis){
+    resetGame(gs);
+    supplyDefaultHandlers(gs);
+    gs->time.start_time_millis = current_time_millis;
+    gs->bluHits.last_decay_millis = current_time_millis;
+    gs->redHits.last_decay_millis = current_time_millis;
+    gs->status = GameStatus::GAME_STATUS_PREGAME;
+    if ( settings->gameType == GAME_TYPE_ATTACK_DEFEND){
+        gs->ownership.capturing = Team::BLU;  
+    }
+    gs->eventHandler.StartedHandler(GAME_STATUS_PREGAME);
+
 }
 
 Team getWinnerByHitsWithVictoryMargin(int red_hits, int blu_hits, int hits_to_win, int victory_margin){
@@ -158,9 +194,6 @@ void updateMetersForRunningGame(GameState* game, GameSettings* settings, MeterSe
         setMeterValues( meters->right, game->bluHits.hits, settings->hits.to_win, CRGB::Blue, CRGB::Black );
     }
     else if ( settings->gameType == GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME ){
-        setMeterValues( meters->left, game->time.elapsed_secs, settings->timed.max_duration_seconds, CRGB::Red, CRGB::Black );
-        setMeterValues( meters->right, game->time.elapsed_secs, settings->timed.max_duration_seconds, CRGB::Blue, CRGB::Black );
-
         int total_hits = game->bluHits.hits + game->redHits.hits;
         if ( total_hits  > 0 ){
             setMeterValues(meters->center, game->redHits.hits, total_hits, CRGB::Red, CRGB::Blue);
@@ -321,18 +354,7 @@ void setupMeters(GameState* gs, GameSettings* settings, MeterSettings* meters){
 }
 
 
-void startGame(GameState* gs, GameSettings* settings, long current_time_millis){
 
-    gs->time.start_time_millis = current_time_millis;
-    gs->bluHits.last_decay_millis = current_time_millis;
-    gs->redHits.last_decay_millis = current_time_millis;
-    gs->status = GameStatus::GAME_STATUS_PREGAME;
-    if ( settings->gameType == GAME_TYPE_ATTACK_DEFEND){
-        gs->ownership.capturing = Team::BLU;  
-    }
-    gs->eventHandler.StartedHandler(GAME_STATUS_PREGAME);
-
-}
 
 void applyHitsTo (GameType gameType, TargetHitData hitdata, HitTracker* hits, Ownership* ownership, Team capturing, long current_time_millis){
     if ( hitdata.hits > 0 ){
@@ -507,7 +529,7 @@ void updateFirstToHitsGame(GameState* current,  GameSettings settings){
     */
     int red_hits = current->redHits.hits;
     int blu_hits = current->bluHits.hits;
-    Log.traceln("RedHits=%d, BluHits=%d",red_hits,blu_hits);
+    Log.infoln("RedHits=%d, BluHits=%d",red_hits,blu_hits);
 
     Team winner = getWinnerByHitsWithVictoryMargin(red_hits, blu_hits, settings.hits.to_win, settings.hits.victory_margin );
     Team closeToWinner = getWinnerByHitsWithoutVictoryMargin(red_hits,blu_hits,settings.hits.to_win);
@@ -555,7 +577,7 @@ void updateMostHitsInTimeGame(GameState* current,  GameSettings settings){
     
 
     Team winner = getWinnerByHitsWithVictoryMargin(red_hits, blu_hits, settings.hits.to_win, settings.hits.victory_margin );
-    Team closeToWinner = getWinnerByHitsWithoutVictoryMargin(red_hits,blu_hits,settings.hits.to_win);
+    //Team closeToWinner = getWinnerByHitsWithoutVictoryMargin(red_hits,blu_hits,settings.hits.to_win);
 
     if ( current->time.overtimeExpired ){
         endGameWithMostHits(current,red_hits, blu_hits);
@@ -599,6 +621,7 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings, long cur
     applyHitDecay(current, settings,current_time_millis);
     int total_hits = current->ownership.capture_hits;
     int hits_to_capture = settings.capture.hits_to_capture;
+    Log.infoln("AD: %d/%d hits", total_hits, hits_to_capture);
     if ( total_hits >= hits_to_capture){
         Log.infoln("AD: %d/%d hits, game over!", total_hits, hits_to_capture);
         endGame(current, Team::BLU);

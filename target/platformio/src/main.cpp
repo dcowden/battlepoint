@@ -457,7 +457,6 @@ void startSelectedGame(){
 
   enable(&leftScanner);
   enable(&rightScanner);
-
   startGame(&gameState, &gameSettings,current_time_millis);
   sound_play_once_in_game(SND_SOUNDS_0021_ANNOUNCER_TIME_ADDED,current_time_millis);
   Log.traceln("Meter States:");
@@ -482,6 +481,7 @@ void stopGameAndReturnToMenu(){
   oled.clear();
   nav.idleOff();  
   nav.refresh();
+  refreshDisplay();
   programMode = PROGRAM_MODE_MENU;
 }
 

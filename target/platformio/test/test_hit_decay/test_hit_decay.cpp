@@ -3,9 +3,16 @@
 #include <game.h>
 #include <ArduinoLog.h>
 
+long current_time_ms = 0;
 
 GameSettings settings;
 GameState currentState;
+
+void preTest(){
+    settings.gameType = GameType::GAME_TYPE_ATTACK_DEFEND;
+    startGame(&currentState,&settings,current_time_ms);
+}
+
 
 void rollTimeForward(long milliseconds_start, int milliseconds_interval, long milliseconds_end){
     int intervals = (milliseconds_end - milliseconds_start) / milliseconds_interval;
@@ -18,6 +25,7 @@ void rollTimeForward(long milliseconds_start, int milliseconds_interval, long mi
 }
 
 void test_decay_less_than_hits_total(){
+    preTest();
     const int INITIAL_HITS=10;
     currentState.ownership.capturing= Team::RED;
     currentState.ownership.last_decay_millis=0;
@@ -31,6 +39,7 @@ void test_decay_less_than_hits_total(){
 
 void test_decay_hits_below_zero(){
     const int INITIAL_HITS=1;
+    preTest();
     currentState.ownership.capturing= Team::RED;  
     currentState.ownership.last_decay_millis=0;
     currentState.ownership.capture_hits=INITIAL_HITS; 
@@ -42,6 +51,7 @@ void test_decay_hits_below_zero(){
 
 void test_no_decay_with_zero_decay_rate(){
     const int INITIAL_HITS=1;
+    preTest();
     currentState.ownership.capturing= Team::RED;  
     currentState.ownership.last_decay_millis=0;
     currentState.ownership.capture_hits=INITIAL_HITS; 
@@ -51,11 +61,8 @@ void test_no_decay_with_zero_decay_rate(){
     TEST_ASSERT_EQUAL_INT(INITIAL_HITS,currentState.ownership.capture_hits);
 }
 
-
-
-
 void setup() {
-    gamestate_init(&currentState);
+
     delay(1000);
     Serial.begin(115200);
     Log.begin(LOG_LEVEL_INFO, &Serial, true);

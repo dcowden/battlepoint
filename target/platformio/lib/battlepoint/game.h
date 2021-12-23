@@ -14,10 +14,10 @@
 //Settings Things
 //////////////////////////////////////
 typedef struct {
-    int max_duration_seconds = 200;
+    int max_duration_seconds = 240;
     int max_overtime_seconds = 30;
     int ownership_time_seconds = 30;
-    int countdown_start_seconds = 20;
+    int countdown_start_seconds = 10;
 } TimedGame;
 
 typedef enum {
@@ -46,8 +46,8 @@ typedef struct {
 } HitCounts;
 
 typedef struct{
-    int hits_to_capture = 10;
-    int capture_cooldown_seconds = 5;
+    int hits_to_capture = 15;
+    int capture_cooldown_seconds = 1;
     int capture_decay_rate_secs_per_hit = 5;
     int capture_overtime_seconds= 30;
 } CaptureSettings;
@@ -130,7 +130,6 @@ typedef   void (*contestedHandler)(void);
 typedef   void (*cancelledHandler)(void);
 typedef   void (*remainingsecsHandler)(int,GameStatus);
 
-
 typedef struct {
    endedHandler EndedHandler;
    startedHandler StartedHandler;
@@ -140,8 +139,6 @@ typedef struct {
    cancelledHandler CancelledHandler;
    remainingsecsHandler RemainingSecsHandler;
 } EventHandler;
-
-
 
 typedef struct {
     GameStatus status;

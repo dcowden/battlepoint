@@ -120,17 +120,9 @@ void setupMeters(){
   initMeter(meters.right,"right",rightLeds,0,7);
 }
 void setup_game(GameType gt){
-    gamestate_init(&gameState);
     setupHandlers();
     reset_sounds_for_new_game();    
-    gameSettings.timed.max_duration_seconds=20;
-    gameSettings.timed.countdown_start_seconds=2;
     gameSettings.gameType = gt;
-    gameSettings.hits.to_win = 8;
-    gameSettings.hits.victory_margin =2;
-    gameSettings.timed.max_duration_seconds= 60;
-    gameSettings.timed.max_overtime_seconds = 20;
-    startGame(&gameState, &gameSettings, current_time_millis);
     current_time_millis = 2000;
     Log.traceln("Setup Complete");    
 }
@@ -170,10 +162,15 @@ void test_one_team_wins_no_ot(){
     gameSettings.timed.max_duration_seconds=200;
     gameSettings.timed.max_overtime_seconds=30;
     gameSettings.timed.ownership_time_seconds=30;
-    gameSettings.timed.countdown_start_seconds=20;
-    gameSettings.gameType =  GameType::GAME_TYPE_ATTACK_DEFEND;
+    gameSettings.timed.countdown_start_seconds=2;
+    gameSettings.hits.to_win=8;
+    gameSettings.hits.victory_margin=2;
+    gameSettings.capture.capture_decay_rate_secs_per_hit=30; //effectively disabled
+
     startGame(&gameState,&gameSettings,current_time_millis);
 
+    add_seconds(5);
+    update();
     add_seconds(5);
     red_hit();
     update();
@@ -209,6 +206,12 @@ void test_one_team_wins_no_ot(){
 void test_one_team_overtime(){
 
     setup_game(GameType::GAME_TYPE_KOTH_FIRST_TO_HITS);
+    gameSettings.timed.countdown_start_seconds=2;
+    gameSettings.hits.to_win=8;
+    gameSettings.hits.victory_margin=2;
+    gameSettings.capture.capture_decay_rate_secs_per_hit=30; //effectively disabled
+
+    startGame(&gameState,&gameSettings,current_time_millis);
 
     for(int i=0;i<7;i++){
         add_seconds(5);
@@ -235,11 +238,11 @@ void test_one_team_overtime(){
     ASSERT_LEDS_EQUAL(ALL_BLACK,centerLeds,VERTICAL_LED_SIZE,"Center All Black");
     //ASSERT_LEDS_EQUAL(TEAM_COLORS,topLeds,VERTICAL_LED_SIZE,"top Team Colors");
     //ASSERT_LEDS_EQUAL(TEAM_COLORS,bottomLeds,VERTICAL_LED_SIZE,"bottom team colors");
-
-    TEST_ASSERT_EQUAL_MESSAGE(meters.rightBottom->flash_interval_millis, FLASH_FAST,"rightBottom should flash slow");
-    TEST_ASSERT_EQUAL_MESSAGE(meters.rightTop->flash_interval_millis, FLASH_FAST,"rightTop should flash");
-    TEST_ASSERT_EQUAL_MESSAGE(meters.leftBottom->flash_interval_millis, FLASH_SLOW,"leftBottom should flash slow");
-    TEST_ASSERT_EQUAL_MESSAGE(meters.leftTop->flash_interval_millis, FLASH_SLOW,"leftTop should flash fast");    
+    TEST_ASSERT_EQUAL(GameStatus::GAME_STATUS_OVERTIME, gameState.status);
+    //TEST_ASSERT_EQUAL_MESSAGE(meters.rightBottom->flash_interval_millis, FLASH_FAST,"rightBottom should flash slow");
+    //TEST_ASSERT_EQUAL_MESSAGE(meters.rightTop->flash_interval_millis, FLASH_FAST,"rightTop should flash");
+    //TEST_ASSERT_EQUAL_MESSAGE(meters.leftBottom->flash_interval_millis, FLASH_SLOW,"leftBottom should flash slow");
+    //TEST_ASSERT_EQUAL_MESSAGE(meters.leftTop->flash_interval_millis, FLASH_SLOW,"leftTop should flash fast");    
 }
 
 
@@ -251,9 +254,9 @@ void setup() {
     Serial.begin(115200);
     Log.begin(LOG_LEVEL_INFO, &Serial, true);
     UNITY_BEGIN();
-    RUN_TEST(test_game_time_progression);
+    //RUN_TEST(test_game_time_progression);
     //RUN_TEST(test_one_team_wins_no_ot);
-    //RUN_TEST(test_one_team_overtime);
+    RUN_TEST(test_one_team_overtime);
     UNITY_END();
 
 }
