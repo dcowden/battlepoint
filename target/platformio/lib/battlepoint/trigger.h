@@ -39,7 +39,7 @@ class Trigger{
         long last_trigger_millis = 0;
         Clock* clock;
 
-        bool doTrigger(){
+        void doTrigger(){
             last_trigger_millis = clock->milliseconds();
             pending_trigger = true;
         };

@@ -3,7 +3,7 @@
 #include <ArduinoLog.h>
 #include <game.h>
 
-#define BP_CURRENT_SETTINGS_VERSION 208
+#define BP_CURRENT_SETTINGS_VERSION 208 //change when any items are added to GameSettings struct
 #define EEPROM_SIZE 320
 
 void initSettings(){

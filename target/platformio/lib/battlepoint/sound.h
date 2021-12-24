@@ -53,7 +53,7 @@
 #define SND_SOUNDS_ANNOUNCER_TIME_ADDED   49 /* sounds/announcer_time_added.mp3 */
 #define NUM_SOUNDS 50
 #define SOUND_TRIGGER_NEVER -999
-#define DEFAULT_POST_SOUND_DELAY 500
+#define DEFAULT_POST_SOUND_DELAY 900
 #define SOUND_CONFIG_NOT_PLAYED_YET 0
 
 typedef struct {
@@ -73,10 +73,11 @@ int sound_times_played(int sound_id);
 void sound_init(int rx_pin, int tx_pin);
 void sound_init_for_testing();
 void reset_sounds_for_new_game();
+void sound_play(int sound_id);
 void sound_play(int sound_id,long current_time_millis);
 void sound_play_once_in_game(int sound_id, long current_time_millis);
 void sound_play_victory(Team winner,long current_time_millis);
-void play_random_startup(long current_time_millis);
+void sound_play_random_startup(long current_time_millis);
 void sound_gametime_update ( int seconds_remaining, long current_time_millis ); //intended to be called every 200 ms or so
 #define STATE_PLAYING 512
 

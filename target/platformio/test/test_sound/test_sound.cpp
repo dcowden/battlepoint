@@ -30,13 +30,13 @@ void test_game_sounds_trigger(void){
         current_time_millis += UPDATE_INTERVAL_MS;        
     }
 
-    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_10SEC) == 1);
-    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_20SEC) == 1);    
-    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_2MIN) == 0);
-    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_20SEC) == 1);
-    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_30SEC) == 1);
-    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_5SEC) == 1);
-    TEST_ASSERT_TRUE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_6SEC) == 1);        
+    TEST_ASSERT_TRUE_MESSAGE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_10SEC) == 1,"A");
+    TEST_ASSERT_TRUE_MESSAGE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_20SEC) == 1,"B");    
+    TEST_ASSERT_TRUE_MESSAGE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_2MIN) == 0,"C");
+    TEST_ASSERT_TRUE_MESSAGE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_20SEC) == 1,"D");
+    TEST_ASSERT_TRUE_MESSAGE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_30SEC) == 1,"E");
+    TEST_ASSERT_TRUE_MESSAGE(sound_times_played(SND_SOUNDS_ANNOUNCER_ENDS_5SEC) == 1,"F");
+        
 }
 
 void setup() {

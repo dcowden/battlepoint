@@ -20,5 +20,5 @@ typedef enum{
 TeamColor getTeamColor(Team t);
 const char* teamTextChar(Team team);
 Team oppositeTeam(Team t);
-//void printTeamText(char* buffer, Team team);
+bool isHumanTeam(Team t);
 #endif

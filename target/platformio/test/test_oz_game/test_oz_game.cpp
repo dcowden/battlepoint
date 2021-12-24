@@ -12,10 +12,9 @@ void preTest(){
     settings.gameType = GameType::GAME_TYPE_KOTH_FIRST_TO_OWN_TIME;
     settings.timed.max_duration_seconds=20;
     settings.timed.countdown_start_seconds=5;
-    settings.timed.max_overtime_seconds=10;
+    settings.timed.max_overtime_seconds=30;
     settings.capture.hits_to_capture=15;
-    settings.timed.ownership_time_seconds = 120;
-    settings.timed.countdown_start_seconds=2;
+    settings.timed.ownership_time_seconds = 10;
     startGame(&state,&settings,current_time_ms);
 }
 
@@ -24,26 +23,25 @@ void assertEndedWithWinner ( Team t){
     TEST_ASSERT_EQUAL(t, state.result.winner );
 }
 
-void test_in_progress_no_capture_yet(){
+void test_in_progress_pregame(){
     preTest();
-    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
+    updateGame(&state,settings,2000);
     TEST_ASSERT_EQUAL(GameStatus::GAME_STATUS_PREGAME, state.status );    
 }
 
-void test_in_progress_one_team_has_some_time(){
+void test_in_progress_ingame(){
     preTest();    
     state.ownership.owner = Team::RED;
-    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
-    TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_PREGAME,state.status);    
+    updateGame(&state,settings,10000);
+    TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_RUNNING,state.status);    
 }
 
 void test_clear_victory(){
     preTest();  
     state.ownership.owner = Team::RED;
-    state.ownership.red_millis=120001;
-    state.ownership.blu_millis=32220;
-
-    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
+    state.ownership.red_millis=10001;
+    state.ownership.blu_millis=2220;
+    updateGame(&state,settings,DEFAULT_UPDATE_TIME);
     assertEndedWithWinner( Team::RED);    
 }
 
@@ -56,7 +54,7 @@ void test_capture_overtime_time_is_not_up(){
     state.ownership.capturing=Team::BLU;
     state.ownership.capture_hits=4;
 
-    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
+    updateGame(&state,settings,DEFAULT_UPDATE_TIME);
     TEST_ASSERT_EQUAL(GameStatus::GAME_STATUS_OVERTIME, state.status );  
 }
 
@@ -69,15 +67,15 @@ void test_overtime_time_is_up(){
     state.ownership.capturing=Team::BLU;
     state.ownership.capture_hits=4;
 
-    updateFirstToOwnTimeGame(&state,settings,DEFAULT_UPDATE_TIME);
+    updateGame(&state,settings,DEFAULT_UPDATE_TIME);
     TEST_ASSERT_EQUAL( GameStatus::GAME_STATUS_OVERTIME,state.status );  
 }
 
 void test_time_is_up_nbody_capturing(){
     preTest();
     state.ownership.owner = Team::RED;
-    state.ownership.red_millis=40000;
-    state.ownership.blu_millis=30000;
+    state.ownership.red_millis=11000;
+    state.ownership.blu_millis=8000;
     state.ownership.capturing=Team::NOBODY;
     state.ownership.capture_hits=0;
     updateGame(&state,settings,26000); //game ends at t=25
@@ -96,7 +94,6 @@ void test_time_is_up_overtime_is_up_too_capturing(){
     assertEndedWithWinner( Team::RED);   
 }
 
-
 void setup() {
 
     delay(1000);
@@ -104,15 +101,13 @@ void setup() {
     Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
     UNITY_BEGIN();
     
-    //RUN_TEST(test_time_is_up_nbody_capturing);
-    RUN_TEST(test_in_progress_no_capture_yet);
-    RUN_TEST(test_in_progress_one_team_has_some_time);
+    RUN_TEST(test_in_progress_pregame);
+    RUN_TEST(test_in_progress_ingame);
     RUN_TEST(test_clear_victory);
     RUN_TEST(test_capture_overtime_time_is_not_up);
     RUN_TEST(test_overtime_time_is_up);
     RUN_TEST(test_time_is_up_nbody_capturing);
     RUN_TEST(test_time_is_up_overtime_is_up_too_capturing);
-    /** **/
     UNITY_END();
 
 }

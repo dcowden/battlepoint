@@ -87,11 +87,10 @@ void updateDisplay(GameState gameState, GameSettings gameSettings){
     oled.setCursor(5,15);
     oled.print("HT: R="); oled.print(gameState.redHits.hits); oled.print( "  B="); oled.print(gameState.bluHits.hits);
 
-    long elapsed_millis = millis() - gameState.time.start_time_millis;
     int elapsed_sec = gameState.time.elapsed_secs;
     oled.setCursor(5,27);
     oled.print("T: "); oled.print(elapsed_sec); oled.print("/"); oled.print(gameSettings.timed.max_duration_seconds); 
-    oled.print(" ["); oled.print(getCharForStatus(gameState.status)); oled.print("]");
+    oled.print(" ["); oled.print(gameState.status); oled.print("]");
     oled.setCursor(5,39);
     oled.print("CAP: "); oled.print(gameState.ownership.capture_hits); oled.print("/"); oled.print(gameSettings.capture.hits_to_capture);
     oled.setCursor(5,52);

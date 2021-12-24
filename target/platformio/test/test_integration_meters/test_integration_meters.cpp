@@ -78,17 +78,16 @@ void update(){
     updateLeds(&meters,current_time_millis);
 }
 
-void handle_game_start(GameStatus status){
-    if ( status == GameStatus::GAME_STATUS_PREGAME){
+void handle_game_statuschange(GameStatus oldstatus, GameStatus newstatus, Team winner){
+    if ( newstatus == GameStatus::GAME_STATUS_PREGAME){
         sound_play(SND_SOUNDS_0021_ANNOUNCER_TIME_ADDED,current_time_millis);
     }
-    else{
+    else if ( newstatus == GameStatus::GAME_STATUS_RUNNING){
         sound_play(SND_SOUNDS_0022_ANNOUNCER_TOURNAMENT_STARTED4,current_time_millis);
     }
-    
-}
-void handle_game_end(Team winner){
-    sound_play_victory(winner,current_time_millis);
+    else if ( newstatus == GameStatus::GAME_STATUS_ENDED){
+        sound_play_victory(winner,current_time_millis);
+    }
 }
 
 void handle_game_seconds_update(int secs, GameStatus status){
@@ -97,8 +96,7 @@ void handle_game_seconds_update(int secs, GameStatus status){
 
 void setupHandlers(){
     gameState.eventHandler.RemainingSecsHandler=handle_game_seconds_update;
-    gameState.eventHandler.StartedHandler=handle_game_start;
-    gameState.eventHandler.EndedHandler=handle_game_end;
+    gameState.eventHandler.StatusChangeHandler=handle_game_statuschange;
 }
 
 void setupMeters(){
@@ -212,6 +210,8 @@ void test_one_team_overtime(){
     gameSettings.capture.capture_decay_rate_secs_per_hit=30; //effectively disabled
 
     startGame(&gameState,&gameSettings,current_time_millis);
+    add_seconds(3); //get past pregame
+    update();
 
     for(int i=0;i<7;i++){
         add_seconds(5);
@@ -228,6 +228,8 @@ void test_one_team_overtime(){
     CRGB BLUE_HITS [VERTICAL_LED_SIZE] = {CRGB::Blue, CRGB::Blue,CRGB::Blue,CRGB::Blue,
                                         CRGB::Blue,CRGB::Blue, CRGB::Blue, CRGB::Black };
 
+    TEST_ASSERT_EQUAL(GameStatus::GAME_STATUS_OVERTIME, gameState.status);
+
     Log.infoln("Check Red Hits Meter");
     ASSERT_LEDS_EQUAL(ALL_RED,leftLeds,VERTICAL_LED_SIZE,"8 Red Hits");
 
@@ -235,10 +237,11 @@ void test_one_team_overtime(){
     ASSERT_LEDS_EQUAL(BLUE_HITS,rightLeds,VERTICAL_LED_SIZE,"7 Blue Hits");
 
     Log.infoln("Check Team Meters");
+
     ASSERT_LEDS_EQUAL(ALL_BLACK,centerLeds,VERTICAL_LED_SIZE,"Center All Black");
     //ASSERT_LEDS_EQUAL(TEAM_COLORS,topLeds,VERTICAL_LED_SIZE,"top Team Colors");
     //ASSERT_LEDS_EQUAL(TEAM_COLORS,bottomLeds,VERTICAL_LED_SIZE,"bottom team colors");
-    TEST_ASSERT_EQUAL(GameStatus::GAME_STATUS_OVERTIME, gameState.status);
+
     //TEST_ASSERT_EQUAL_MESSAGE(meters.rightBottom->flash_interval_millis, FLASH_FAST,"rightBottom should flash slow");
     //TEST_ASSERT_EQUAL_MESSAGE(meters.rightTop->flash_interval_millis, FLASH_FAST,"rightTop should flash");
     //TEST_ASSERT_EQUAL_MESSAGE(meters.leftBottom->flash_interval_millis, FLASH_SLOW,"leftBottom should flash slow");
@@ -254,8 +257,8 @@ void setup() {
     Serial.begin(115200);
     Log.begin(LOG_LEVEL_INFO, &Serial, true);
     UNITY_BEGIN();
-    //RUN_TEST(test_game_time_progression);
-    //RUN_TEST(test_one_team_wins_no_ot);
+    RUN_TEST(test_game_time_progression);
+    RUN_TEST(test_one_team_wins_no_ot);
     RUN_TEST(test_one_team_overtime);
     UNITY_END();
 

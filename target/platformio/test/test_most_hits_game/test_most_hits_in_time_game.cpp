@@ -16,7 +16,6 @@ void preTest(){
     settings.hits.to_win = 10;
     settings.hits.victory_margin = 2;
     settings.capture.hits_to_capture=10;
-    settings.timed.countdown_start_seconds=2;
     startGame(&state,&settings,current_time_ms);
 }
 
@@ -49,6 +48,8 @@ void test_end_in_time(){
     preTest();
     state.redHits.hits = 10;
     state.bluHits.hits = 11;
+    updateGame(&state,settings,10000);
+    updateGame(&state,settings,10100);
     updateGame(&state,settings,60000);
     updateGame(&state,settings,60100);
     TEST_ASSERT_EQUAL(GameStatus::GAME_STATUS_ENDED,state.status);    
@@ -68,6 +69,8 @@ void test_end_in_slight_victory(){
     preTest();    
     state.redHits.hits = 11;
     state.bluHits.hits = 12;
+    updateGame(&state,settings,10000);
+    updateGame(&state,settings,10100);    
     updateGame(&state,settings,40100);
     updateGame(&state,settings,40200);
     assertEndedWithWinner(Team::BLU);
@@ -76,6 +79,8 @@ void test_end_in_tie(){
     preTest();
     state.redHits.hits = 11;
     state.bluHits.hits = 11;
+    updateGame(&state,settings,10000);
+    updateGame(&state,settings,10100);    
     updateGame(&state,settings,40100);
     updateGame(&state,settings,40200);
     assertEndedWithWinner(Team::TIE);

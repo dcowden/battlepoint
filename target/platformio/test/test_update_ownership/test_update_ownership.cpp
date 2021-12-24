@@ -11,7 +11,6 @@ GameState currentState;
 
 long current_time_ms = 0;
 
-
 void ASSERT_OWNER_AND_CAPTURING(Ownership o, Team owner, Team capturing){
     TEST_ASSERT_EQUAL(capturing, o.capturing);
     TEST_ASSERT_EQUAL(owner, o.owner);
@@ -27,7 +26,6 @@ void preTest(){
     settings.capture.capture_decay_rate_secs_per_hit=0;
    
 }
-
 
 void test_owner_no_capture_yet_no_owner(){
     preTest();    
@@ -55,14 +53,11 @@ void test_capture_with_current_owner(){
     ASSERT_OWNER_AND_CAPTURING(currentState.ownership,Team::BLU,Team::RED);
     updateOwnership(&currentState,settings,BOGUS_UPDATE_TIME);
 
-    TEST_ASSERT_EQUAL(0,currentState.ownership.capture_hits);
-    TEST_ASSERT_EQUAL(30, currentState.ownership.overtime_remaining_millis);
+    TEST_ASSERT_EQUAL(0,currentState.ownership.capture_hits);    
     ASSERT_OWNER_AND_CAPTURING(currentState.ownership,Team::RED,Team::BLU);
     ASSERT_RED_AND_BLUE_OWNERSHIP_TIME(currentState.ownership,0,BOGUS_UPDATE_TIME);
 
 }
-
-
 
 void setup() {
 

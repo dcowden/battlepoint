@@ -3,6 +3,8 @@
 #define I2C_ADDRESS 0x3C
 
 typedef enum {
+    DF_PLAYER_TX = 5,
+    DF_PLAYER_RX = 4,
     TARGET_LEFT = 33,
     TARGET_RIGHT = 32,
     LED_LEFT_EDGE = 12,

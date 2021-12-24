@@ -83,9 +83,9 @@ void test_end_in_fail(){
     settings.timed.max_duration_seconds=20;
     settings.timed.countdown_start_seconds=5;    
     startGame(&state,&settings,current_time_ms);
-    state.ownership.capture_hits = 9;
-    updateGame(&state,settings,6000);    
-    updateGame(&state,settings,61000);    
+    state.ownership.capture_hits = 7;
+    updateGame(&state,settings,25000);    
+    updateGame(&state,settings,25100);    
 
 
     assertEndedWithWinner(Team::RED);

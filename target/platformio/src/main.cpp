@@ -5,6 +5,7 @@
 #include <target.h>
 #include <LedMeter.h>
 #include <game.h>
+#include <game_meters.h>
 #include "EncoderMenuDriver.h"
 #include "trigger.h"
 #include <display.h>
@@ -26,9 +27,9 @@
 #include <Teams.h>
 #include <sound.h>
 
-#define BATTLEPOINT_VERSION "1.1.1"
-#define BP_MENU "BP v1.1.1"
-//TODO: organize these into groups
+#define BATTLEPOINT_VERSION "1.1.3"
+#define BP_MENU "BP v1.1.3"
+
 #define MENU_MAX_DEPTH 4
 #define OFFSET_X 0
 #define OFFSET_Y 0
@@ -72,6 +73,7 @@
 #define ENCODER_SERVICE_PRESCALER 5
 #define POST_INTERVAL_MS 80
 #define TIMER_INTERVAL_MICROSECONDS 100
+#define HITS_TO_AVOID_EMBARASSMENT 4
 
 //two shots from an atlas are 50ms apart, so we need to take samples 
 //after a hit for no more than 50ms. 
@@ -113,7 +115,7 @@ typedef enum {
 } ProgramMode;
 
 int programMode = ProgramMode::PROGRAM_MODE_MENU;
-
+int manualSoundIdToPlay = 0;
 // ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
 // and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
 //portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -132,15 +134,6 @@ void stopGameAndReturnToMenu();
 void victoryDance(Team winner);
 void captureDance(Team capture);
 
-/*
-void handle_game_capture(Team t);
-void handle_game_ended(Team t);
-void handle_game_cancel();
-void handle_game_overtime();
-void handle_game_started(GameStatus status);
-void handle_game_contested();
-void handle_game_remainingsecs(int remaining_secs, GameStatus status);
-*/
 void IRAM_ATTR onTimer();
 
 //from example here: https://github.com/neu-rah/ArduinoMenu/blob/master/examples/ESP32/ClickEncoderTFT/ClickEncoderTFT.ino
@@ -149,7 +142,6 @@ ClickEncoder clickEncoder = ClickEncoder(Pins::ENC_DOWN, Pins::ENC_UP, Pins::ENC
 
 double getBatteryVoltage(){
   int r = analogRead(Pins::VBATT);
-
   return (double)r / 1575.0 * 2.0 * 5; //ADC_11db = 1v per 1575 count
 }
 
@@ -173,39 +165,25 @@ void updateDisplayLocal(){
   else if ( programMode == PROGRAM_MODE_DIAGNOSTICS){
     diagnosticsDisplay(hardwareInfo);
   }
-
 }
 
 void localUpdateGame(){  
   long current_time_millis = millis();
-  updateGame(&gameState, gameSettings, current_time_millis);
 
-  sound_gametime_update(gameState.time.remaining_secs,current_time_millis);
+  //note: game updates trigger update callbacks
+  updateGame(&gameState, gameSettings, current_time_millis);
 
   if ( gameSettings.gameType == GameType::GAME_TYPE_TARGET_TEST){
       gameSettings.target.hit_energy_threshold += clickEncoder.getValue()*100;
   }
-
-  if ( gameState.status == GameStatus::GAME_STATUS_ENDED ){
-    Log.warning("Game Over!");    
-    if ( gameState.result.winner == Team::RED ||  gameState.result.winner == Team::BLU){
-      sound_play(SND_SOUNDS_0023_ANNOUNCER_VICTORY,current_time_millis);
-    }
-    else{
-      sound_play(SND_SOUNDS_0018_ANNOUNCER_SD_MONKEYNAUT_END_CRASH02,current_time_millis);
-    }
-    gameOverDisplay(gameState);
-    stopGameAndReturnToMenu();
-  }
-
 }
 
 TickTwo updateDisplayTimer(updateDisplayLocal,DISPLAY_UPDATE_INTERVAL_MS);
 TickTwo gameUpdateTimer(localUpdateGame, GAME_UPDATE_INTERVAL_MS );
 TickTwo diagnosticsDataTimer(updateHardwareInfo, HARDWARE_INFO_UPDATE_INTERVAL_MS);
 
-
-
+//TODO: main should own the leds, but right now game updates them.
+//we need to proxy updates to the meters/feedback devices through main via callbacks or something
 void setupLEDs(){
   FastLED.addLeds<NEOPIXEL, Pins::LED_TOP>(topLeds, 2* HORIONTAL_LED_SIZE);
   FastLED.addLeds<NEOPIXEL, Pins::LED_BOTTOM>(bottomLeds, 2* HORIONTAL_LED_SIZE);
@@ -223,7 +201,6 @@ void setupEncoder(){
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, TIMER_INTERVAL_MICROSECONDS, true); //units are microseconds, 100 = 0.1ms
   timerAlarmEnable(timer);
-    
 }
 
 void loadSettingsForSelectedGameType(){
@@ -259,6 +236,7 @@ Menu::result loadOwnZoneSettings(){
   loadSettingsForSelectedGameType();
   return Menu::proceed;
 }
+//TODO: Gametype MOST_OWN_IN_TIME is not yet implelmented, need to add that.
 Menu::result loadCPSettings(){
   gameSettings.gameType = GameType::GAME_TYPE_ATTACK_DEFEND;
   loadSettingsForSelectedGameType();
@@ -278,32 +256,56 @@ void handle_game_capture(Team t){
   }
 }
 
-void handle_game_ended(Team winner){
-    if ( winner == Team::RED ||  winner == Team::BLU){
-      sound_play(SND_SOUNDS_0023_ANNOUNCER_VICTORY,millis());
-      victoryDance(winner);
+
+int choose_endgame_sound( Team winner){
+  if ( gameSettings.gameType == GameType::GAME_TYPE_ATTACK_DEFEND){
+      if ( Team::BLU == winner){
+        return SND_SOUNDS_0020_ANNOUNCER_SUCCESS;
+      }
+      else{
+        return SND_SOUNDS_0027_ANNOUNCER_YOU_FAILED;
+      }
+  }
+  else {
+    if ( isHumanTeam(winner) ){
+      return SND_SOUNDS_0023_ANNOUNCER_VICTORY;
     }
     else{
-      sound_play(SND_SOUNDS_0018_ANNOUNCER_SD_MONKEYNAUT_END_CRASH02,millis());
+      int total_hits = gameState.redHits.hits + gameState.bluHits.hits;
+
+      if ( total_hits > HITS_TO_AVOID_EMBARASSMENT){
+          return SND_SOUNDS_0019_ANNOUNCER_STALEMATE;
+      }
+      else{
+          return SND_SOUNDS_0018_ANNOUNCER_SD_MONKEYNAUT_END_CRASH02;
+      }      
     }
-}
-
-void handle_game_cancel(){
-  sound_play(SND_SOUNDS_0028_ENGINEER_SPECIALCOMPLETED10,millis() );
-}
-
-void handle_game_overtime(){
-  sound_play(SND_SOUNDS_0016_ANNOUNCER_OVERTIME,millis() );
-}
-
-void handle_game_started(GameStatus status){
-  if ( status == GAME_STATUS_PREGAME){
-    sound_play(SND_SOUNDS_0021_ANNOUNCER_TIME_ADDED,millis() );
   }
-  else if ( status == GAME_STATUS_RUNNING){
-    sound_play(SND_SOUNDS_0022_ANNOUNCER_TOURNAMENT_STARTED4,millis() );
-  }
+  return SND_SOUNDS_0028_ENGINEER_SPECIALCOMPLETED10;
 }
+
+void handle_game_statuschange(GameStatus oldstatus, GameStatus newstatus, Team winner){
+    
+    if ( newstatus == GameStatus::GAME_STATUS_OVERTIME){
+      sound_play(SND_SOUNDS_0016_ANNOUNCER_OVERTIME);
+    }
+    else if ( newstatus == GameStatus::GAME_STATUS_RUNNING){
+      sound_play(SND_SOUNDS_0022_ANNOUNCER_TOURNAMENT_STARTED4 );
+    }
+    else if ( newstatus == GameStatus::GAME_STATUS_PREGAME){
+      sound_play(SND_SOUNDS_0021_ANNOUNCER_TIME_ADDED );
+    }
+    else if ( newstatus == GameStatus::GAME_STATUS_ENDED){
+      Log.infoln("Handling End Game Event");  
+      sound_play(choose_endgame_sound(winner));
+      victoryDance(winner);
+      gameOverDisplay(gameState);
+      sound_play_random_startup(millis());
+      stopGameAndReturnToMenu();      
+    } 
+    
+}
+
 void handle_game_contested(){
   sound_play(SND_SOUNDS_0002_ANNOUNCER_ALERT_CENTER_CONTROL_BEING_CONTESTED,millis() );
 }
@@ -312,14 +314,14 @@ void handle_game_remainingsecs(int secs_remaining, GameStatus status){
   sound_gametime_update(secs_remaining, millis() );
 }
 
+void handle_manual_sound(){
+  sound_play(manualSoundIdToPlay);
+}
+
 void setupEventHandlers(){
-  gamestate_init(&gameState);
+  gameState.eventHandler.StatusChangeHandler=handle_game_statuschange;
   gameState.eventHandler.CapturedHandler = handle_game_capture;
   gameState.eventHandler.ContestedHandler = handle_game_contested;
-  gameState.eventHandler.EndedHandler = handle_game_ended;
-  gameState.eventHandler.OvertimeHandler =  handle_game_overtime;
-  gameState.eventHandler.StartedHandler = handle_game_started;
-  gameState.eventHandler.CancelledHandler = handle_game_cancel;
   gameState.eventHandler.RemainingSecsHandler = handle_game_remainingsecs;
 } 
 
@@ -385,13 +387,20 @@ MENU(testTargetMenu, "TugOWar",  loadTargetTestSettings, Menu::enterEvent, Menu:
 );
 
 
+
+MENU(diagnosticsMenu, "Diagnostics",  Menu::doNothing, Menu::noEvent, Menu::wrapStyle   
+    ,FIELD(manualSoundIdToPlay,"PlaySound","",1,49,1,1,handle_manual_sound,Menu::exitEvent,Menu::noStyle) 
+    ,EXIT("<Back")
+);
+
+
 MENU(mainMenu, BP_MENU, Menu::doNothing, Menu::noEvent, Menu::wrapStyle
   ,SUBMENU(mostHitsSubMenu)
   ,SUBMENU(ozSubMenu)
   ,SUBMENU(firstToHitsSubMenu)
   ,SUBMENU(adSubMenu)
   ,SUBMENU(testTargetMenu)
-  ,OP("Diagnostics",startDiagnostics,Menu::enterEvent)
+  ,SUBMENU(diagnosticsMenu)
 );
 
 //{{disabled normal,disabled selected},{enabled normal,enabled selected, enabled editing}}
@@ -661,8 +670,9 @@ void setup() {
   gameUpdateTimer.start();
   diagnosticsDataTimer.start();
   loadTargetTestSettings();
-  sound_init_for_testing();
+  sound_init(Pins::DF_PLAYER_RX,Pins::DF_PLAYER_TX);
   refreshDisplay();
+  sound_play_random_startup(millis());
 }
 
 void readTargets(){  

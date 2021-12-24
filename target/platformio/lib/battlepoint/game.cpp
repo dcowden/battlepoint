@@ -2,23 +2,11 @@
 #include <Teams.h>
 #include <math.h>
 #include <target.h>
+
+//TODO: dont want game to know about meters at all.
 #include <LedMeter.h>
 #include <ArduinoLog.h>
 
-const char* getCharForStatus(GameStatus s){
-    if ( s == GameStatus::GAME_STATUS_ENDED){
-        return "E";
-    }
-    else if ( s == GameStatus::GAME_STATUS_OVERTIME){
-        return "O";
-    }
-    else if ( s == GameStatus::GAME_STATUS_PREGAME){
-        return "P";
-    }
-    else{
-        return "R";
-    }
-}
 const char* getCharForGameType(GameType t){
     if ( t == GAME_TYPE_ATTACK_DEFEND ){
         return "AD";
@@ -37,12 +25,9 @@ const char* getCharForGameType(GameType t){
     }
 }
 
-void default_handle_game_capture(Team t){}
-void default_handle_game_ended(Team winner){}
-void default_handle_game_cancel(){}
-void default_handle_game_overtime(){}
-void default_handle_game_started(GameStatus status){}
+void default_handle_game_statuschange(GameStatus oldstatus, GameStatus newstatus, Team winner){};
 void default_handle_game_contested(){}
+void default_handle_game_capture(Team capturing){}
 void default_handle_game_remainingsecs(int secs_remaining, GameStatus status){}
 
 void supplyDefaultHandlers(GameState* state){
@@ -52,17 +37,8 @@ void supplyDefaultHandlers(GameState* state){
     if ( state->eventHandler.ContestedHandler == 0 ){
         state->eventHandler.ContestedHandler = default_handle_game_contested;
     }
-    if ( state->eventHandler.EndedHandler == 0 ){
-        state->eventHandler.EndedHandler = default_handle_game_ended;
-    }
-    if ( state->eventHandler.OvertimeHandler == 0 ){
-        state->eventHandler.OvertimeHandler = default_handle_game_overtime;
-    }
-    if ( state->eventHandler.StartedHandler == 0 ){
-        state->eventHandler.StartedHandler = default_handle_game_started;
-    }
-    if ( state->eventHandler.CancelledHandler == 0 ){
-        state->eventHandler.CancelledHandler = default_handle_game_cancel;
+    if ( state->eventHandler.StatusChangeHandler == 0 ){
+        state->eventHandler.StatusChangeHandler = default_handle_game_statuschange;
     }
     if ( state->eventHandler.RemainingSecsHandler == 0 ){
         state->eventHandler.RemainingSecsHandler = default_handle_game_remainingsecs;
@@ -70,7 +46,7 @@ void supplyDefaultHandlers(GameState* state){
 }
 
 void resetGame(GameState* state){
-    state->status = GameStatus::GAME_STATUS_PREGAME;
+    state->status = GameStatus::GAME_STATUS_NOTSTARTED;
 
     state->time.elapsed_secs=0;
     state->time.last_update_millis=0;
@@ -100,18 +76,30 @@ void resetGame(GameState* state){
     state->ownership.last_hit_millis=0; 
 }
 
+void changeGameStatus(GameState* state, GameStatus newStatus ){
+    
+    if ( state->status != newStatus){
+        GameStatus oldStatus = state->status;
+        Log.infoln("New Status: %c",newStatus);
+        Team t = Team::NOBODY;
+        if ( newStatus == GameStatus::GAME_STATUS_ENDED){
+            t = state->result.winner;
+        }
+        state->status = newStatus;
+        state->eventHandler.StatusChangeHandler(oldStatus,newStatus,t);        
+    }
+}
+
 void startGame(GameState* gs, GameSettings* settings, long current_time_millis){
     resetGame(gs);
     supplyDefaultHandlers(gs);
     gs->time.start_time_millis = current_time_millis;
     gs->bluHits.last_decay_millis = current_time_millis;
     gs->redHits.last_decay_millis = current_time_millis;
-    gs->status = GameStatus::GAME_STATUS_PREGAME;
+    changeGameStatus(gs,GameStatus::GAME_STATUS_PREGAME);
     if ( settings->gameType == GAME_TYPE_ATTACK_DEFEND){
         gs->ownership.capturing = Team::BLU;  
     }
-    gs->eventHandler.StartedHandler(GAME_STATUS_PREGAME);
-
 }
 
 Team getWinnerByHitsWithVictoryMargin(int red_hits, int blu_hits, int hits_to_win, int victory_margin){
@@ -139,52 +127,9 @@ Team getWinnerByHitsWithoutVictoryMargin(int red_hits, int blu_hits, int hits_to
     }
 }
 
-void updateLeds(MeterSettings* meters, long current_time_millis ){
-    updateLedMeter(meters->left,current_time_millis);
-    updateLedMeter(meters->right,current_time_millis);
-    updateLedMeter(meters->center,current_time_millis);
-    updateLedMeter(meters->leftTop,current_time_millis);
-    updateLedMeter(meters->leftBottom,current_time_millis);
-    updateLedMeter(meters->rightTop,current_time_millis);
-    updateLedMeter(meters->rightBottom,current_time_millis);
-}
-
-void setFlashMeterForTeam(Team t, MeterSettings* meters, FlashInterval fi ){
-    if ( t == Team::RED ){
-        meters->leftBottom->flash_interval_millis = fi;
-        meters->leftTop->flash_interval_millis = fi;        
-    }
-    else  if ( t == Team::BLU ){
-        meters->rightBottom->flash_interval_millis = fi;
-        meters->rightTop->flash_interval_millis = fi;        
-    }
-    else{
-        Log.warningln("Ignored updating flash on meters for invalid team.");
-    }
-}
-
-void setMetersToFlashInterval(MeterSettings* meters, long flashInterval){
-    meters->center->flash_interval_millis = flashInterval;
-    meters->leftBottom->flash_interval_millis = flashInterval;
-    meters->leftTop->flash_interval_millis = flashInterval;
-    meters->left->flash_interval_millis = flashInterval;
-    meters->rightBottom->flash_interval_millis = flashInterval;
-    meters->rightTop->flash_interval_millis = flashInterval;
-    meters->right->flash_interval_millis = flashInterval;
-}
-
-void setHorizontalMetersToTeamColors(MeterSettings* meters){
-    setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
-    setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black );
-    setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );
-    setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black );  
-}
-void setHorizontalMetersToNeutralColors(MeterSettings* meters){
-    setMeterValues( meters->leftTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Yellow, CRGB::Black );
-    setMeterValues( meters->leftBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Yellow, CRGB::Black );
-    setMeterValues( meters->rightTop, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Yellow, CRGB::Black );
-    setMeterValues( meters->rightBottom, STANDARD_METER_MAX_VAL, STANDARD_METER_MAX_VAL, CRGB::Yellow, CRGB::Black );  
-}
+//TODO: this needs more de-coupling, with callbacks
+//so that other types of feecback/meters can be implmeented
+//but thats best done when we know the other kind of meters we have
 
 void updateMetersForRunningGame(GameState* game, GameSettings* settings, MeterSettings* meters){
     setHorizontalMetersToTeamColors(meters);
@@ -195,17 +140,16 @@ void updateMetersForRunningGame(GameState* game, GameSettings* settings, MeterSe
     }
     else if ( settings->gameType == GameType::GAME_TYPE_KOTH_MOST_HITS_IN_TIME ){
         int total_hits = game->bluHits.hits + game->redHits.hits;
+    
         if ( total_hits  > 0 ){
             setMeterValues(meters->center, game->redHits.hits, total_hits, CRGB::Red, CRGB::Blue);
-            setMeterValues(meters->left, game->redHits.hits, total_hits, CRGB::Red, CRGB::Blue);
-            setMeterValues(meters->right, game->bluHits.hits, total_hits, CRGB::Blue, CRGB::Red);
+            setMeterValues(meters->left, game->redHits.hits, total_hits, CRGB::Red, CRGB::Black);
+            setMeterValues(meters->right, game->bluHits.hits, total_hits, CRGB::Blue, CRGB::Black);    
         }
         else{
-            setMeterValues(meters->center, game->bluHits.hits, total_hits, CRGB::Red, CRGB::Blue);
-            meters->center->max_val = 1;
-            meters->center->val = 0;
-            meters->center->bgColor = CRGB::Black;
-            meters->center->fgColor = CRGB::Black;        
+            setMeterValues(meters->left, 0, STANDARD_METER_MAX_VAL, CRGB::Red, CRGB::Black);
+            setMeterValues(meters->right, 0, STANDARD_METER_MAX_VAL, CRGB::Blue, CRGB::Black);                
+            setMeterValues(meters->center, 0, STANDARD_METER_MAX_VAL, CRGB::Black, CRGB::Black);                 
         }
 
     }
@@ -215,8 +159,14 @@ void updateMetersForRunningGame(GameState* game, GameSettings* settings, MeterSe
         int red_own_secs = game->ownership.red_millis/1000;
         int blue_own_secs = game->ownership.blu_millis/1000;
 
-        setMeterValues( meters->left, red_own_secs, secs_to_win, CRGB::Red, CRGB::Black );
-        setMeterValues( meters->right, blue_own_secs, secs_to_win, CRGB::Blue, CRGB::Black ); 
+
+        //normally the team meters are progress towards seconds to win. if, however, we are
+        //in overtime, and one team has more time than the other, we udpate max value 
+        //to the larger value, so that its easy to see who the winner is
+        int ownership_meter_max_val = max(max(red_own_secs, blue_own_secs),secs_to_win);
+        
+        setMeterValues( meters->left, red_own_secs, ownership_meter_max_val, CRGB::Red, CRGB::Black );
+        setMeterValues( meters->right, blue_own_secs, ownership_meter_max_val, CRGB::Blue, CRGB::Black ); 
 
         //the center meter is the capture meter
         //its neutral until someone is the owner. then its the capture meter
@@ -353,10 +303,7 @@ void setupMeters(GameState* gs, GameSettings* settings, MeterSettings* meters){
     }
 }
 
-
-
-
-void applyHitsTo (GameType gameType, TargetHitData hitdata, HitTracker* hits, Ownership* ownership, Team capturing, long current_time_millis){
+void applyHitsTo (GameType gameType, TargetHitData hitdata, HitTracker* hits, Ownership* ownership, Team capturing, Team  hitting, long current_time_millis){
     if ( hitdata.hits > 0 ){
         //used mainly in hit-count games
         hits->hits += hitdata.hits;
@@ -365,7 +312,7 @@ void applyHitsTo (GameType gameType, TargetHitData hitdata, HitTracker* hits, Ow
         hits->last_decay_millis = current_time_millis;
     }
     if ( gameType == GAME_TYPE_KOTH_FIRST_TO_OWN_TIME || gameType == GAME_TYPE_KOTH_MOST_OWN_IN_TIME ){
-        if ( capturing == Team::RED){
+        if ( capturing == hitting){
            ownership->capture_hits += hitdata.hits;
         }
     }
@@ -373,13 +320,22 @@ void applyHitsTo (GameType gameType, TargetHitData hitdata, HitTracker* hits, Ow
            ownership->capture_hits += hitdata.hits;
     }
 } 
-//TODO: duplicated with below. combine this, its nearly identical between red and blue
+
+bool canApplyHits(GameState* current){
+    return ( current->status == GameStatus::GAME_STATUS_OVERTIME || current->status == GameStatus::GAME_STATUS_RUNNING);
+}
+
 void applyLeftHits(GameState* current, GameSettings* settings,TargetHitData hitdata, long current_time_millis){
-    applyHitsTo (settings->gameType, hitdata, &current->redHits, &current->ownership, Team::RED, current_time_millis);
+    if ( canApplyHits(current)){
+        applyHitsTo (settings->gameType, hitdata, &current->redHits, &current->ownership, current->ownership.capturing, Team::RED, current_time_millis);
+    }
+    
 }
 
 void applyRightHits(GameState* current, GameSettings* settings,TargetHitData hitdata, long current_time_millis){
-    applyHitsTo (settings->gameType, hitdata, &current->bluHits, &current->ownership, Team::BLU, current_time_millis); 
+    if ( canApplyHits(current)){
+        applyHitsTo (settings->gameType, hitdata, &current->bluHits, &current->ownership, current->ownership.capturing, Team::BLU, current_time_millis); 
+    }
 }
 
 //assumes that captureHits is being updated first
@@ -426,45 +382,64 @@ void applyTestModeHitDecay(GameState* current, GameSettings settings, long curre
 }
 
 
-//updates timeExpired based on game state. 
-//makes testing easier, so we dont have to set up all those conditions
+//important note: 
+//this function is not reesponsible for deciding when overtime is triggered,
+//because more game rules apply there that just the time elapsed
+//see triggerOvertime
+
 void updateGameTime(GameState* current,GameSettings settings, long current_time_millis){
 
-    long second_elapsed_since_start = (current_time_millis - current->time.start_time_millis)/1000;
-    long elapsed_sec = second_elapsed_since_start - settings.timed.countdown_start_seconds;
-    current->time.elapsed_secs= elapsed_sec;   
+    int second_elapsed_since_start = (current_time_millis - current->time.start_time_millis)/1000;    
+    int game_seconds_elapsed = second_elapsed_since_start - settings.timed.countdown_start_seconds;
+    current->time.elapsed_secs = game_seconds_elapsed;
     bool isExpired = false;
     bool isOvertimeExpired = false;
 
-    if ( elapsed_sec >= 0){
-        current->time.remaining_secs =(settings.timed.max_duration_seconds - elapsed_sec);
-        if ( current->status == GAME_STATUS_PREGAME){
-            current->eventHandler.StartedHandler(GAME_STATUS_RUNNING);
-        }
-        current->status = GAME_STATUS_RUNNING;
-        if ( settings.timed.max_duration_seconds > 0){
-            if ( elapsed_sec > settings.timed.max_duration_seconds){
-                isExpired =  true;
-            }
-            if ( elapsed_sec > (settings.timed.max_duration_seconds + settings.timed.max_overtime_seconds)){
-                isOvertimeExpired = true;
-            }
+    if ( current->status == GameStatus::GAME_STATUS_PREGAME){
+        int seconds_till_game_start = settings.timed.countdown_start_seconds - second_elapsed_since_start;
+        
+        //in the context of pregame, remaining seconds is time till the start, but negative  
+        current->time.remaining_secs = game_seconds_elapsed;
+
+        if (seconds_till_game_start <= 0  ){
+            changeGameStatus(current, GameStatus::GAME_STATUS_RUNNING);
         }
     }
-    else{
-        current->time.remaining_secs = elapsed_sec;
-        current->status = GAME_STATUS_PREGAME;
+    else if ( current->status == GameStatus::GAME_STATUS_RUNNING){
+
+        //NOTE : this code doesnt trigger overtime, beacuse it doesnt always happen based only on time. 
+        int seconds_till_game_end = settings.timed.max_duration_seconds - game_seconds_elapsed;
+        
+        //in the context of running game, remaining seconds is time till end of regulation ( not including overtime)
+        current->time.remaining_secs =seconds_till_game_end;
+        if ( seconds_till_game_end <= 0 ){
+            isExpired = true;
+        }        
     }
+    else if ( current->status == GameStatus::GAME_STATUS_OVERTIME){
+        int seconds_till_overtime_end = settings.timed.max_duration_seconds + settings.timed.max_overtime_seconds - game_seconds_elapsed ;
+
+        //in the context of overtime, remaining seconds is time till end of overtime 
+        current->time.remaining_secs =seconds_till_overtime_end;
+        if ( seconds_till_overtime_end <= 0){
+            isOvertimeExpired = true;
+        }
+    }
+    else if ( current->status == GameStatus::GAME_STATUS_ENDED){
+        current->time.remaining_secs = 0;
+        isExpired = true;
+        isOvertimeExpired = true;
+    }
+    Log.infoln("Time(s): Since Start: %d, Remaining: %d", current->time.elapsed_secs,current->time.remaining_secs);
     current->eventHandler.RemainingSecsHandler(current->time.remaining_secs,current->status);
     current->time.timeExpired = isExpired;
     current->time.overtimeExpired = isOvertimeExpired;
 }
 
 void endGame( GameState* current, Team winner){    
-    current->status = GameStatus::GAME_STATUS_ENDED;
     current->result.winner = winner;        
     Log.infoln("Ending Game, winner=%d",current->result.winner);
-    current->eventHandler.EndedHandler(winner);
+    changeGameStatus(current, GameStatus::GAME_STATUS_ENDED);
 }
 
 void endGameWithMostHits(GameState* current, int red_hits, int blu_hits ){
@@ -492,10 +467,13 @@ void endGameWithMostOwnership(GameState* current){
 }
 
 void triggerOvertime(GameState* current,  GameSettings settings){
-    current->status = GameStatus::GAME_STATUS_OVERTIME;
-    Log.infoln("Overtime Triggered!");
-    current->ownership.overtime_remaining_millis = settings.capture.capture_overtime_seconds;
-    current->eventHandler.OvertimeHandler();
+    Serial.print("in triggerOvertime, status = ");Serial.println(current->status);
+    if ( GameStatus::GAME_STATUS_OVERTIME != current->status ){
+        changeGameStatus(current, GameStatus::GAME_STATUS_OVERTIME);
+        Log.infoln("Overtime Triggered!");
+        current->ownership.overtime_remaining_millis = settings.capture.capture_overtime_seconds;
+    }
+
 }
 
 void updateFirstToHitsGame(GameState* current,  GameSettings settings){
@@ -620,7 +598,7 @@ void updateAttackDefendGame(GameState* current,  GameSettings settings, long cur
 
     applyHitDecay(current, settings,current_time_millis);
     int total_hits = current->ownership.capture_hits;
-    int hits_to_capture = settings.capture.hits_to_capture;
+    int hits_to_capture = settings.capture.hits_to_capture;    
     Log.infoln("AD: %d/%d hits", total_hits, hits_to_capture);
     if ( total_hits >= hits_to_capture){
         Log.infoln("AD: %d/%d hits, game over!", total_hits, hits_to_capture);
@@ -644,6 +622,7 @@ void capture(GameState* current,  Team capturingTeam){
     Log.infoln("Control Point has been captured by: %c", teamTextChar(capturingTeam));
     current->ownership.capturing = oppositeTeam(capturingTeam);      
     current->ownership.capture_hits = 0;
+    current->ownership.notifiedContested = false;
     current->eventHandler.CapturedHandler(capturingTeam);
 }
 
@@ -681,11 +660,14 @@ void updateOwnership(GameState* current,  GameSettings settings, long current_ti
         }
         Log.infoln("Checking for Capture, %d/%d to capture.",current->ownership.capture_hits,settings.capture.hits_to_capture);
         if ( current->ownership.capture_hits >= settings.capture.hits_to_capture ){
-            triggerOvertime(current,settings);
             capture(current,current->ownership.capturing);
         }
     }
 
+}
+
+bool isControlPointContested( Ownership* ownership){
+    return isHumanTeam(ownership->owner) && ownership->capture_hits > 0;
 }
 
 void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long current_time_millis){
@@ -742,43 +724,54 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
     bool blue_time_complete = (current->ownership.blu_millis > ownership_time_to_win_millis);
     bool red_time_complete = (current->ownership.red_millis > ownership_time_to_win_millis);
 
-    bool isContested  = ( current->ownership.overtime_remaining_millis > 0 );
+    //bool isContested  = ( current->ownership.overtime_remaining_millis > 0 );
     bool isTimeExpired = current->time.timeExpired;
     bool isOverTimeExpired = current->time.overtimeExpired;
+    bool isContested = isControlPointContested(&current->ownership);
 
-    if ( isOverTimeExpired ){
-        Log.infoln("Max Overtime Expired. Forcing Game End");
-        endGameWithMostOwnership(current);
+    if ( ! current->ownership.notifiedContested && isContested ){
+            current->eventHandler.ContestedHandler();
+            current->ownership.notifiedContested = true;
     }
-    else if ( isTimeExpired ){
-        if ( isContested){
-            Log.infoln("Time is expired, but point is still contested.");
-            triggerOvertime(current,settings);
+
+    if ( current->status == GameStatus::GAME_STATUS_RUNNING){
+        if ( blue_time_complete && red_time_complete){
+            Log.infoln("Both teams have enough time to win. Overtime!");
+            triggerOvertime(current,settings);            
         }
-        else{
-            Log.infoln("Time is expired, ending with most ownership");
+        else if ( blue_time_complete ){
+            if ( current->ownership.capturing == Team::RED && isContested){
+                triggerOvertime(current,settings);            
+            }
+            else{
+                Log.infoln("Blue wins");
+                endGame(current,Team::BLU);                
+            }
+        }
+        else if ( red_time_complete ){
+            if ( current->ownership.capturing == Team::BLU && isContested){
+                triggerOvertime(current,settings);            
+            }
+            else{
+                Log.infoln("Red wins");
+                endGame(current,Team::RED);                
+            }
+        }
+        else if ( isTimeExpired ){
+            if ( isContested){
+                triggerOvertime(current,settings);            
+            }
+            else{
+                endGameWithMostOwnership(current);
+            }
+            
+        }
+    }
+    else if ( current->status ==  GameStatus::GAME_STATUS_OVERTIME){
+        if ( isOverTimeExpired ){
+            Log.infoln("Max Overtime Expired. Forcing Game End");
             endGameWithMostOwnership(current);
-        }
-    }
-    else if ( blue_time_complete ){
-        if ( isContested ){
-            Log.infoln("Blue is about to win, but we are in overtime");
-            triggerOvertime(current,settings);
-        }
-        else{
-            Log.infoln("Blue wins");
-            endGame(current,Team::BLU);
-        }
-    }
-    else if ( red_time_complete ){
-        if ( isContested ){
-            Log.infoln("Red is about to win, but we are in overtime");
-            triggerOvertime(current,settings);
-        }
-        else{
-            Log.infoln("Red wins");
-            endGame(current,Team::RED);
-        }
+        }    
     }
      
 }
@@ -808,14 +801,9 @@ void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long cu
 }
 
 void updateGame(GameState* current,  GameSettings settings, long current_time_millis){
-    if ( current->status == GAME_STATUS_ENDED){
-        Log.infoln("not updating, game is over");
-    }
-    else if ( current->status == GAME_STATUS_PREGAME ){
-        updateGameTime(current, settings, current_time_millis);
-    }   
-    else if ( current->status == GAME_STATUS_RUNNING || current->status == GAME_STATUS_OVERTIME){    
-        updateGameTime(current, settings, current_time_millis);
+
+    updateGameTime(current, settings, current_time_millis);
+    if ( current->status == GAME_STATUS_RUNNING || current->status == GAME_STATUS_OVERTIME){            
         Log.traceln("After Update, Hits:B=%d,R=%d",current->bluHits.hits, current->redHits.hits);
         if ( settings.gameType == GameType::GAME_TYPE_KOTH_FIRST_TO_HITS){
             updateFirstToHitsGame(current,settings);
@@ -841,6 +829,7 @@ void updateGame(GameState* current,  GameSettings settings, long current_time_mi
     }
     //very last to make sure everyone can see the time delta during update
     current->time.last_update_millis = current_time_millis;
+    Log.infoln("Current Status: %c",current->status);
 }
 
 

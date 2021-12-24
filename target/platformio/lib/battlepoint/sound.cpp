@@ -2,6 +2,7 @@
 #include "HardwareSerial.h"
 #include "DFRobotDFPlayerMini.h"
 #include <Teams.h>
+#include <ArduinoLog.h>
 
 HardwareSerial mySoftwareSerial(1);
 DFRobotDFPlayerMini myDFPlayer;
@@ -29,10 +30,10 @@ void setup_sound_triggers(){
     soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_4SEC].game_secs_trigger = 4;
     soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_5SEC].game_secs_trigger = 5;
     soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_60SEC].game_secs_trigger = 60;
-    soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_6SEC].game_secs_trigger = 6;
-    soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_7SEC].game_secs_trigger = 7;
-    soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_8SEC].game_secs_trigger = 8;
-    soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_9SEC].game_secs_trigger = 9;
+    //soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_6SEC].game_secs_trigger = 6;
+    //soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_7SEC].game_secs_trigger = 7;
+    //soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_8SEC].game_secs_trigger = 8;
+    //soundState.sound_config[SND_SOUNDS_ANNOUNCER_ENDS_9SEC].game_secs_trigger = 9;
    
 }
 
@@ -115,6 +116,9 @@ void _play(int sound_id, long current_time_millis){
 void sound_play(int sound_id, long current_time_millis){
   if ( ready_to_play( current_time_millis) ){
     _play(sound_id,current_time_millis);
+  }
+  else{
+    Log.infoln("Not Ready to play yet: %d",sound_id);
   }    
 }
 
@@ -123,14 +127,18 @@ void sound_play_once_in_game(int sound_id, long current_time_millis){
     _play(sound_id,current_time_millis);
   }
   else{
-    //Serial.print("Can't play right now:");Serial.println(sound_id);
+    Log.infoln("Cant play right now: %d",sound_id);
   }
+}
+
+void sound_play(int sound_id){
+  sound_play(sound_id, millis());
 }
 
 void sound_gametime_update ( int game_seconds_remaining , long current_time_millis){  
    for(int i=0;i<NUM_SOUNDS;i++){
        if ( game_seconds_remaining == soundState.sound_config[i].game_secs_trigger ){
-          sound_play_once_in_game(i,current_time_millis);
+          sound_play(i,current_time_millis);
        }
    }   
 }
@@ -144,7 +152,7 @@ void sound_play_victory(Team winner,long current_time_millis){
     }
 }
 
-void play_random_startup(long current_time_millis){
+void sound_play_random_startup(long current_time_millis){
     long r = random(18,25);
     sound_play(r,current_time_millis);
 }

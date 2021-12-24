@@ -1,5 +1,9 @@
 #include "Teams.h"
 
+bool isHumanTeam(Team t){
+    return t == Team::RED || t == Team::BLU;
+}
+
 Team oppositeTeam(Team t){
   if ( t == Team::RED){
     return Team::BLU;

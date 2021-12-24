@@ -1,11 +1,12 @@
 #ifndef __INC_GAME_H
 #define __INC_GAME_H
 #include <Teams.h>
-#include <LedMeter.h>
+
+#include <game_meters.h>
 #include <target.h>
 #include <targetscan.h>
 
-#define STANDARD_METER_MAX_VAL 10
+
 //important: keep settings separate from 
 //status, so that settings can be saved in eeprom
 
@@ -27,8 +28,6 @@ typedef enum {
     SLOT_4 = 4,
     SLOT_5 = 5
 } GameSettingSlot;
-
-
 
 typedef enum {
     GAME_TYPE_KOTH_FIRST_TO_HITS=0,
@@ -58,6 +57,7 @@ typedef struct {
     long hit_energy_threshold = 7;
 } TargetSettings;
 
+//update settings.h to a new BP_VERSION if you change any items in this struct
 typedef struct {    
     int BP_VERSION;
     GameType gameType = GAME_TYPE_UNSELECTED;
@@ -68,26 +68,17 @@ typedef struct {
 } GameSettings;
 
 
-
 //////////////////////////////////////
 ///  Status Things
 //////////////////////////////////////
 typedef enum {
-    GAME_STATUS_PREGAME='C',
+    GAME_STATUS_NOTSTARTED='N',
+    GAME_STATUS_PREGAME='P',
     GAME_STATUS_OVERTIME='O',
     GAME_STATUS_RUNNING = 'R',
     GAME_STATUS_ENDED= 'E'
 } GameStatus;
 
-typedef struct{
-    LedMeter* leftTop;
-    LedMeter* leftBottom;
-    LedMeter* rightTop;
-    LedMeter* rightBottom;
-    LedMeter* center;
-    LedMeter* left;
-    LedMeter* right;
-} MeterSettings;
 
 typedef struct {
     long start_time_millis=0; //start of the whole game, including pre-game countdown
@@ -120,23 +111,18 @@ typedef struct {
     long overtime_remaining_millis = 0;
     long last_hit_millis=0;
     long last_decay_millis=0;
+    bool notifiedContested = false;
 } Ownership;
 
-typedef   void (*endedHandler)(Team);
-typedef   void (*startedHandler)(GameStatus);
-typedef   void (*overtimeHandler)(void);
+typedef   void (*statusChangeHandler)(GameStatus,GameStatus,Team);
 typedef   void (*capturedHandler)(Team);
 typedef   void (*contestedHandler)(void);
-typedef   void (*cancelledHandler)(void);
 typedef   void (*remainingsecsHandler)(int,GameStatus);
 
 typedef struct {
-   endedHandler EndedHandler;
-   startedHandler StartedHandler;
-   overtimeHandler OvertimeHandler;
+   statusChangeHandler StatusChangeHandler;
    capturedHandler CapturedHandler;
    contestedHandler ContestedHandler;
-   cancelledHandler CancelledHandler;
    remainingsecsHandler RemainingSecsHandler;
 } EventHandler;
 
@@ -153,13 +139,13 @@ typedef struct {
 
 void setDefaultGameSettings(GameSettings* settings );
 void startGame(GameState* gs, GameSettings* settings, long current_time_millis);
-void gamestate_init(GameState* state);
+//void gamestate_init(GameState* state);
 
 //exposed for testing
 void updateGameTime(GameState* current,GameSettings settings, long current_time_millis);
 void updateOwnership(GameState* current,  GameSettings settings, long current_time_millis);
 void applyHitDecay(GameState* current, GameSettings settings, long current_time_millis);
-
+void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters);
 void applyLeftHits(GameState* current, GameSettings* settings,TargetHitData hitdata, long current_time_millis);
 void applyRightHits(GameState* current, GameSettings* settings,TargetHitData hitdata, long current_time_millis);
 void updateFirstToHitsGame(GameState* current,  GameSettings settings);
@@ -168,8 +154,6 @@ void updateFirstToOwnTimeGame(GameState* current,  GameSettings settings, long c
 void updateAttackDefendGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateMostOwnInTimeGame(GameState* current,  GameSettings settings, long current_time_millis);
 void updateGame(GameState* game, GameSettings settings, long current_time_millis);
-void updateLeds(MeterSettings* meters, long current_time_millis );
-void updateMeters(GameState* game, GameSettings* settings, MeterSettings* meters);
 
 const char* getCharForGameType(GameType t);
 const char* getCharForStatus(GameStatus s);
