@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name FieldTarget_ESP_Plus_Nano)(type KiCad)(uri ${KIPRJMOD}/FieldTarget_ESP_Plus_Nano.pretty)(options "")(descr ""))
+)
