@@ -155,7 +155,7 @@ void test_sample_data_ready(){
     TEST_ASSERT_TRUE(ts.dataReady == false);
     TEST_ASSERT_TRUE(ts.lastScanValue == 44);
     TEST_ASSERT_TRUE(ts.sampling == false);
-    TEST_ASSERT_TRUE(ts.lastScanMillis == 1003 )
+    TEST_ASSERT_TRUE(ts.lastScanMillis == 1003 );
 }
 
 void setup() {

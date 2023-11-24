@@ -1,0 +1,78 @@
+#include <Arduino.h>
+#include "TickTwo.h"
+#include <FastLED.h>
+#include <settings.h>
+#include <pins.h>
+#include <RespawnUX.h>
+#include <RespawnTimer.h>
+#include <OneButton.h>
+#include <NonBlockingRtttl.h>
+
+#define BATTLEPOINT_VERSION "1.1.4"
+#define RESPAWN_POSITIONS 4
+
+CRGB respawnLeds[RESPAWN_POSITIONS];
+
+RespawnTimer respawnPlayer1Timer;
+RespawnTimer respawnPlayer2Timer;
+RespawnTimer respawnPlayer3Timer;
+RespawnTimer respawnPlayer4Timer;
+
+RespawnUX respawnPlayer1UX;
+RespawnUX respawnPlayer2UX;
+RespawnUX respawnPlayer3UX;
+RespawnUX respawnPlayer4UX;
+
+OneButton shortRespawn(Pins::SHORT_DURATION_BTN,true);
+OneButton mediumRespawn(Pins::MEDIUM_DURATION_BTN,true);
+OneButton longRespawn(Pins::LONG_DURATION_BTN,true);
+
+
+void setupUX(){
+  initRespawnUX(&respawnPlayer1UX,respawnLeds,0, Pins::SOUND);
+  initRespawnUX(&respawnPlayer2UX,respawnLeds,1, Pins::SOUND);
+  initRespawnUX(&respawnPlayer3UX,respawnLeds,2, Pins::SOUND);
+  initRespawnUX(&respawnPlayer4UX,respawnLeds,3, Pins::SOUND);
+  FastLED.addLeds<NEOPIXEL, Pins::RESPAWN_LEDS>(respawnLeds, RESPAWN_POSITIONS);
+  pinMode(Pins::SOUND, OUTPUT);
+}
+
+void setupInputs(){
+  // link the button 2 functions.
+  // button2.attachClick(click2);
+  // button2.attachDoubleClick(doubleclick2);
+  // button2.attachLongPressStart(longPressStart2);
+  // button2.attachLongPressStop(longPressStop2);
+  // button2.attachDuringLongPress(longPress2);
+}
+
+void updateUX(){
+  long current_time_millis = millis();
+  
+  updateRespawnUX(&respawnPlayer1UX,computeTimerState(&respawnPlayer1Timer,current_time_millis),current_time_millis);
+  updateRespawnUX(&respawnPlayer2UX,computeTimerState(&respawnPlayer2Timer,current_time_millis),current_time_millis);
+  updateRespawnUX(&respawnPlayer3UX,computeTimerState(&respawnPlayer3Timer,current_time_millis),current_time_millis);
+  updateRespawnUX(&respawnPlayer4UX,computeTimerState(&respawnPlayer4Timer,current_time_millis),current_time_millis);
+  rtttl::play();
+  FastLED.show();
+}
+
+void updateInputs(){
+  shortRespawn.tick();
+  mediumRespawn.tick();
+  longRespawn.tick();
+}
+
+void setup() {
+    setCpuFrequencyMhz(240);
+    Serial.begin(115200);
+    Serial.setTimeout(500);
+    initSettings();
+    setupInputs();
+    setupUX();   
+}
+
+void loop() {
+  updateInputs();
+  updateUX();
+}
