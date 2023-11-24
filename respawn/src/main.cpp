@@ -10,8 +10,12 @@
 
 #define BATTLEPOINT_VERSION "1.1.4"
 #define RESPAWN_POSITIONS 4
+#define DEFAULT_SHORT_RESPAWN_MILLIS 5000
+#define DEFAULT_MEDIUM_RESPAWN_MILLIS 10000
+#define DEFAULT_LONG_RESPAWN_MILLIS 20000
 
 CRGB respawnLeds[RESPAWN_POSITIONS];
+const char * SOUND_NO_RESPAWN_SLOTS = "Arkanoid:d=4,o=5,b=140:8g6,16p,16g.6,2a#6,32p,8a6,8g6,8f6,8a6,2g6";
 
 RespawnTimer respawnPlayer1Timer;
 RespawnTimer respawnPlayer2Timer;
@@ -27,7 +31,6 @@ OneButton shortRespawn(Pins::SHORT_DURATION_BTN,true);
 OneButton mediumRespawn(Pins::MEDIUM_DURATION_BTN,true);
 OneButton longRespawn(Pins::LONG_DURATION_BTN,true);
 
-
 void setupUX(){
   initRespawnUX(&respawnPlayer1UX,respawnLeds,0, Pins::SOUND);
   initRespawnUX(&respawnPlayer2UX,respawnLeds,1, Pins::SOUND);
@@ -36,6 +39,37 @@ void setupUX(){
   FastLED.addLeds<NEOPIXEL, Pins::RESPAWN_LEDS>(respawnLeds, RESPAWN_POSITIONS);
   pinMode(Pins::SOUND, OUTPUT);
 }
+
+void handleRespawnInput(long durationMillis){
+    //try to find a respawn slot
+    long currentTimeMillis = millis();
+    if ( isAvailable(&respawnPlayer1Timer,currentTimeMillis) ){
+       startTimer(&respawnPlayer1Timer,durationMillis,currentTimeMillis);
+    }
+    else if ( isAvailable(&respawnPlayer2Timer,currentTimeMillis) ){
+       startTimer(&respawnPlayer2Timer,durationMillis,currentTimeMillis);
+    }
+    else if ( isAvailable(&respawnPlayer3Timer,currentTimeMillis) ){
+       startTimer(&respawnPlayer3Timer,durationMillis,currentTimeMillis);
+    }   
+    else if ( isAvailable(&respawnPlayer4Timer,currentTimeMillis) ){
+       startTimer(&respawnPlayer4Timer,durationMillis,currentTimeMillis);
+    } 
+    else{
+       rtttl::begin(Pins::SOUND, SOUND_NO_RESPAWN_SLOTS);
+    }     
+}
+
+void handleShortRespawnClick(){
+    handleRespawnInput(DEFAULT_SHORT_RESPAWN_MILLIS);
+}
+
+void handleMediumRespawnClick(){
+    handleRespawnInput(DEFAULT_MEDIUM_RESPAWN_MILLIS);
+} 
+void handleLongRespawnClick(){
+    handleRespawnInput(DEFAULT_LONG_RESPAWN_MILLIS);
+} 
 
 void setupInputs(){
   // link the button 2 functions.

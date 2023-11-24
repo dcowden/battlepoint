@@ -8,6 +8,12 @@ void startTimer ( RespawnTimer* timer, int timerDurationMillis, long currentTime
     timer->resetMillis = timer->endMillis + DEFAULT_GO_SIGNAL_MILLIS;    
 }
 
+bool isAvailable(RespawnTimer* timer, long currentTimeMillis ){
+    RespawnTimerState s;
+    s = computeTimerState( timer, currentTimeMillis);
+    return s == RespawnTimerState::IDLE;
+}
+
 RespawnTimerState computeTimerState (RespawnTimer* timer, long currentTimeMillis){
     long timeLeftMillis = timer->endMillis - currentTimeMillis;
 

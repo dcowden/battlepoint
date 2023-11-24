@@ -19,6 +19,7 @@ typedef struct  {
     long resetMillis=0;
 } RespawnTimer;
 
+bool isAvailable(RespawnTimer* timer, long currentTimeMillis );
 RespawnTimerState computeTimerState (RespawnTimer* timer, long currentTimeMillis);
 void startTimer ( RespawnTimer* timer, int durationMillis, long currentTimeMillis );
 
