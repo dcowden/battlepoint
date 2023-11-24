@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <ArduinoLog.h>
 #include "TickTwo.h"
 #include <FastLED.h>
 #include <settings.h>
@@ -40,25 +41,33 @@ void setupUX(){
   pinMode(Pins::SOUND, OUTPUT);
 }
 
+void handleRespawn(RespawnTimer* timer, long durationMillis, long currentTimeMillis){
+    Log.warningln("Starting Timer, Slot %d, Duration=%d", timer->id,durationMillis);
+    startTimer(timer,durationMillis,currentTimeMillis);
+}
+
 void handleRespawnInput(long durationMillis){
     //try to find a respawn slot
     long currentTimeMillis = millis();
     if ( isAvailable(&respawnPlayer1Timer,currentTimeMillis) ){
-       startTimer(&respawnPlayer1Timer,durationMillis,currentTimeMillis);
+      handleRespawn(&respawnPlayer1Timer,durationMillis,currentTimeMillis);
     }
     else if ( isAvailable(&respawnPlayer2Timer,currentTimeMillis) ){
-       startTimer(&respawnPlayer2Timer,durationMillis,currentTimeMillis);
+      handleRespawn(&respawnPlayer2Timer,durationMillis,currentTimeMillis);
     }
     else if ( isAvailable(&respawnPlayer3Timer,currentTimeMillis) ){
-       startTimer(&respawnPlayer3Timer,durationMillis,currentTimeMillis);
+      handleRespawn(&respawnPlayer3Timer,durationMillis,currentTimeMillis);
     }   
     else if ( isAvailable(&respawnPlayer4Timer,currentTimeMillis) ){
-       startTimer(&respawnPlayer4Timer,durationMillis,currentTimeMillis);
+      handleRespawn(&respawnPlayer4Timer,durationMillis,currentTimeMillis);
     } 
     else{
-       rtttl::begin(Pins::SOUND, SOUND_NO_RESPAWN_SLOTS);
+      Log.warning("No Respawn Slot Available");
+      rtttl::begin(Pins::SOUND, SOUND_NO_RESPAWN_SLOTS);
     }     
 }
+
+
 
 void handleShortRespawnClick(){
     handleRespawnInput(DEFAULT_SHORT_RESPAWN_MILLIS);
@@ -101,9 +110,14 @@ void setup() {
     setCpuFrequencyMhz(240);
     Serial.begin(115200);
     Serial.setTimeout(500);
+    Log.begin(LOG_LEVEL_INFO, &Serial, true);
+    Log.warning("Starting...");
     initSettings();
+    Log.noticeln("LOAD SETTINGS [OK]");
     setupInputs();
-    setupUX();   
+    Log.noticeln("LOAD INPUTS [OK]");  
+    setupUX();
+    Log.noticeln("LOAD UX [OK]");    
 }
 
 void loop() {

@@ -2,7 +2,7 @@
 #include <RespawnTimer.h>
 #include <FastLED.h>
 #include <NonBlockingRtttl.h>
-
+#include <ArduinoLog.h>
 
 CRGB COLOR_STOP = CRGB::Red;
 CRGB COLOR_GO = CRGB::Green;
@@ -40,11 +40,13 @@ void updateRespawnUX(RespawnUX* respawnUX, RespawnTimerState state, long current
     CRGB newColor = getColorForTimerState(state);
     respawnUX->leds[respawnUX->index] = newColor;
     if ( state== RespawnTimerState::RESPAWNING && ! respawnUX->notifiedStart){
+        Log.noticeln("Beginning Respawn, timer=%d",respawnUX->index);
         rtttl::begin(respawnUX->soundPin, SOUND_MARIO);
         respawnUX->notifiedStart = true;
     }
     if ( state== RespawnTimerState::FINISHED && ! respawnUX->notifiedFinish){
         respawnUX->notifiedFinish = true;
+        Log.noticeln("Respawn, complete timer=%d",respawnUX->index);
         rtttl::begin(respawnUX->soundPin, SOUND_TETRIS);
     }
 };

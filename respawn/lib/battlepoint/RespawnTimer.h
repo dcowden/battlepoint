@@ -12,6 +12,7 @@ const int DEFAULT_READY_TIME_LEFT_MILLIS =3000;
 const int DEFAULT_GO_SIGNAL_MILLIS =3000;
 
 typedef struct  {
+    int id=0;
     long durationMillis=0;
     long startMillis=0;
     long endMillis=0;

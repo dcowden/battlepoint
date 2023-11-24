@@ -1,4 +1,5 @@
 #include <RespawnTimer.h>
+#include <ArduinoLog.h>
 
 void startTimer ( RespawnTimer* timer, int timerDurationMillis, long currentTimeMillis){
     timer->durationMillis = timerDurationMillis;
