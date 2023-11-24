@@ -8,13 +8,14 @@ typedef enum {
     IDLE=3
 } RespawnTimerState;
 
+const int MILLIS_NOT_STARTED = -1;
 const int DEFAULT_READY_TIME_LEFT_MILLIS =3000;
 const int DEFAULT_GO_SIGNAL_MILLIS =3000;
 
 typedef struct  {
     int id=0;
     long durationMillis=0;
-    long startMillis=0;
+    long startMillis=MILLIS_NOT_STARTED;
     long endMillis=0;
     long respawnImminentMillis=0;
     long resetMillis=0;
@@ -23,5 +24,5 @@ typedef struct  {
 bool isAvailable(RespawnTimer* timer, long currentTimeMillis );
 RespawnTimerState computeTimerState (RespawnTimer* timer, long currentTimeMillis);
 void startTimer ( RespawnTimer* timer, int durationMillis, long currentTimeMillis );
-
+void disableTimer ( RespawnTimer* timer);
 #endif

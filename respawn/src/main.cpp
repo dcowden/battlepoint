@@ -11,13 +11,13 @@
 
 #define BATTLEPOINT_VERSION "1.1.4"
 #define RESPAWN_POSITIONS 4
-#define DEFAULT_SHORT_RESPAWN_MILLIS 5000
-#define DEFAULT_MEDIUM_RESPAWN_MILLIS 10000
-#define DEFAULT_LONG_RESPAWN_MILLIS 20000
+
+RespawnSettings respawnDurations;
 
 CRGB respawnLeds[RESPAWN_POSITIONS];
 const char * SOUND_NO_RESPAWN_SLOTS = "Arkanoid:d=4,o=5,b=140:8g6,16p,16g.6,2a#6,32p,8a6,8g6,8f6,8a6,2g6";
 
+//TODO: i hate this. probably should combine these so we have only 4 not 8
 RespawnTimer respawnPlayer1Timer;
 RespawnTimer respawnPlayer2Timer;
 RespawnTimer respawnPlayer3Timer;
@@ -28,9 +28,42 @@ RespawnUX respawnPlayer2UX;
 RespawnUX respawnPlayer3UX;
 RespawnUX respawnPlayer4UX;
 
-OneButton shortRespawn(Pins::SHORT_DURATION_BTN,true);
-OneButton mediumRespawn(Pins::MEDIUM_DURATION_BTN,true);
-OneButton longRespawn(Pins::LONG_DURATION_BTN,true);
+typedef enum {
+  CONFIGURE =1,
+  RUN =2
+} OperationMode;
+
+OperationMode current_mode = OperationMode::RUN;
+long configuredSpawnTimeStartMillis =0;
+
+//(pin, active low, enable pullup)
+OneButton shortRespawn(Pins::SHORT_DURATION_BTN,true,true);
+OneButton mediumRespawn(Pins::MEDIUM_DURATION_BTN,true,true);
+OneButton longRespawn(Pins::LONG_DURATION_BTN,true,true);
+
+
+// ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
+// and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
+//portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+hw_timer_t *timer = NULL;
+
+void enterConfigurationMode(){
+    current_mode = OperationMode::CONFIGURE;
+    Log.warningln("Entering config mode: disabling timers");
+    disableTimer(&respawnPlayer1Timer);
+    disableTimer(&respawnPlayer2Timer);
+    disableTimer(&respawnPlayer3Timer);
+    disableTimer(&respawnPlayer4Timer);
+}
+void enterRunMode(){
+    saveSettings(&respawnDurations);
+    current_mode = OperationMode::RUN;
+    Log.warningln("Entering Running Mode");  
+}
+
+void setupTimers(){
+  loadSettings(&respawnDurations);  
+}
 
 void setupUX(){
   initRespawnUX(&respawnPlayer1UX,respawnLeds,0, Pins::SOUND);
@@ -47,6 +80,7 @@ void handleRespawn(RespawnTimer* timer, long durationMillis, long currentTimeMil
 }
 
 void handleRespawnInput(long durationMillis){
+  if ( current_mode == OperationMode::RUN){
     //try to find a respawn slot
     long currentTimeMillis = millis();
     if ( isAvailable(&respawnPlayer1Timer,currentTimeMillis) ){
@@ -65,28 +99,75 @@ void handleRespawnInput(long durationMillis){
       Log.warning("No Respawn Slot Available");
       rtttl::begin(Pins::SOUND, SOUND_NO_RESPAWN_SLOTS);
     }     
+  }
+  else{
+    Log.warningln("Click Ignored, another button is long-pressed, so we're in config mode");
+  }
+  
 }
 
-
-
 void handleShortRespawnClick(){
-    handleRespawnInput(DEFAULT_SHORT_RESPAWN_MILLIS);
+    handleRespawnInput(respawnDurations.shortRespawnMillis);
 }
 
 void handleMediumRespawnClick(){
-    handleRespawnInput(DEFAULT_MEDIUM_RESPAWN_MILLIS);
+    handleRespawnInput(respawnDurations.mediumRespawnMillis);
 } 
 void handleLongRespawnClick(){
-    handleRespawnInput(DEFAULT_LONG_RESPAWN_MILLIS);
+    handleRespawnInput(respawnDurations.longRespawnMillis);
 } 
 
+void handleSetupShortDurationLongClickStart(){
+  enterConfigurationMode();
+  Log.warningln("Configure Short Duration");
+  configuredSpawnTimeStartMillis = millis();
+}
+
+void handleSetupMediumDurationLongClickStart(){
+  enterConfigurationMode();
+  Log.warningln("Configure Medium Duration");
+  configuredSpawnTimeStartMillis = millis();
+}
+
+void handleSetupLongDurationLongClickStart(){
+  enterConfigurationMode();
+  Log.warningln("Configure Long Duration");
+  configuredSpawnTimeStartMillis = millis();
+}
+
+void handleSetupShortDurationLongClickEnd(){
+  long configuredDuration = millis() - configuredSpawnTimeStartMillis;
+  Log.warningln("Configure Short Duration: %d ms", configuredDuration);
+  respawnDurations.shortRespawnMillis = configuredDuration;
+  enterRunMode();
+}
+
+void handleSetupMediumDurationLongClickEnd(){
+  long configuredDuration = millis() - configuredSpawnTimeStartMillis;
+  Log.warningln("Configure Medium Duration: %d ms", configuredDuration);
+  respawnDurations.mediumRespawnMillis = configuredDuration;
+  enterRunMode();
+}
+
+void handleSetupLongDurationLongClickEnd(){
+  long configuredDuration = millis() - configuredSpawnTimeStartMillis;
+  Log.warningln("Configure Long Duration: %d ms", configuredDuration);
+  respawnDurations.longRespawnMillis = configuredDuration;
+  enterRunMode();
+}
+
 void setupInputs(){
-  // link the button 2 functions.
-  // button2.attachClick(click2);
-  // button2.attachDoubleClick(doubleclick2);
-  // button2.attachLongPressStart(longPressStart2);
-  // button2.attachLongPressStop(longPressStop2);
-  // button2.attachDuringLongPress(longPress2);
+  shortRespawn.attachClick(handleShortRespawnClick);
+  mediumRespawn.attachClick(handleMediumRespawnClick);
+  longRespawn.attachClick(handleLongRespawnClick);
+
+  shortRespawn.attachLongPressStart(handleSetupShortDurationLongClickStart);
+  mediumRespawn.attachLongPressStart(handleSetupMediumDurationLongClickStart);
+  longRespawn.attachLongPressStart(handleSetupLongDurationLongClickStart);  
+
+  shortRespawn.attachLongPressStop(handleSetupShortDurationLongClickEnd);
+  mediumRespawn.attachLongPressStop(handleSetupMediumDurationLongClickEnd);
+  longRespawn.attachLongPressStop(handleSetupLongDurationLongClickEnd); 
 }
 
 void updateUX(){
@@ -114,6 +195,8 @@ void setup() {
     Log.warning("Starting...");
     initSettings();
     Log.noticeln("LOAD SETTINGS [OK]");
+    setupTimers();
+    Log.noticeln("LOAD TIMERS [OK]");
     setupInputs();
     Log.noticeln("LOAD INPUTS [OK]");  
     setupUX();
