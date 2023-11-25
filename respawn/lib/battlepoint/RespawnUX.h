@@ -19,6 +19,7 @@ typedef struct{
     bool notifiedFinish;
 } RespawnUX;
 
+void signalNoSlotsAvailable(int soundPin);
 void initRespawnUX(RespawnUX* respawnUX, CRGB* leds, uint8_t index, int soundPin);
 void updateRespawnUX(RespawnUX* respawnUX, RespawnTimerState state, long currentTimeMillis);
 CRGB getColorForTimerState(RespawnTimerState state);

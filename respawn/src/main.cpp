@@ -15,7 +15,7 @@
 RespawnSettings respawnDurations;
 
 CRGB respawnLeds[RESPAWN_POSITIONS];
-const char * SOUND_NO_RESPAWN_SLOTS = "Arkanoid:d=4,o=5,b=140:8g6,16p,16g.6,2a#6,32p,8a6,8g6,8f6,8a6,2g6";
+
 
 //TODO: i hate this. probably should combine these so we have only 4 not 8
 RespawnTimer respawnPlayer1Timer;
@@ -42,19 +42,19 @@ OneButton mediumRespawn(Pins::MEDIUM_DURATION_BTN,true,true);
 OneButton longRespawn(Pins::LONG_DURATION_BTN,true,true);
 
 
-// ESP32 timer thanks to: http://www.iotsharing.com/2017/06/how-to-use-interrupt-timer-in-arduino-esp32.html
-// and: https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
-//portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-hw_timer_t *timer = NULL;
-
-void enterConfigurationMode(){
-    current_mode = OperationMode::CONFIGURE;
-    Log.warningln("Entering config mode: disabling timers");
+void disableAllTimers(){
     disableTimer(&respawnPlayer1Timer);
     disableTimer(&respawnPlayer2Timer);
     disableTimer(&respawnPlayer3Timer);
     disableTimer(&respawnPlayer4Timer);
 }
+void enterConfigurationMode(){
+    current_mode = OperationMode::CONFIGURE;
+    Log.warningln("Entering config mode: disabling timers");
+    disableAllTimers();
+    configuredSpawnTimeStartMillis = millis();
+}
+
 void enterRunMode(){
     saveSettings(&respawnDurations);
     current_mode = OperationMode::RUN;
@@ -63,6 +63,7 @@ void enterRunMode(){
 
 void setupTimers(){
   loadSettings(&respawnDurations);  
+  disableAllTimers();
 }
 
 void setupUX(){
@@ -97,7 +98,7 @@ void handleRespawnInput(long durationMillis){
     } 
     else{
       Log.warning("No Respawn Slot Available");
-      rtttl::begin(Pins::SOUND, SOUND_NO_RESPAWN_SLOTS);
+      signalNoSlotsAvailable(Pins::SOUND);
     }     
   }
   else{
@@ -118,21 +119,18 @@ void handleLongRespawnClick(){
 } 
 
 void handleSetupShortDurationLongClickStart(){
-  enterConfigurationMode();
   Log.warningln("Configure Short Duration");
-  configuredSpawnTimeStartMillis = millis();
+  enterConfigurationMode();
 }
 
 void handleSetupMediumDurationLongClickStart(){
-  enterConfigurationMode();
   Log.warningln("Configure Medium Duration");
-  configuredSpawnTimeStartMillis = millis();
+  enterConfigurationMode();
 }
 
 void handleSetupLongDurationLongClickStart(){
-  enterConfigurationMode();
   Log.warningln("Configure Long Duration");
-  configuredSpawnTimeStartMillis = millis();
+  enterConfigurationMode();
 }
 
 void handleSetupShortDurationLongClickEnd(){

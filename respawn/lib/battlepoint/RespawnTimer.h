@@ -13,12 +13,12 @@ const int DEFAULT_READY_TIME_LEFT_MILLIS =3000;
 const int DEFAULT_GO_SIGNAL_MILLIS =3000;
 
 typedef struct  {
-    int id=0;
-    long durationMillis=0;
-    long startMillis=MILLIS_NOT_STARTED;
-    long endMillis=0;
-    long respawnImminentMillis=0;
-    long resetMillis=0;
+    int id;
+    long durationMillis;
+    long startMillis;
+    long endMillis;
+    long respawnImminentMillis;
+    long resetMillis;
 } RespawnTimer;
 
 bool isAvailable(RespawnTimer* timer, long currentTimeMillis );
