@@ -5,12 +5,16 @@
 #define DEFAULT_MEDIUM_RESPAWN_MILLIS 10000
 #define DEFAULT_LONG_RESPAWN_MILLIS 20000
 
+#define RESPAWN_DURATION_SHORT_INDEX  0
+#define RESPAWN_DURATION_MEDIUM_INDEX  1
+#define RESPAWN_DURATION_LONG_INDEX  2
 
 typedef struct {
     int BP_VERSION;
-    int shortRespawnMillis = DEFAULT_SHORT_RESPAWN_MILLIS;
-    int mediumRespawnMillis = DEFAULT_MEDIUM_RESPAWN_MILLIS;
-    int longRespawnMillis = DEFAULT_LONG_RESPAWN_MILLIS;
+    int respawnDurations[3] = { DEFAULT_SHORT_RESPAWN_MILLIS, DEFAULT_MEDIUM_RESPAWN_MILLIS, DEFAULT_LONG_RESPAWN_MILLIS};
+    //int shortRespawnMillis = DEFAULT_SHORT_RESPAWN_MILLIS;
+    //int mediumRespawnMillis = DEFAULT_MEDIUM_RESPAWN_MILLIS;
+    //int longRespawnMillis = DEFAULT_LONG_RESPAWN_MILLIS;
 } RespawnSettings;
 
 #endif

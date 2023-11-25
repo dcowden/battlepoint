@@ -27,92 +27,71 @@ void setupUX(){
   ux.init();
 }
 
-void handleRespawnInput(long durationMillis){
-    ux.requestRespawn(durationMillis,millis());
-}
-
-void handleShortRespawnClick(){
-    handleRespawnInput(respawnDurations.shortRespawnMillis);
-}
-void handleMediumRespawnClick(){
-    handleRespawnInput(respawnDurations.mediumRespawnMillis);
-} 
-void handleLongRespawnClick(){
-    handleRespawnInput(respawnDurations.longRespawnMillis);
-} 
-
-void handleSetupLongClickStart(){
-  ux.startConfigureRespawnTime(millis());
-}
-
-//TODO: how to remove this duplication?
-void handleSetupShortDurationLongClickEnd(){
-  long configuredDuration =ux.getConfiguredDuration(millis());
-  Log.warningln("Configure Short Duration: %d ms", configuredDuration);
-  respawnDurations.shortRespawnMillis = configuredDuration;
-  saveSettings(&respawnDurations);
-}
-
-void handleSetupMediumDurationLongClickEnd(){
-  long configuredDuration =ux.getConfiguredDuration(millis());
-  Log.warningln("Configure Medium Duration: %d ms", configuredDuration);
-  respawnDurations.mediumRespawnMillis = configuredDuration;
-  saveSettings(&respawnDurations);
-}
-
-void handleSetupLongDurationLongClickEnd(){
-  long configuredDuration =ux.getConfiguredDuration(millis());
-  Log.warningln("Configure Long Duration: %d ms", configuredDuration);
-  respawnDurations.longRespawnMillis = configuredDuration;
-  saveSettings(&respawnDurations);
-}
-
 void setupSettings(){
   initSettings();
   loadSettings(&respawnDurations);
 }
 
+void handleSetupLongClickStart(){
+  ux.startConfigureRespawnTime(millis());
+}
+
+void handleLongPressEnd(int respawnDurationIndex){
+  long configuredDuration =ux.getConfiguredDuration(millis());
+  Log.warningln("Configure Duration SLot: %d = %dms", respawnDurationIndex, configuredDuration);
+  respawnDurations.respawnDurations[respawnDurationIndex] = configuredDuration;
+  saveSettings(&respawnDurations);
+}
+
 void setupInputs(){
-  shortRespawn.attachClick(handleShortRespawnClick);
-  mediumRespawn.attachClick(handleMediumRespawnClick);
-  longRespawn.attachClick(handleLongRespawnClick);
+  shortRespawn.attachClick([](){
+      ux.requestRespawn(respawnDurations.respawnDurations[RESPAWN_DURATION_SHORT_INDEX],millis());
+  });
+
+  mediumRespawn.attachClick([](){
+      ux.requestRespawn(respawnDurations.respawnDurations[RESPAWN_DURATION_MEDIUM_INDEX],millis());
+  });
+
+  longRespawn.attachClick([](){
+      ux.requestRespawn(respawnDurations.respawnDurations[RESPAWN_DURATION_LONG_INDEX],millis());
+  });
 
   shortRespawn.attachLongPressStart(handleSetupLongClickStart);
   mediumRespawn.attachLongPressStart(handleSetupLongClickStart);
   longRespawn.attachLongPressStart(handleSetupLongClickStart);  
 
-  shortRespawn.attachLongPressStop(handleSetupShortDurationLongClickEnd);
-  mediumRespawn.attachLongPressStop(handleSetupMediumDurationLongClickEnd);
-  longRespawn.attachLongPressStop(handleSetupLongDurationLongClickEnd); 
-}
+  shortRespawn.attachLongPressStop([](){
+      handleLongPressEnd(RESPAWN_DURATION_SHORT_INDEX);
+  });
 
-void updateUX(){  
-  ux.update(millis());
-  rtttl::play();
-  FastLED.show();
-}
+  mediumRespawn.attachLongPressStop([](){
+      handleLongPressEnd(RESPAWN_DURATION_MEDIUM_INDEX);
+  });
 
-void updateInputs(){
-  shortRespawn.tick();
-  mediumRespawn.tick();
-  longRespawn.tick();
+  longRespawn.attachLongPressStop([](){
+      handleLongPressEnd(RESPAWN_DURATION_LONG_INDEX);    
+  }); 
 }
 
 void setup() {
-    setCpuFrequencyMhz(240);
-    Serial.begin(115200);
-    Serial.setTimeout(500);
-    Log.begin(LOG_LEVEL_INFO, &Serial, true);
-    Log.warning("Starting...");
-    setupSettings();
-    Log.noticeln("LOAD SETTINGS [OK]");
-    setupInputs();
-    Log.noticeln("LOAD INPUTS [OK]");  
-    setupUX();
-    Log.noticeln("LOAD UX [OK]");    
+  setCpuFrequencyMhz(240);
+  Serial.begin(115200);
+  Serial.setTimeout(500);
+  Log.begin(LOG_LEVEL_INFO, &Serial, true);
+  Log.warning("Starting...");
+  setupSettings();
+  Log.noticeln("LOAD SETTINGS [OK]");
+  setupInputs();
+  Log.noticeln("LOAD INPUTS [OK]");  
+  setupUX();
+  Log.noticeln("LOAD UX [OK]");    
 }
 
 void loop() {
-  updateInputs();
-  updateUX();
+  shortRespawn.tick();
+  mediumRespawn.tick();
+  longRespawn.tick();
+  ux.update(millis());
+  rtttl::play();
+  FastLED.show();
 }
