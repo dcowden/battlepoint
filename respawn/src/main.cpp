@@ -16,8 +16,6 @@ RespawnSettings respawnDurations;
 
 CRGB respawnLeds[RESPAWN_POSITIONS];
 
-
-//TODO: i hate this. probably should combine these so we have only 4 not 8
 RespawnTimer respawnPlayer1Timer;
 RespawnTimer respawnPlayer2Timer;
 RespawnTimer respawnPlayer3Timer;
@@ -27,6 +25,9 @@ RespawnUX respawnPlayer1UX;
 RespawnUX respawnPlayer2UX;
 RespawnUX respawnPlayer3UX;
 RespawnUX respawnPlayer4UX;
+
+RespawnContext uiContext;
+
 
 typedef enum {
   CONFIGURE =1,
@@ -42,16 +43,10 @@ OneButton mediumRespawn(Pins::MEDIUM_DURATION_BTN,true,true);
 OneButton longRespawn(Pins::LONG_DURATION_BTN,true,true);
 
 
-void disableAllTimers(){
-    disableTimer(&respawnPlayer1Timer);
-    disableTimer(&respawnPlayer2Timer);
-    disableTimer(&respawnPlayer3Timer);
-    disableTimer(&respawnPlayer4Timer);
-}
 void enterConfigurationMode(){
     current_mode = OperationMode::CONFIGURE;
     Log.warningln("Entering config mode: disabling timers");
-    disableAllTimers();
+    contextDisableTimers(&uiContext);
     configuredSpawnTimeStartMillis = millis();
 }
 
@@ -61,16 +56,17 @@ void enterRunMode(){
     Log.warningln("Entering Running Mode");  
 }
 
-void setupTimers(){
-  loadSettings(&respawnDurations);  
-  disableAllTimers();
-}
-
 void setupUX(){
-  initRespawnUX(&respawnPlayer1UX,respawnLeds,0, Pins::SOUND);
-  initRespawnUX(&respawnPlayer2UX,respawnLeds,1, Pins::SOUND);
-  initRespawnUX(&respawnPlayer3UX,respawnLeds,2, Pins::SOUND);
-  initRespawnUX(&respawnPlayer4UX,respawnLeds,3, Pins::SOUND);
+  respawnPlayer1UX.timer = &respawnPlayer1Timer;
+  respawnPlayer2UX.timer = &respawnPlayer2Timer;
+  respawnPlayer3UX.timer = &respawnPlayer3Timer;
+  respawnPlayer4UX.timer = &respawnPlayer4Timer;
+  uiContext.player1 = &respawnPlayer1UX;
+  uiContext.player1 = &respawnPlayer2UX;
+  uiContext.player1 = &respawnPlayer3UX;
+  uiContext.player1 = &respawnPlayer4UX;
+  initContext ( &uiContext,respawnLeds,Pins::SOUND);
+ 
   FastLED.addLeds<NEOPIXEL, Pins::RESPAWN_LEDS>(respawnLeds, RESPAWN_POSITIONS);
   pinMode(Pins::SOUND, OUTPUT);
 }
@@ -110,7 +106,6 @@ void handleRespawnInput(long durationMillis){
 void handleShortRespawnClick(){
     handleRespawnInput(respawnDurations.shortRespawnMillis);
 }
-
 void handleMediumRespawnClick(){
     handleRespawnInput(respawnDurations.mediumRespawnMillis);
 } 
@@ -118,21 +113,12 @@ void handleLongRespawnClick(){
     handleRespawnInput(respawnDurations.longRespawnMillis);
 } 
 
-void handleSetupShortDurationLongClickStart(){
-  Log.warningln("Configure Short Duration");
+void handleSetupLongClickStart(){
+  Log.warningln("Configure Duration");
   enterConfigurationMode();
 }
 
-void handleSetupMediumDurationLongClickStart(){
-  Log.warningln("Configure Medium Duration");
-  enterConfigurationMode();
-}
-
-void handleSetupLongDurationLongClickStart(){
-  Log.warningln("Configure Long Duration");
-  enterConfigurationMode();
-}
-
+//TODO: how to remove this duplication?
 void handleSetupShortDurationLongClickEnd(){
   long configuredDuration = millis() - configuredSpawnTimeStartMillis;
   Log.warningln("Configure Short Duration: %d ms", configuredDuration);
@@ -154,27 +140,27 @@ void handleSetupLongDurationLongClickEnd(){
   enterRunMode();
 }
 
+void setupSettings(){
+  initSettings();
+  loadSettings(&respawnDurations);
+}
+
 void setupInputs(){
   shortRespawn.attachClick(handleShortRespawnClick);
   mediumRespawn.attachClick(handleMediumRespawnClick);
   longRespawn.attachClick(handleLongRespawnClick);
 
-  shortRespawn.attachLongPressStart(handleSetupShortDurationLongClickStart);
-  mediumRespawn.attachLongPressStart(handleSetupMediumDurationLongClickStart);
-  longRespawn.attachLongPressStart(handleSetupLongDurationLongClickStart);  
+  shortRespawn.attachLongPressStart(handleSetupLongClickStart);
+  mediumRespawn.attachLongPressStart(handleSetupLongClickStart);
+  longRespawn.attachLongPressStart(handleSetupLongClickStart);  
 
   shortRespawn.attachLongPressStop(handleSetupShortDurationLongClickEnd);
   mediumRespawn.attachLongPressStop(handleSetupMediumDurationLongClickEnd);
   longRespawn.attachLongPressStop(handleSetupLongDurationLongClickEnd); 
 }
 
-void updateUX(){
-  long current_time_millis = millis();
-  
-  updateRespawnUX(&respawnPlayer1UX,computeTimerState(&respawnPlayer1Timer,current_time_millis),current_time_millis);
-  updateRespawnUX(&respawnPlayer2UX,computeTimerState(&respawnPlayer2Timer,current_time_millis),current_time_millis);
-  updateRespawnUX(&respawnPlayer3UX,computeTimerState(&respawnPlayer3Timer,current_time_millis),current_time_millis);
-  updateRespawnUX(&respawnPlayer4UX,computeTimerState(&respawnPlayer4Timer,current_time_millis),current_time_millis);
+void updateUX(){  
+  contextUpdate(&uiContext,millis());
   rtttl::play();
   FastLED.show();
 }
@@ -191,10 +177,8 @@ void setup() {
     Serial.setTimeout(500);
     Log.begin(LOG_LEVEL_INFO, &Serial, true);
     Log.warning("Starting...");
-    initSettings();
+    setupSettings();
     Log.noticeln("LOAD SETTINGS [OK]");
-    setupTimers();
-    Log.noticeln("LOAD TIMERS [OK]");
     setupInputs();
     Log.noticeln("LOAD INPUTS [OK]");  
     setupUX();
