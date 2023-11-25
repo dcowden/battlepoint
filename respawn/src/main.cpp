@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
-#include "TickTwo.h"
 #include <FastLED.h>
 #include <settings.h>
 #include <pins.h>
@@ -17,45 +16,19 @@ CRGB respawnLeds[RESPAWN_POSITIONS];
 
 RespawnApp ux = RespawnApp(respawnLeds,Pins::SOUND);
 
-typedef enum {
-  CONFIGURE =1,
-  RUN =2
-} OperationMode;
-
-OperationMode current_mode = OperationMode::RUN;
-long configuredSpawnTimeStartMillis =0;
-
 //(pin, active low, enable pullup)
 OneButton shortRespawn(Pins::SHORT_DURATION_BTN,true,true);
 OneButton mediumRespawn(Pins::MEDIUM_DURATION_BTN,true,true);
 OneButton longRespawn(Pins::LONG_DURATION_BTN,true,true);
 
-
-void enterConfigurationMode(){
-    current_mode = OperationMode::CONFIGURE;
-    Log.warningln("Entering config mode: disabling timers");
-    ux.disable();
-    configuredSpawnTimeStartMillis = millis();
-}
-
-void enterRunMode(){
-    saveSettings(&respawnDurations);
-    current_mode = OperationMode::RUN;
-    Log.warningln("Entering Running Mode");  
-}
-
 void setupUX(){
   FastLED.addLeds<NEOPIXEL, Pins::RESPAWN_LEDS>(respawnLeds, RESPAWN_POSITIONS);
   pinMode(Pins::SOUND, OUTPUT);
+  ux.init();
 }
 
 void handleRespawnInput(long durationMillis){
-  if ( current_mode == OperationMode::RUN){
     ux.requestRespawn(durationMillis,millis());
-  }
-  else{
-    Log.warningln("Click Ignored, another button is long-pressed, so we're in config mode");
-  }
 }
 
 void handleShortRespawnClick(){
@@ -69,30 +42,29 @@ void handleLongRespawnClick(){
 } 
 
 void handleSetupLongClickStart(){
-  Log.warningln("Configure Duration");
-  enterConfigurationMode();
+  ux.startConfigureRespawnTime(millis());
 }
 
 //TODO: how to remove this duplication?
 void handleSetupShortDurationLongClickEnd(){
-  long configuredDuration = millis() - configuredSpawnTimeStartMillis;
+  long configuredDuration =ux.getConfiguredDuration(millis());
   Log.warningln("Configure Short Duration: %d ms", configuredDuration);
   respawnDurations.shortRespawnMillis = configuredDuration;
-  enterRunMode();
+  saveSettings(&respawnDurations);
 }
 
 void handleSetupMediumDurationLongClickEnd(){
-  long configuredDuration = millis() - configuredSpawnTimeStartMillis;
+  long configuredDuration =ux.getConfiguredDuration(millis());
   Log.warningln("Configure Medium Duration: %d ms", configuredDuration);
   respawnDurations.mediumRespawnMillis = configuredDuration;
-  enterRunMode();
+  saveSettings(&respawnDurations);
 }
 
 void handleSetupLongDurationLongClickEnd(){
-  long configuredDuration = millis() - configuredSpawnTimeStartMillis;
+  long configuredDuration =ux.getConfiguredDuration(millis());
   Log.warningln("Configure Long Duration: %d ms", configuredDuration);
   respawnDurations.longRespawnMillis = configuredDuration;
-  enterRunMode();
+  saveSettings(&respawnDurations);
 }
 
 void setupSettings(){

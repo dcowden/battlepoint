@@ -14,6 +14,11 @@ const char * SOUND_MARIO_1UP = "life:d=8,o=4,b=450:e.5,32p.,g.5,32p.,e.6,32p.,c.
 const char * SOUND_MARIO_DEAD = "death:d=32,o=4,b=355:8b.,p.,8f.5,p.,4p,8f.5,p.,4f5,16p,4e5,16p,4d5,16p,8c.5,p.,8e.,p.,4p,8e.,p.,8c.,p.";
 const char * SOUND_NO_SLOTS = "StarwarsI:d=16,o=5,b=100:4e,4e,4e,8c,p,g,4e,8c,p,g,4e,4p";
 
+typedef enum {
+  CONFIGURE =1,
+  RUN =2
+} OperationMode;
+
 CRGB getColorForTimerState(RespawnTimerState state){
     if ( state == RespawnTimerState::IMMINENT ){
         return COLOR_READY;
@@ -77,6 +82,7 @@ class RespawnPlayer{
 
 class RespawnApp{
     public:
+        
         RespawnApp(CRGB* leds,int soundPin){
             leds = leds;
             soundPin = soundPin;
@@ -85,25 +91,47 @@ class RespawnApp{
             player3 = new RespawnPlayer(leds,2,soundPin);
             player4 = new RespawnPlayer(leds,3,soundPin);
         };
-        void update(long currentTimeMillis){
-            player1->update(currentTimeMillis);
-            player2->update(currentTimeMillis);
-            player3->update(currentTimeMillis);
-            player4->update(currentTimeMillis);
+        OperationMode getCurrentMode(){
+            return currentMode;
         };
-        void disable(){
+        void init(){
+
+        };
+        void startConfigureRespawnTime(long currentTimeMillis){
+            Log.warningln("Entering config mode: disabling timers");
+            currentMode = OperationMode::CONFIGURE;
+            configuredDurationStartMillis = currentTimeMillis;
+            disableTimers();
+        };
+        long getConfiguredDuration(long currentTimeMillis){
+            currentMode = OperationMode::RUN;
+            return currentTimeMillis -configuredDurationStartMillis;
+        }
+        void update(long currentTimeMillis){
+            if ( currentMode == OperationMode::RUN){
+                player1->update(currentTimeMillis);
+                player2->update(currentTimeMillis);
+                player3->update(currentTimeMillis);
+                player4->update(currentTimeMillis);            
+            }        
+        };
+        void disableTimers(){
             player1->disable();
             player2->disable();
             player3->disable();
             player4->disable();
         };
         void requestRespawn(long durationMillis, long currentTimeMillis){
-
-            if ( player1->acceptRespawnRequest(durationMillis,currentTimeMillis )) return;
-            if ( player2->acceptRespawnRequest(durationMillis,currentTimeMillis )) return;
-            if ( player3->acceptRespawnRequest(durationMillis,currentTimeMillis )) return;
-            if ( player4->acceptRespawnRequest(durationMillis,currentTimeMillis )) return;  
-            signalNoSlotsAvailable();                      
+            if ( currentMode == OperationMode::CONFIGURE){
+                Log.warningln("Respawn Request Ignored: another button is long-pressed, so we're in config mode");
+            }
+            else{
+                if ( player1->acceptRespawnRequest(durationMillis,currentTimeMillis )) return;
+                if ( player2->acceptRespawnRequest(durationMillis,currentTimeMillis )) return;
+                if ( player3->acceptRespawnRequest(durationMillis,currentTimeMillis )) return;
+                if ( player4->acceptRespawnRequest(durationMillis,currentTimeMillis )) return;  
+                signalNoSlotsAvailable();  
+            }                               
         };
         void signalNoSlotsAvailable(){
             Log.warning("No Respawn Slot Available");
@@ -111,6 +139,8 @@ class RespawnApp{
         };
 
     protected:
+        OperationMode currentMode = OperationMode::RUN;
+        long configuredDurationStartMillis = 0;
         CRGB* leds;
         int soundPin;
         RespawnPlayer* player1;
