@@ -12,9 +12,6 @@
 typedef struct {
     int BP_VERSION;
     int respawnDurations[3] = { DEFAULT_SHORT_RESPAWN_MILLIS, DEFAULT_MEDIUM_RESPAWN_MILLIS, DEFAULT_LONG_RESPAWN_MILLIS};
-    //int shortRespawnMillis = DEFAULT_SHORT_RESPAWN_MILLIS;
-    //int mediumRespawnMillis = DEFAULT_MEDIUM_RESPAWN_MILLIS;
-    //int longRespawnMillis = DEFAULT_LONG_RESPAWN_MILLIS;
 } RespawnSettings;
 
 #endif
