@@ -2,7 +2,7 @@
 #include <ArduinoLog.h>
 
 void startTimer ( RespawnTimer* timer, int timerDurationMillis, long currentTimeMillis){
-    if ( timer->startMillis)
+
     timer->durationMillis = timerDurationMillis;
     timer->startMillis = currentTimeMillis;
     timer->endMillis = currentTimeMillis + timerDurationMillis;

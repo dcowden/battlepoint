@@ -3,8 +3,6 @@
 #include <FastLED.h>
 #include <RespawnTimer.h>
 
-
-
 typedef enum {
     FLASH_SLOW = 800,
     FLASH_FAST = 400,

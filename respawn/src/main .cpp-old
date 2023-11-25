@@ -4,7 +4,8 @@
 #include <FastLED.h>
 #include <settings.h>
 #include <pins.h>
-#include <RespawnApp.h>
+#include <RespawnUX.h>
+#include <RespawnTimer.h>
 #include <OneButton.h>
 #include <NonBlockingRtttl.h>
 
@@ -15,7 +16,18 @@ RespawnSettings respawnDurations;
 
 CRGB respawnLeds[RESPAWN_POSITIONS];
 
-RespawnApp ux = RespawnApp(respawnLeds,Pins::SOUND);
+RespawnTimer respawnPlayer1Timer;
+RespawnTimer respawnPlayer2Timer;
+RespawnTimer respawnPlayer3Timer;
+RespawnTimer respawnPlayer4Timer;
+
+RespawnUX respawnPlayer1UX;
+RespawnUX respawnPlayer2UX;
+RespawnUX respawnPlayer3UX;
+RespawnUX respawnPlayer4UX;
+
+RespawnContext uiContext;
+
 
 typedef enum {
   CONFIGURE =1,
@@ -34,7 +46,7 @@ OneButton longRespawn(Pins::LONG_DURATION_BTN,true,true);
 void enterConfigurationMode(){
     current_mode = OperationMode::CONFIGURE;
     Log.warningln("Entering config mode: disabling timers");
-    ux.disable();
+    contextDisableTimers(&uiContext);
     configuredSpawnTimeStartMillis = millis();
 }
 
@@ -45,17 +57,50 @@ void enterRunMode(){
 }
 
 void setupUX(){
+  respawnPlayer1UX.timer = &respawnPlayer1Timer;
+  respawnPlayer2UX.timer = &respawnPlayer2Timer;
+  respawnPlayer3UX.timer = &respawnPlayer3Timer;
+  respawnPlayer4UX.timer = &respawnPlayer4Timer;
+  uiContext.player1 = &respawnPlayer1UX;
+  uiContext.player1 = &respawnPlayer2UX;
+  uiContext.player1 = &respawnPlayer3UX;
+  uiContext.player1 = &respawnPlayer4UX;
+  initContext ( &uiContext,respawnLeds,Pins::SOUND);
+ 
   FastLED.addLeds<NEOPIXEL, Pins::RESPAWN_LEDS>(respawnLeds, RESPAWN_POSITIONS);
   pinMode(Pins::SOUND, OUTPUT);
 }
 
+void handleRespawn(RespawnTimer* timer, long durationMillis, long currentTimeMillis){
+    Log.warningln("Starting Timer, Slot %d, Duration=%d", timer->id,durationMillis);
+    startTimer(timer,durationMillis,currentTimeMillis);
+}
+
 void handleRespawnInput(long durationMillis){
   if ( current_mode == OperationMode::RUN){
-    ux.requestRespawn(durationMillis,millis());
+    //try to find a respawn slot
+    long currentTimeMillis = millis();
+    if ( isAvailable(&respawnPlayer1Timer,currentTimeMillis) ){
+      handleRespawn(&respawnPlayer1Timer,durationMillis,currentTimeMillis);
+    }
+    else if ( isAvailable(&respawnPlayer2Timer,currentTimeMillis) ){
+      handleRespawn(&respawnPlayer2Timer,durationMillis,currentTimeMillis);
+    }
+    else if ( isAvailable(&respawnPlayer3Timer,currentTimeMillis) ){
+      handleRespawn(&respawnPlayer3Timer,durationMillis,currentTimeMillis);
+    }   
+    else if ( isAvailable(&respawnPlayer4Timer,currentTimeMillis) ){
+      handleRespawn(&respawnPlayer4Timer,durationMillis,currentTimeMillis);
+    } 
+    else{
+      Log.warning("No Respawn Slot Available");
+      signalNoSlotsAvailable(Pins::SOUND);
+    }     
   }
   else{
     Log.warningln("Click Ignored, another button is long-pressed, so we're in config mode");
   }
+  
 }
 
 void handleShortRespawnClick(){
@@ -115,7 +160,7 @@ void setupInputs(){
 }
 
 void updateUX(){  
-  ux.update(millis());
+  contextUpdate(&uiContext,millis());
   rtttl::play();
   FastLED.show();
 }
