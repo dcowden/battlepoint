@@ -17,7 +17,7 @@ Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
 // Non standard: Arduino.h also chosen if ARDUINO is not defined. To facilitate use in non-Arduino test environments
 #if ARDUINO < 100
-	#include "WProgram.h"
+	//#include "WProgram.h"
 #else
 	#include "Arduino.h"
 #endif

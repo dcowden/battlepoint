@@ -1,9 +1,9 @@
 #ifndef __INC_RESPAWNAPP_H
 #define __INC_RESPAWNAPP_H
 #include <FastLED.h>
-#include <RespawnTimer2.h>
+#include <RespawnTimer.h>
 #include <NonBlockingRtttl.h>
-#include <ArduinoLog.h>
+//#include <ArduinoLog.h>
 
 CRGB COLOR_STOP = CRGB::Red;
 CRGB COLOR_GO = CRGB::Green;
@@ -47,9 +47,9 @@ class RespawnPlayer{
                 return false;
             }
             else{
-                Log.warningln("Starting Timer, Slot %d, Duration=%d", index, durationMillis);
+                //Log.warningln("Starting Timer, Slot %d, Duration=%d", index, durationMillis);
                 timer->start(durationMillis,currentTimeMillis);
-                Log.noticeln("Beginning Respawn, timer=%d",index);
+                //Log.noticeln("Beginning Respawn, timer=%d",index);
                 rtttl::begin(soundPin, SOUND_MARIO_DEAD);                
                 return true;
             }
@@ -69,14 +69,14 @@ class RespawnPlayer{
         void notifyFinished(RespawnTimerState state){
             if ( state== RespawnTimerState::FINISHED && ! notifiedFinish){
                 notifiedFinish = true;
-                Log.noticeln("Respawn, complete timer=%d",index);
+                //Log.noticeln("Respawn, complete timer=%d",index);
                 rtttl::begin(soundPin, SOUND_MARIO_1UP);
             }
         }
         CRGB* leds;
         uint8_t index;
         int soundPin;
-        RespawnTimer2* timer;
+        RespawnTimer* timer;
         bool notifiedFinish=false;
 };
 
@@ -98,7 +98,7 @@ class RespawnApp{
 
         };
         void startConfigureRespawnTime(long currentTimeMillis){
-            Log.warningln("Entering config mode: disabling timers");
+            //Log.warningln("Entering config mode: disabling timers");
             currentMode = OperationMode::CONFIGURE;
             configuredDurationStartMillis = currentTimeMillis;
             disableTimers();
@@ -123,7 +123,7 @@ class RespawnApp{
         };
         void requestRespawn(long durationMillis, long currentTimeMillis){
             if ( currentMode == OperationMode::CONFIGURE){
-                Log.warningln("Respawn Request Ignored: another button is long-pressed, so we're in config mode");
+                //Log.warningln("Respawn Request Ignored: another button is long-pressed, so we're in config mode");
             }
             else{
                 if ( player1->acceptRespawnRequest(durationMillis,currentTimeMillis )) return;
@@ -134,7 +134,7 @@ class RespawnApp{
             }                               
         };
         void signalNoSlotsAvailable(){
-            Log.warning("No Respawn Slot Available");
+            //Log.warning("No Respawn Slot Available");
             rtttl::begin(soundPin, SOUND_NO_SLOTS);
         };
 

@@ -1,48 +1,55 @@
-#include <Arduino.h>
 #include <RespawnTimer.h>
-#include <ArduinoLog.h>
 #include <unity.h>
 
-RespawnTimer simpleTimer {
-    .id=0,
-    .durationMillis=0,
-    .startMillis=MILLIS_NOT_STARTED,
-    .endMillis=0,
-    .respawnImminentMillis=0,
-    .resetMillis=0
-};
+#ifdef ARDUINO
+   #include<Arduino.h>
+#endif
+
+#ifdef UNIT_TEST
+    #include <ArduinoFake.h>
+#endif
+
+RespawnTimer simpleTimer = RespawnTimer();
+
 
 void test_init_starts_disabled(void){
-    disableTimer(&simpleTimer);
-    TEST_ASSERT_EQUAL( isAvailable(&simpleTimer,millis()), false);
-    TEST_ASSERT_EQUAL(computeTimerState(&simpleTimer, millis() ), RespawnTimerState::IDLE);
+    TEST_ASSERT_TRUE( simpleTimer.isIdle(0));
+    TEST_ASSERT_EQUAL(simpleTimer.computeTimerState(0), RespawnTimerState::IDLE);
+}
+void test_disabled_timer_not_available(void){
+    simpleTimer.disable();
+    TEST_ASSERT_TRUE( simpleTimer.isIdle(0));
 }
 
-void test_test_timer_stages(void){
-    long currentTimeMillis = 0;
-    long respawnDurationMillis = 20000;
-    startTimer(&simpleTimer,respawnDurationMillis,currentTimeMillis);
-    TEST_ASSERT_EQUAL(computeTimerState(&simpleTimer, currentTimeMillis ), RespawnTimerState::RESPAWNING);
-    TEST_ASSERT_EQUAL(computeTimerState(&simpleTimer, 10000 ), RespawnTimerState::RESPAWNING);
-    TEST_ASSERT_EQUAL(computeTimerState(&simpleTimer, 18000 ), RespawnTimerState::IMMINENT);
-    TEST_ASSERT_EQUAL(computeTimerState(&simpleTimer, respawnDurationMillis + DEFAULT_READY_TIME_LEFT_MILLIS - 1000 ), RespawnTimerState::FINISHED);
-    TEST_ASSERT_EQUAL(computeTimerState(&simpleTimer, respawnDurationMillis + DEFAULT_GO_SIGNAL_MILLIS + 1000 ), RespawnTimerState::IDLE);
-}
-
-void setup() {
-    
-    delay(1000);
-    Serial.begin(115200);
-    Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
+void RUN_UNITY_TESTS() {
     UNITY_BEGIN();
-
-    
     RUN_TEST(test_init_starts_disabled);
-
-
     UNITY_END();
-
 }
+
+#ifdef ARDUINO
+
+#include <Arduino.h>
+void setup() {
+    // NOTE!!! Wait for >2 secs
+    // if board doesn't support software reset via Serial.DTR/RTS
+    Serial.begin(115200);
+    Serial.setTimeout(500);    
+    delay(2000);
+
+    RUN_UNITY_TESTS();
+}
+
 void loop() {
     delay(500);
 }
+
+#else
+#include <ArduinoFake.h>
+
+int main(int argc, char **argv) {
+    RUN_UNITY_TESTS();
+    return 0;
+}
+
+#endif
