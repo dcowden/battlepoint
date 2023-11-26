@@ -74,7 +74,7 @@ void setupInputs(){
 }
 
 void setup() {
-  setCpuFrequencyMhz(240);
+  //setCpuFrequencyMhz(240);
   Serial.begin(115200);
   Serial.setTimeout(500);
   Log.begin(LOG_LEVEL_INFO, &Serial, true);

@@ -1,5 +1,6 @@
 #include <RespawnTimer.h>
 #include <unity.h>
+#include <Clock.h>
 
 #ifdef ARDUINO
    #include<Arduino.h>
@@ -9,7 +10,8 @@
     #include <ArduinoFake.h>
 #endif
 
-RespawnTimer simpleTimer = RespawnTimer();
+TestClock clock; 
+RespawnTimer simpleTimer(&clock);
 
 
 void test_init_starts_disabled(void){

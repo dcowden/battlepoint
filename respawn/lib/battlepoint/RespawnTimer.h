@@ -1,6 +1,6 @@
 #ifndef __INC_RESPAWNTIMER_H
 #define __INC_RESPAWNTIMER_H
-//#include <Arduino.h>
+#include <Clock.h>
 
 typedef enum {
     RESPAWNING = 0,
@@ -15,13 +15,15 @@ const int DEFAULT_GO_SIGNAL_MILLIS =3000;
 
 class RespawnTimer{
     public:
-        RespawnTimer(){
+        RespawnTimer(Clock* p_clock){
+            clock = p_clock;
             disable();
         };
 
         virtual bool isIdle( long currentTimeMillis){
             return (computeTimerState( currentTimeMillis)) == RespawnTimerState::IDLE;
         };
+        
         virtual void update(long currentTimeMillis){
 
         };
@@ -66,6 +68,7 @@ class RespawnTimer{
             }
         };
     protected:
+        Clock* clock;
         long durationMillis;
         long startMillis;
         long endMillis;

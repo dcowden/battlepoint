@@ -43,7 +43,7 @@ class RespawnPlayer{
         };
 
         bool acceptRespawnRequest(long durationMillis, long currentTimeMillis){
-            if ( ! timer->isAvailable(currentTimeMillis)){
+            if ( ! timer->isIdle(currentTimeMillis)){
                 return false;
             }
             else{

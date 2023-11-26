@@ -8,7 +8,8 @@
 #define MAIN_SLOT 0
 
 void initSettings(){
-    EEPROM.begin(EEPROM_SIZE);
+    //for esp32 only
+    //EEPROM.begin(EEPROM_SIZE);
 }
 
 int getSlotAddress(int slot_num){
@@ -23,7 +24,7 @@ void saveSettings (RespawnSettings* respawnSettings){
   for (unsigned int t=0; t<sizeof(toSave); t++){
       EEPROM.write(addr + t, *((char*)&toSave + t));  
   }
-  EEPROM.commit();
+  //EEPROM.commit();
   Log.noticeln("Settings Saved.");
 }
 
