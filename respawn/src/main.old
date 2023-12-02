@@ -1,0 +1,125 @@
+#include <Arduino.h>
+#include <ArduinoLog.h>
+#include <FastLED.h>
+#include <settings.h>
+#include <pins.h>
+#include <RespawnApp.h>
+#include <OneButton.h>
+#include <NonBlockingRtttl.h>
+#include <Ticker.h>
+
+#define BATTLEPOINT_VERSION "1.1.4"
+#define RESPAWN_POSITIONS 5
+#define SHORT_RESPAWN 1000
+#define MEDIUM_RESPAWN 5000
+#define LONG_RESPAWN 20000
+#define NO_TIMER_AVAILABLE -1
+
+
+
+RespawnSettings respawnSettings;
+
+
+//const char * SOUND_MARIO_1UP = "life:d=8,o=4,b=450:e.5,32p.,g.5,32p.,e.6,32p.,c.6,32p.,d.6,32p.,g.6,32p.";
+//const char * SOUND_MARIO_DEAD = "death:d=32,o=4,b=355:8b.,p.,8f.5,p.,4p,8f.5,p.,4f5,16p,4e5,16p,4d5,16p,8c.5,p.,8e.,p.,4p,8e.,p.,8c.,p.";
+//const char * SOUND_NO_SLOTS = "NoSlot:d=32,o=5,b=100:8g,8c";
+
+CRGB respawnLeds[RESPAWN_POSITIONS];
+
+
+# define GET_READY_TIME 3000
+
+RespawnApp ux = RespawnApp(respawnLeds,Pins::SOUND);
+
+void setupUX(){
+  FastLED.addLeds<NEOPIXEL, Pins::RESPAWN_LEDS>(respawnLeds, RESPAWN_POSITIONS);
+  pinMode(Pins::SOUND, OUTPUT);
+  ux.init();
+}
+
+//(pin, active low, enable pullup)
+OneButton shortRespawn(Pins::SHORT_DURATION_BTN,true,true);
+OneButton mediumRespawn(Pins::MEDIUM_DURATION_BTN,true,true);
+OneButton longRespawn(Pins::LONG_DURATION_BTN,true,true);
+
+
+
+void setupSettings(){
+  //initSettings();
+  respawnSettings.durations[0] = 1000;
+  respawnSettings.durations[1] = 5000;
+  respawnSettings.durations[2] = 20000;
+  //loadSettings(&respawnSettings);
+  //cLog.infoln("Loaded Durations: short=%d, med=%d, long=%d", respawnSettings.durations[0], respawnSettings.durations[1],respawnSettings.durations[2]);
+}
+
+void handleSetupLongClickStart(){
+  ux.startConfigureRespawnTime(millis());
+}
+
+void setLedsToColor(CRGB newcolor){
+  for ( int i=0;i<RESPAWN_POSITIONS;i++){
+    respawnLeds[i] = newcolor;
+  }
+}
+
+void handleLongPressEnd(int respawnDurationIndex){
+  long configuredDuration =ux.getConfiguredDuration(millis());
+  Log.warningln("Configure Duration SLot: %d = %dms", respawnDurationIndex, configuredDuration);
+  respawnSettings.durations[respawnDurationIndex] = configuredDuration;
+  saveSettings(&respawnSettings);
+}
+
+
+void setupInputs(){
+  shortRespawn.attachClick([](){
+      ux.requestRespawn(respawnSettings.durations[RESPAWN_DURATION_SHORT_INDEX],millis());
+  });
+
+  mediumRespawn.attachClick([](){
+      ux.requestRespawn(respawnSettings.durations[RESPAWN_DURATION_MEDIUM_INDEX],millis());
+  });
+
+  longRespawn.attachClick([](){
+      ux.requestRespawn(respawnSettings.durations[RESPAWN_DURATION_LONG_INDEX],millis());
+  });
+
+  shortRespawn.attachLongPressStart(handleSetupLongClickStart);
+  mediumRespawn.attachLongPressStart(handleSetupLongClickStart);
+  longRespawn.attachLongPressStart(handleSetupLongClickStart);  
+
+  shortRespawn.attachLongPressStop([](){
+      handleLongPressEnd(RESPAWN_DURATION_SHORT_INDEX);
+  });
+
+  mediumRespawn.attachLongPressStop([](){
+      handleLongPressEnd(RESPAWN_DURATION_MEDIUM_INDEX);
+  });
+
+  longRespawn.attachLongPressStop([](){
+      handleLongPressEnd(RESPAWN_DURATION_LONG_INDEX);    
+  }); 
+}
+
+void setup() {
+  //setCpuFrequencyMhz(240);
+  Serial.begin(57600);
+  Serial.setTimeout(500);
+  Log.begin(LOG_LEVEL_INFO, &Serial, true);
+  Log.warning("Starting...");
+  //setupSettings();
+  Log.noticeln("LOAD SETTINGS [OK]");
+  setupInputs();
+  Log.noticeln("LOAD INPUTS [OK]");  
+  setupUX();
+  Log.noticeln("LOAD UX [OK]");    
+}
+
+void loop() {
+  shortRespawn.tick();
+  mediumRespawn.tick();
+  longRespawn.tick();
+  ux.update(millis());
+  rtttl::play();
+  FastLED.show();
+}
