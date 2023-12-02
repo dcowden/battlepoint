@@ -1,6 +1,5 @@
 #ifndef __INC_CLOCK_H
 #define __INC_CLOCK_H
-//#include <Arduino.h>
 
 class Clock{
     public:

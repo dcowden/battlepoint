@@ -3,7 +3,7 @@ void test_test(){
 
 };
 
-void process(){
+void RUN_UNITY_TESTS(){
     UNITY_BEGIN();
     RUN_TEST(test_test);
     UNITY_END();
@@ -15,9 +15,10 @@ void process(){
 void setup() {
     // NOTE!!! Wait for >2 secs
     // if board doesn't support software reset via Serial.DTR/RTS
+ 
     delay(2000);
 
-    process();
+    RUN_UNITY_TESTS  ();
 }
 
 void loop() {

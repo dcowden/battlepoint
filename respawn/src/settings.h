@@ -1,9 +1,11 @@
+#ifndef _INC_SETTINGS_H
+#define _INC_SETTINGS_H
 #include <EEPROM.h>
 #include <ArduinoLog.h>
 #include <Arduino.h>
-#include <state.h>
+#include <RespawnSettings.h>
 
-#define BP_CURRENT_SETTINGS_VERSION 208 //change when any items are added to GameSettings struct
+#define BP_CURRENT_SETTINGS_VERSION 211 //change when any items are added to GameSettings struct
 #define EEPROM_SIZE 320
 #define MAIN_SLOT 0
 
@@ -41,5 +43,5 @@ void loadSettings(RespawnSettings* respawnSettings){
     Log.noticeln("Settings Loaded.");
   }
 }
-
+#endif
 

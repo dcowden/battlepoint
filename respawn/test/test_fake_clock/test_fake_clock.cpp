@@ -41,14 +41,15 @@ void RUN_COMMON_TESTS(){
 void setup() {
     // NOTE!!! Wait for >2 secs
     // if board doesn't support software reset via Serial.DTR/RTS
-    Serial.begin(115200);
-    Serial.setTimeout(500);    
     delay(2000);
 
     RUN_COMMON_TESTS();
 }
 
 void loop() {
+    digitalWrite(13, HIGH);
+    delay(100);
+    digitalWrite(13, LOW);
     delay(500);
 }
 

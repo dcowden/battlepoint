@@ -3,77 +3,114 @@
 #include <Clock.h>
 
 typedef enum {
-    RESPAWNING = 0,
-    IMMINENT =1,
-    FINISHED = 2,
-    IDLE=3
+    RESPAWN_START = 0,
+    RESPAWNING = 1,
+    IMMINENT =2,
+    FINISHED = 3,
+    IDLE = 4
 } RespawnTimerState;
 
+typedef struct{
+    long durationMillis;  //how long is the respawn interval?
+    long immientMillis;   //how long before completion do we get the 'get ready' state?
+    long afterFinishMillis; //how long after finish do we indicate the go signal?
+    long afterStartMillis;  //how long after start do we indicate the respawning signal?
+} TimerConfig;
+
 const int MILLIS_NOT_STARTED = -1;
-const int DEFAULT_READY_TIME_LEFT_MILLIS =3000;
-const int DEFAULT_GO_SIGNAL_MILLIS =3000;
+
+typedef void (*stateCallback)(RespawnTimerState newState, int id);
+
+//TODO, this would be cool as an operator on TimerConfig
+//inline RespawnTimerState& computeTimerState (long timeSinceStart ) __attribute__((always_inline))
+RespawnTimerState computeStateForTimer( TimerConfig config, long elapsedMillis){
+    //compute some relative end times
+    long endTimeMillis = config.durationMillis;
+    long timeWhenImminentStarts = config.durationMillis - config.immientMillis;
+    long endOfPostFinish = config.durationMillis + config.afterFinishMillis;
+
+    if ( elapsedMillis < 0 ){
+        //invalid state
+        return RespawnTimerState::IDLE;
+    }
+    if ( elapsedMillis <  config.afterStartMillis){
+        return RespawnTimerState::RESPAWN_START;
+    }
+    else if ( elapsedMillis < timeWhenImminentStarts ){
+        return RespawnTimerState::RESPAWNING;
+    }
+    else if ( elapsedMillis < endTimeMillis){
+        return RespawnTimerState::IMMINENT;
+    }
+    else if ( elapsedMillis < endOfPostFinish){
+        return RespawnTimerState::FINISHED;
+    }
+    else{
+        return RespawnTimerState::IDLE;
+    }
+};
 
 class RespawnTimer{
     public:
-        RespawnTimer(Clock* p_clock){
-            clock = p_clock;
-            disable();
+        RespawnTimer(Clock* clock, int id){
+            _clock = clock;
+            _id = id;
+            _running = false;
         };
 
-        virtual bool isIdle( long currentTimeMillis){
-            return (computeTimerState( currentTimeMillis)) == RespawnTimerState::IDLE;
-        };
-        
-        virtual void update(long currentTimeMillis){
-
-        };
-        virtual void start(long timerDurationMillis, long currentTimeMillis){
-            durationMillis = timerDurationMillis;
-            startMillis = currentTimeMillis;
-            endMillis = currentTimeMillis + timerDurationMillis;
-            respawnImminentMillis = endMillis - DEFAULT_READY_TIME_LEFT_MILLIS;
-            resetMillis = endMillis + DEFAULT_GO_SIGNAL_MILLIS; 
+        bool isAvailable(){
+            return (state() == RespawnTimerState::FINISHED || state() == RespawnTimerState::IDLE);
+        }
+        int id(){
+            return _id;
         };
 
-        virtual void disable(){
-            startMillis = MILLIS_NOT_STARTED;
-            endMillis = MILLIS_NOT_STARTED;
-            resetMillis = MILLIS_NOT_STARTED;
-            respawnImminentMillis = MILLIS_NOT_STARTED;
+        void onStateChange( stateCallback callback){
+            _callback = callback;
         };
-        virtual RespawnTimerState computeTimerState( long currentTimeMillis){
-            if ( startMillis == MILLIS_NOT_STARTED){
-                return RespawnTimerState::IDLE;
+
+        void start(TimerConfig config){
+            _config = config;
+            _startMillis= _clock->milliseconds();      
+            _running = true;
+            _lastState = RespawnTimerState::IDLE;
+            updateState(RespawnTimerState::RESPAWN_START);
+        };
+
+        void stop(){
+            _running = false;
+            updateState(RespawnTimerState::IDLE);
+        };
+
+        RespawnTimerState state(){
+            long millisSinceStart = _clock->milliseconds() - _startMillis;
+            if ( _running ){
+                RespawnTimerState newState = computeStateForTimer(_config,millisSinceStart);
+                updateState(newState);
+                return newState;
             }
             else{
-                long timeLeftMillis = endMillis - currentTimeMillis;
-
-                if ( timeLeftMillis > 0 ){
-                    if ( currentTimeMillis < respawnImminentMillis){
-                        return RespawnTimerState::RESPAWNING;
-                    }
-                    else{
-                        return RespawnTimerState::IMMINENT;
-                    }
-                }
-                else {
-                    // no time left
-                    if ( currentTimeMillis > resetMillis ){
-                        return RespawnTimerState::IDLE;
-                    }
-                    else{
-                        return RespawnTimerState::FINISHED;
-                    }
-                }
+                return RespawnTimerState::IDLE;
             }
         };
-    protected:
-        Clock* clock;
-        long durationMillis;
-        long startMillis;
-        long endMillis;
-        long respawnImminentMillis;
-        long resetMillis;
 
+    protected:
+        void updateState(RespawnTimerState newState){
+            if ( newState != _lastState){
+                if ( _callback != 0 ){
+                    _callback(newState,_id);
+                }               
+            }  
+             _lastState = newState;                     
+        };
+
+        Clock* _clock;
+        bool _running;
+        stateCallback _callback = 0;
+        RespawnTimerState _lastState = RespawnTimerState::IDLE;
+        int _id = 0;
+        long _startMillis = MILLIS_NOT_STARTED;
+        TimerConfig _config;
+        long _lastUpdateMillis=0;
 };
 #endif
