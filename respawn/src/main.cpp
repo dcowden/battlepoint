@@ -14,9 +14,11 @@
 
 #define BATTLEPOINT_VERSION "1.1.5"
 #define CONFIGURE_BLINK_CONFIRM_MILLIS 100
+#define RESPAWN_SOUNDOUT_DELAY_MILLIS 300
 
 const char * SOUND_LIFE1 =  "life:d=8,o=4,b=450:e.5,32p.,g.5,32p.,e.6,32p.,c.6,32p.,d.6,32p.,g.6,32p.";
 const char * SPAWN_START =  "life:d=8,o=4,b=450:e.5,32p.";
+const char * RESPAWN_COUNT =  "rc:d=8,o=4,b=450:e.5";
 //const char * DEATH =   "death:d=32,o=4,b=355:8b.,p.,8f.5,p.,4p,8f.5,p.,4f5,16p,4e5,16p,4d5,16p,8c.5,p.,8e.,p.,4p,8e.,p.,8c.,p.";
 const char * NO_SLOT = "NoSlot:d=32,o=5,b=100:8g,8c";
 const char * READY = "ready:d=4,o=5,b=112:16e4,16e4";
@@ -110,11 +112,11 @@ void updatePixels(){
 
 void updateUX(RespawnTimerState newState, int id){
     if ( currentMode == RunMode::MODE_RUNNING){  
-        Log.infoln("New State %d on timer id %d", newState, id);
+        Log.traceln("New State %d on timer id %d", newState, id);
         const char* song = getMelodyForState(newState);
         ledPixels[id].setPixelColor(getColorForState(newState));
         if ( song != NULL){
-          Log.infoln("Play Song, index=%s",song);
+          Log.traceln("Play Song, index=%s",song);
             rtttl::begin(Pins::SOUND,song);
         }
     }  
@@ -131,9 +133,18 @@ void setupUX(){
 void setupSettings(){
   initSettings();
   loadSettings(&respawnSettings);
-  Log.infoln(F("Loaded Durations: short=%l, med=%l, long=%l"), respawnSettings.durations[0], respawnSettings.durations[1],respawnSettings.durations[2]);
+  Log.traceln(F("Loaded Durations: short=%l, med=%l, long=%l"), respawnSettings.durations[0], respawnSettings.durations[1],respawnSettings.durations[2]);
 }
 
+void countRespawns(){
+    int rc = respawnController.getRespawnCount();
+    Log.warningln("There were %d respawns. Counting them out",rc);
+    for ( int i=0;i<rc;i++){
+       rtttl::begin(Pins::SOUND,RESPAWN_COUNT);
+       rtttl::play();
+       delay(RESPAWN_SOUNDOUT_DELAY_MILLIS);
+    }
+}
 void handleRespawnClick(RespawnDurationSlot slot){
     Log.infoln("Request Respawn, button %d",slot);
     if ( currentMode == RunMode::MODE_RUNNING){
@@ -177,6 +188,10 @@ void setupInputs(){
   mediumRespawn.attachClick([](){ handleRespawnClick(RespawnDurationSlot::SPAWN_DURATION_MEDIUM); });
   longRespawn.attachClick([](){ handleRespawnClick(RespawnDurationSlot::SPAWN_DURATION_LONG); });
 
+  shortRespawn.attachDoubleClick(countRespawns);
+  mediumRespawn.attachDoubleClick(countRespawns);
+  longRespawn.attachDoubleClick(countRespawns);
+
   shortRespawn.attachLongPressStart([](){ handleRespawnLongClick(RespawnDurationSlot::SPAWN_DURATION_SHORT); });
   mediumRespawn.attachLongPressStart([](){ handleRespawnLongClick(RespawnDurationSlot::SPAWN_DURATION_MEDIUM); });
   longRespawn.attachLongPressStart([](){ handleRespawnLongClick(RespawnDurationSlot::SPAWN_DURATION_LONG);  }); 
@@ -185,7 +200,7 @@ void setupInputs(){
 void setup() {
   Serial.begin(115200);
   Serial.setTimeout(500);
-  Log.begin(LOG_LEVEL_WARNING, &Serial, true);
+  Log.begin(LOG_LEVEL_INFO, &Serial, true);
   Log.warning("Starting...");
   setupSettings();
   Log.noticeln("LOAD SETTINGS [OK]");

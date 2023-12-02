@@ -24,6 +24,7 @@ class RespawnController{
         RespawnController(Clock* clock, RespawnSettings* settings){
             _clock = clock;
             _settings = settings;
+            _respawnCount=0;
             for ( int i=0;i<NUM_CONTROLLER_TIMERS; i++){
                 _timers[i] = new RespawnTimer(clock,i);
             }
@@ -34,6 +35,9 @@ class RespawnController{
                 _timers[i]->stop();
             }
         };
+        int getRespawnCount(){
+            return _respawnCount;
+        }
         void setCallBackForAllTimers(stateCallback callbackFunction){
             for ( int i=0;i<NUM_CONTROLLER_TIMERS; i++){
                 _timers[i]->onStateChange(callbackFunction);
@@ -51,7 +55,7 @@ class RespawnController{
         };
 
         RespawnTimer* requestRespawn(TimerConfig config){
-
+            
             int timerIndex = findAvailableTimer();
             if ( timerIndex == NO_TIMER_AVAILABLE ){
                 return NULL;
@@ -59,6 +63,7 @@ class RespawnController{
 
             RespawnTimer* timer = _timers[timerIndex];
             timer->start(config);
+            _respawnCount++;
             return timer;
         };
 
@@ -76,6 +81,7 @@ class RespawnController{
             return NO_TIMER_AVAILABLE;
         };
         Clock* _clock;
+        int _respawnCount = 0;
         RespawnTimer* _timers[NUM_CONTROLLER_TIMERS];
         RespawnSettings* _settings;
 };

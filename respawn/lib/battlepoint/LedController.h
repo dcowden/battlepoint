@@ -29,14 +29,14 @@ class LedPixel{
             }
         }
         void setSolidColor ( CRGB newColor){
-            Log.infoln("LedPixel %d, solid %l",_index, newColor);
+            Log.traceln("LedPixel %d, solid %l",_index, newColor);
             _flashIntervalMillis = 0;
             _fgColor = newColor;
             _bgColor = newColor;
             setColor(newColor);
         };
         void setBlinkingColor ( CRGB fgColor, CRGB bgColor, long flashIntervalMillis){
-            Log.infoln("LedPixel %d, blinking %l",_index, fgColor);
+            Log.traceln("LedPixel %d, blinking %l",_index, fgColor);
             _fgColor = fgColor;
             _bgColor = bgColor;
             _flashIntervalMillis = flashIntervalMillis;
