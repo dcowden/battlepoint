@@ -126,8 +126,12 @@ void setupUX(){
   PixelColor ic = getColorForState(RespawnTimerState::IDLE);
   setSolidColor(ic);
   respawnController.setCallBackForAllTimers(updateUX);
+  pinMode(Pins::RESPAWN_LEDS,OUTPUT);
   FastLED.addLeds<NEOPIXEL, Pins::RESPAWN_LEDS>(respawnLeds, NUM_CONTROLLER_TIMERS);
   pinMode(Pins::SOUND, OUTPUT);
+  //pinMode(Pins::SHORT_DURATION_BTN, INPUT_PULLUP);
+  //pinMode(Pins::LONG_DURATION_BTN, INPUT_PULLUP);
+  //pinMode(Pins::MEDIUM_DURATION_BTN, INPUT_PULLUP);
 }
 
 void setupSettings(){
@@ -188,13 +192,20 @@ void setupInputs(){
   mediumRespawn.attachClick([](){ handleRespawnClick(RespawnDurationSlot::SPAWN_DURATION_MEDIUM); });
   longRespawn.attachClick([](){ handleRespawnClick(RespawnDurationSlot::SPAWN_DURATION_LONG); });
 
-  shortRespawn.attachDoubleClick(countRespawns);
-  mediumRespawn.attachDoubleClick(countRespawns);
+  //shortRespawn.attachDoubleClick(countRespawns);
+  //mediumRespawn.attachDoubleClick(countRespawns);
   longRespawn.attachDoubleClick(countRespawns);
 
   shortRespawn.attachLongPressStart([](){ handleRespawnLongClick(RespawnDurationSlot::SPAWN_DURATION_SHORT); });
   mediumRespawn.attachLongPressStart([](){ handleRespawnLongClick(RespawnDurationSlot::SPAWN_DURATION_MEDIUM); });
   longRespawn.attachLongPressStart([](){ handleRespawnLongClick(RespawnDurationSlot::SPAWN_DURATION_LONG);  }); 
+}
+
+void debugSetColor(CRGB newColor){
+  for ( int i = 0;i<NUM_CONTROLLER_TIMERS;i++){
+    respawnLeds[i] = newColor;
+  }
+  FastLED.show();  
 }
 
 void setup() {
@@ -208,7 +219,12 @@ void setup() {
   Log.noticeln("LOAD INPUTS [OK]");  
   setupUX();
   Log.noticeln("LOAD UX [OK]"); 
-  currentMode = RunMode::MODE_RUNNING;   
+  debugSetColor(CRGB::Green);
+  delay(2000);
+  debugSetColor(CRGB::Black);
+  FastLED.show();
+  currentMode = RunMode::MODE_RUNNING; 
+  Log.noticeln("SETUP DONE [OK]");   
 }
 
 void loop() {
