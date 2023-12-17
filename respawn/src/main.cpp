@@ -192,8 +192,8 @@ void setupInputs(){
   mediumRespawn.attachClick([](){ handleRespawnClick(RespawnDurationSlot::SPAWN_DURATION_MEDIUM); });
   longRespawn.attachClick([](){ handleRespawnClick(RespawnDurationSlot::SPAWN_DURATION_LONG); });
 
-  shortRespawn.attachDoubleClick(countRespawns);
-  mediumRespawn.attachDoubleClick(countRespawns);
+  //shortRespawn.attachDoubleClick(countRespawns);
+  //mediumRespawn.attachDoubleClick(countRespawns);
   longRespawn.attachDoubleClick(countRespawns);
 
   shortRespawn.attachLongPressStart([](){ handleRespawnLongClick(RespawnDurationSlot::SPAWN_DURATION_SHORT); });
