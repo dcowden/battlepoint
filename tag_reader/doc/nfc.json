@@ -1,0 +1,30 @@
+
+//config card
+{
+    "card_type": 4,
+    "class_name": "Scout",
+    "max_spawns": 0,    
+    "max_hp": 9,
+    "hp": 9,    
+    "big_hit": 3,
+    "little_hit": 1,
+    "invuln_ms":5000
+}
+
+//medic card
+//hp += add_hp, up to max value
+{
+    "card_type":1,
+    "add_hp": 5
+}
+
+//respawn_card
+//hp = max_hp, spawns += 1
+{
+    "card_type": 2,
+}
+
+//flag
+{
+    "card_type": 3
+}
