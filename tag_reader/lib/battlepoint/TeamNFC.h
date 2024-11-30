@@ -1,6 +1,9 @@
 #ifndef __INC_NFC_H
 #define __INC_NFC_H
 
+const long START_TIME_NOTSTARTED = -1;
+const int NOT_SET = 1;
+
 typedef enum{
     MEDIC=1,
     RESPAWN=2,
@@ -8,75 +11,147 @@ typedef enum{
     CONFIG=4
 } NFCCardType;
 
+typedef enum {
+    DEAD=0,
+    RESPAWNING=1,
+    ALIVE=2,
+    INVULNERABLE=3,
+    INIT
+} LifeStage;
+
 typedef struct { 
-    int max_spawns = 100;
-    int spawns = 0;
-    int max_hp=10;
-    int hp = 10;
-    int big_hit=3;
-    int little_hit=1;
-    int invuln_ms=3000;
-    long invuln_start=0;
-    bool is_dead = false;
-    bool is_invul = false;
-    bool is_forever_dead = false;
+    //TODO: divide into a class or nest these?
+    //configurations
+    int max_hp=NOT_SET;
+    int big_hit=NOT_SET;
+    int little_hit=NOT_SET;
+    int invuln_ms=NOT_SET;
+    long respawn_ms=NOT_SET;
+
+
+    //state
+    long respawn_allowed_time_ms=START_TIME_NOTSTARTED;
+    long invuln_end_time_ms = START_TIME_NOTSTARTED;
+    int hp = 0;
+    int state = LifeStage::INIT;    
+    bool respawnRequested = false; 
+
 } LifeConfig;
 
-void updateLife(LifeConfig* config){
-    if ( config->is_invul){
-        if (millis() > (config->invuln_start + config->invuln_ms)){
-            config->is_invul = false;
+
+void doRespawn( LifeConfig &config , long current_time_millis){
+    config.hp = config.max_hp;
+    config.state = LifeStage::ALIVE;
+    config.invuln_end_time_ms = START_TIME_NOTSTARTED;
+    config.respawnRequested = false;
+}
+
+void doKill( LifeConfig &config , long current_time_millis){
+    config.state = LifeStage::DEAD;
+    config.hp = 0;
+
+    //important: this is computed here so that even if we change classes, 
+    //we can't respawn until the timeout for THIS class
+    config.respawn_allowed_time_ms = (current_time_millis + config.respawn_ms);        
+    config.respawnRequested = false;
+}
+
+void requestRespawn(LifeConfig &config , long current_time_millis){
+    config.respawnRequested = true;
+    if ( config.state == LifeStage::INIT){
+       doKill(config, current_time_millis);
+    }
+}
+
+void start_invuln(LifeConfig &config , long current_time_millis){
+    config.state = LifeStage::INVULNERABLE;
+    config.invuln_end_time_ms = current_time_millis + config.invuln_ms;
+}
+
+void end_invuln(LifeConfig &config , long current_time_millis){
+    config.state = LifeStage::ALIVE;
+    config.invuln_end_time_ms = START_TIME_NOTSTARTED;
+}
+
+void updateLifeStatus(LifeConfig &config, long current_time_millis){
+    if ( config.state == LifeStage::INVULNERABLE){
+        if (current_time_millis > config.invuln_end_time_ms){
+            end_invuln(config,current_time_millis);
         }
     }
-    if ( config->hp <= 0 ){
-        config->is_dead = true;
-        config->is_invul = true;
-        config->invuln_start = millis();
+
+    if ( config.state == LifeStage::INIT ){
+        //dont do anything: waiting to get configured
     }
-
+    else if ( config.state == LifeStage::ALIVE  ){
+        if ( config.hp <= 0 ){
+            doKill(config,current_time_millis);
+        }        
+    }
+    else if ( config.state == LifeStage::DEAD){
+        if ( config.respawnRequested ){
+            config.state = LifeStage::RESPAWNING;
+        }
+        else{
+            //no respawn requested, so stay dead
+        }
+    }
+    else if ( config.state == LifeStage::RESPAWNING ){
+        if (current_time_millis > config.respawn_allowed_time_ms){
+            doRespawn(config,current_time_millis);
+        }
+        else{
+            //stay respawning
+        }     
+    }
 }
-void printLift(LifeConfig* config){
-  //Log.notice("DMG: ");  Log.notice(config->big_hit);  Log.notice("/"); Log.noticeln(config->little_hit);
-  //Log.notice("HP: ");  Log.notice(config->hp);  Log.notice("/"); Log.noticeln(config->max_hp);
-  //Log.notice("Lives: "); Log.notice(config->spawns); Log.notice("/"); Log.noticeln(config->max_spawns);
-  //Log.notice("Dead: "); if ( config->is_dead){ Log.noticeln("Y");} else {Log.noticeln("N");} 
-  //Log.notice("Inv: "); if ( config->is_invul){ Log.noticeln("Y");} else {Log.noticeln("N");}
-}
 
-void respawn(LifeConfig* config){
-    if ( config->spawns >= config->max_spawns){
-        config->spawns += 1;
-        config->is_forever_dead = true;
+const char * lifeStatus( LifeConfig &config ){
+    if ( config.state == LifeStage::RESPAWNING){
+        return "RESP";
+    }
+    else if ( config.state == LifeStage::DEAD){
+        return "DEAD";
+    }
+    else if ( config.state == LifeStage::INVULNERABLE){
+        return "INV";
+    }
+    else if ( config.state == LifeStage::ALIVE){
+        return "ALIV";
     }
     else{
-        config->spawns += 1;
-        config->hp = config->max_hp;
-        config->is_dead = false;
-        config->is_forever_dead = false;
+        return "UNKN";
     }
 }
 
-void medic(LifeConfig* config, int add_hp){
-    config->hp += add_hp;
-    if( config->hp > config->max_hp){
-        config->hp = config->max_hp;
+void logLife(LifeConfig &config){
+  Log.noticeln("DMG: %d/%d",config.big_hit, config.little_hit);
+  Log.noticeln("HP: %d/%d, config.hp, config.max_hp");
+  Log.noticeln("STS: %s", lifeStatus(config)); 
+}
+
+
+void adjust_hp(LifeConfig &config, int delta,long current_time_millis){
+    if ( config.state == LifeStage::ALIVE){
+        config.hp += delta; 
+        config.hp = constrain(config.hp,0,config.max_hp);
+        updateLifeStatus(config,current_time_millis);
+    }
+    else{
+        Log.warningln("Can't add health when not alive.");
     }
 }
 
-void big_hit(LifeConfig* config){
-    config->hp -= config->big_hit;
-    if ( config->hp <= 0){
-        config->is_dead = true;
-        config->hp = 0;
-    }
+void medic(LifeConfig &config, int add_hp, long current_time_millis){
+    adjust_hp(config, add_hp, current_time_millis);    
 }
 
-void little_hit(LifeConfig* config){
-    config->hp -= config->little_hit;
-    if ( config->hp <= 0){
-        config->is_dead = true;
-        config->hp = 0;
-    }
+void big_hit(LifeConfig &config, long current_time_millis){
+    adjust_hp(config, -config.big_hit, current_time_millis);
+}
+
+void little_hit(LifeConfig &config, long current_time_millis){
+    adjust_hp(config, -config.little_hit, current_time_millis);    
 }
 
 #endif

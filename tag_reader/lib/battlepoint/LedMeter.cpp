@@ -69,6 +69,11 @@ void setMeterValue(LedMeter* meter, int val, CRGB fgColor ){
     meter->flash_interval_millis = FlashInterval::FLASH_NONE;
 }
 
+void setMeterValue(LedMeter* meter, int val, CRGB fgColor, long flash_interval_millis){
+   setMeterValue(meter, val, fgColor);
+   meter->flash_interval_millis = flash_interval_millis;
+
+}
 //blank is different than value=0: the background color for blank is always 
 //black (off)
 

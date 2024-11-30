@@ -41,4 +41,5 @@ void updateLedMeter(LedMeter* meter );
 void updateLedMeter(LedMeter* meter, long current_time_millis );
 void setMeterValues (LedMeter* meter, int val, int max_val, CRGB fgColor, CRGB bgColor );
 void setMeterValue(LedMeter* meter, int val, CRGB fgColor );
+void setMeterValue(LedMeter* meter, int val, CRGB fgColor, long flash_interval_millis);
 #endif

@@ -3,12 +3,12 @@
 {
     "card_type": 4,
     "class_name": "Scout",
-    "max_spawns": 0,    
     "max_hp": 9,
     "hp": 9,    
     "big_hit": 3,
     "little_hit": 1,
-    "invuln_ms":5000
+    "invuln_ms":5000,
+    "respawn_ms":30000
 }
 
 //medic card
