@@ -1,10 +1,10 @@
-#include <Card.h>
+#include <CardReader.h>
 #include <PN532_HSU.h>
 #include <PN532.h>
 #include <NfcAdapter.h>
-#include <TeamNFC.h>
 #include <ArduinoJson.h>
 #include <ArduinoLog.h>
+#include "NFCCards.h"
 
 #define AFTER_CARD_READ_DELAY_MS 1000
 #define CARD_BUFFER_BYTES 500
@@ -20,15 +20,16 @@ byte nuidPICC[4];
 String tagId= "None";
 JsonDocument doc;
 
-void initNFC(){
+void cardReaderInit(){
   nfc.begin();
   Log.noticeln("NFC  [OK]");    
 }
 
+
 void parseClassCard ( ClassCard &card ){
-  Log.info("Reading Class Card");
+  Log.infoln("Reading Class Card");
   
-  setDefaults(card );
+  cardSetDefaults(card );
 
   int max_hp = doc["max_hp"];
   if ( max_hp){
@@ -60,17 +61,17 @@ void parseClassCard ( ClassCard &card ){
     card.team = team;
   }
 
-  unsigned char player_class = doc["class"];
+  int player_class = doc["class"];
   if ( player_class){
     card.player_class = player_class;
   }
-  Log.infoln("Read Class Card: class=%c,max_hp=%d, bighit=%d, littlehit=%d, invuln_ms=%d, respawn_ms=%d, team=%c",
+  Log.infoln("Read Class Card: class=%d max_hp=%d, bighit=%d, littlehit=%d, invuln_ms=%d, respawn_ms=%d, team=%c",
         card.player_class,card.max_hp,card.big_hit,card.little_hit,card.invuln_ms,card.respawn_ms,card.team);
 }
 
 void parseMedicCard ( MedicCard &card){
   Log.info("Reading Class Card");
-  setDefaults(card );
+  cardSetDefaults(card );
   int hp = doc["hp"];
   if ( hp){
     card.hp = hp;
@@ -79,7 +80,7 @@ void parseMedicCard ( MedicCard &card){
 }
 
 void parseFlagCard ( FlagCard &card){
-  setDefaults(card );
+  cardSetDefaults(card );
   Log.info("Reading Flag Card");  
   int value = doc["value"];
   if ( value){
@@ -121,12 +122,11 @@ NFCCard parseCard(){
 }
 
 
-//TODO: this fires calls to UI, which i dont want
-NFCCard readNFC() 
+NFCCard cardReaderTryCardIfPresent() 
 {
 
   NFCCard card;
-  setDefaults(card);
+  cardSetDefaults(card);
 
   if (nfc.tagPresent(TAG_PRESENT_TIMEOUT))
   {
@@ -164,3 +164,4 @@ NFCCard readNFC()
   
   return card;
 }
+

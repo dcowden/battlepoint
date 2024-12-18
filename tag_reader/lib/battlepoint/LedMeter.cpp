@@ -117,7 +117,7 @@ void updateLedMeter(LedMeter* meter ){
     total_lights = startIndex - endIndex + 1;
     indexIncrement = -1;
   }
-
+  
   int num_lights_on = proportionalValue( meter->val, meter->max_val, total_lights); 
   int currentIndex = startIndex;
 

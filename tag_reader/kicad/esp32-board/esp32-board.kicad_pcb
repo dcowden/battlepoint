@@ -1040,7 +1040,7 @@
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J3"
-			(at 0 -2.33 360)
+			(at 0 -2.33 0)
 			(layer "F.SilkS")
 			(uuid "0a18a8a2-95bf-4fec-8c4c-1e9302c793d5")
 			(effects
@@ -1051,7 +1051,7 @@
 			)
 		)
 		(property "Value" "PWR"
-			(at 0 4.87 360)
+			(at 0 4.87 0)
 			(layer "F.Fab")
 			(uuid "93afae45-2cb9-410f-b458-d3dd714ea53f")
 			(effects
@@ -2437,7 +2437,7 @@
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J9"
-			(at 0 -2.33 360)
+			(at 0 -2.33 0)
 			(layer "F.SilkS")
 			(uuid "f4a91a47-0bfa-43a1-985a-e709b6fb11d1")
 			(effects
@@ -2448,7 +2448,7 @@
 			)
 		)
 		(property "Value" "SPK"
-			(at 0 4.87 360)
+			(at 0 4.87 0)
 			(layer "F.Fab")
 			(uuid "2e46ad5b-ca6e-4c5e-9ba5-aee292bab605")
 			(effects
@@ -2715,7 +2715,7 @@
 			)
 		)
 		(property "Value" "OLED"
-			(at 0 9.95 360)
+			(at 0 9.95 0)
 			(layer "F.Fab")
 			(uuid "d7aff3df-54a8-46c9-8dca-6c806acd4434")
 			(effects

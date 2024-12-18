@@ -1,7 +1,7 @@
 #include <UI.h>
 #include <FastLED.h>
 #include <Wire.h>
-#include <TeamNFC.h>
+#include <CardReader.h>
 #include "gsl/gsl-lite.hpp"
 #include <NonBlockingRtttl.h>
 #include "SSD1306Ascii.h"
@@ -14,10 +14,12 @@
 #define CARDREAD_CONFIRM_NUM_BLINKS 6
 #define CARDREAD_CONFIRM_BLINK_MS 500
 #define BATTLEPOINT_VERSION "1.1.3"
+#define OLED_UPDATE_INTERVAL_MS 500
 
 bool notifiedDead = false;
+long last_oled_update = 0;
 
-extern LifeConfig currentConfig;
+//extern LifeConfig currentConfig;
 
 CRGB leftLeds[SIDE_LED_SIZE];
 CRGB rightLeds[SIDE_LED_SIZE];
@@ -31,8 +33,9 @@ const char * LITTLE_HIT = "bighit:d=8,o=4,b=450:e.5,e.5,e.5";
 const char * BIG_HIT = "little:d=8,o=4,b=450:8g,8g,8g";
 const char * DEAD_MUSIC = "dead:d=32,o=4,b=64:32g,32p,32g,32p,32g,32p,2d#";
 
-void blinkLedsWithColor(int numBlinks, CRGB color, int blink_rate_millis);
-void initDisplay(){
+void blinkLedsWithColor(LifeConfig &config,int numBlinks, CRGB color, int blink_rate_millis);
+
+void uiInit(LifeConfig &config, long current_time_millis){
 
     pinMode(Pins::BUZZER_PIN, OUTPUT);
         
@@ -45,6 +48,8 @@ void initDisplay(){
     int IDX=SIDE_LED_SIZE-1;
     initMeter(&leftMeter,"left",leftLeds,IDX,0);
     initMeter(&rightMeter,"right",rightLeds,IDX,0);   
+    Log.infoln("Meter Values: max=%d, val=%d",config.max_hp, config.hp);
+    configureMeter(&leftMeter,config.max_hp,config.hp,CRGB::Green, CRGB::Black);
 
     oled.begin(&Adafruit128x64, I2C_ADDRESS);
     oled.setFont(MENU_FONT);
@@ -53,25 +58,26 @@ void initDisplay(){
     oled.println(BATTLEPOINT_VERSION); 
     oled.println("HitTracker...");
     Log.noticeln("OLED [OK]");         
-    blinkLedsWithColor(6, CRGB::Blue, 500 );
-
+    blinkLedsWithColor(config,6, CRGB::Blue, 500 ); 
+    
     rtttl::play();   
 }
 
-void handleLittleHit(){
+void uiHandleLittleHit(long current_time_millis){
     rtttl::begin(Pins::BUZZER_PIN, BIG_HIT);
 }
-void handleBigHit(){
+
+void uiHandleBigHit(long current_time_millis){
     rtttl::begin(Pins::BUZZER_PIN, LITTLE_HIT);
 }
 
-void uiDelay(int millis_to_wait ){
+void uiDelay(LifeConfig &config,int millis_to_wait ){
   Expects(millis_to_wait > 0 );
   //delay while updating sound, leds, and display
   long s = millis();
   long end = millis_to_wait + s;
   while ( millis() < end){
-      updateUI(s);
+      uiUpdate(config,s);
   }
 }  
 
@@ -87,22 +93,25 @@ void updateMeters (CRGB fgColor, int val ){
   updateMeters(fgColor,val,FlashInterval::FLASH_NONE);
 }
 
-void blinkLedsWithColor(int numBlinks, CRGB color, int blink_rate_millis){
+void blinkLedsWithColor(LifeConfig &config, int numBlinks, CRGB color, int blink_rate_millis){
   long delay_ms = numBlinks* blink_rate_millis;
   updateMeters(color,leftMeter.max_val,blink_rate_millis);
-  uiDelay(delay_ms);
+  uiDelay(config,delay_ms);
 } 
 
-void updateDisplay(){  
+void updateDisplay(LifeConfig &config,long current_time_millis){  
+  long start_time = millis();
   char SPACE = ' ';
   oled.setCursor(0,0);
-  oled.print("HP: ");  oled.print(currentConfig.hp);  oled.print("/"); oled.print(currentConfig.max_hp); 
+  oled.print("HP: ");  oled.print(config.hp);  oled.print("/"); oled.print(config.max_hp); 
   oled.clearToEOL(); oled.println("");
+  oled.print("CLS: "); oled.print(playerClassName(config.player_class)); oled.print( " TM: ");oled.print((char)(config.team));
   oled.clearToEOL(); oled.println("");
-  oled.print("DMG: ");  oled.print(currentConfig.little_hit); oled.print("/"); oled.print(currentConfig.big_hit); 
+  oled.print("DMG: ");  oled.print(config.little_hit); oled.print("/"); oled.print(config.big_hit); 
   oled.clearToEOL(); oled.println("");
-  oled.print("STS: "); oled.print(lifeStatus(currentConfig));
+  oled.print("STS: "); oled.print(trackerLifeStatus(config));
   oled.clearToEOL(); oled.println("");
+  //Log.traceln("Update Display :%l ms", millis()-start_time);
 }  
 
 long getRespawnFlashInterval(LifeConfig &config){
@@ -114,53 +123,76 @@ long getRespawnFlashInterval(LifeConfig &config){
     return config.respawn_ms / MULTIPLIER;
 }
 
-void updateLEDs(){ 
+void updateLEDs(LifeConfig &config,long current_time_millis){ 
     CRGB fgColor = CRGB::Black;
     long flash_interval = FlashInterval::FLASH_NONE;
     int meterVal = 0;
-
-    if ( currentConfig.state == LifeStage::ALIVE){
+    const int METER_MAX = config.max_hp;
+    if ( config.state == LifeStage::ALIVE){
       fgColor = CRGB::Green;
       flash_interval = FlashInterval::FLASH_NONE;
-      meterVal = currentConfig.hp;
+      meterVal = config.hp;
     }
-    else if ( currentConfig.state == LifeStage::DEAD){
+    else if ( config.state == LifeStage::DEAD){
       fgColor = CRGB::Red;
       flash_interval = FlashInterval::FLASH_SLOW;
-      meterVal = currentConfig.max_hp;
+      meterVal = config.max_hp;
     }
-    else if ( currentConfig.state == LifeStage::INVULNERABLE){
+    else if ( config.state == LifeStage::INVULNERABLE){
       fgColor = CRGB::Yellow;
       flash_interval = FlashInterval::FLASH_SLOW;
-      meterVal = currentConfig.max_hp;
+      meterVal = config.max_hp;
     }
-    else if ( currentConfig.state == LifeStage::RESPAWNING){
+    else if ( config.state == LifeStage::RESPAWNING){
       fgColor = CRGB::Orange;
-      flash_interval = getRespawnFlashInterval(currentConfig);
-      meterVal = currentConfig.max_hp;
+      flash_interval = getRespawnFlashInterval(config);
+      meterVal = config.max_hp;
+    }
+    else if ( config.state == LifeStage::INIT){
+      //waiting to be configured
+      fgColor = CRGB::Red;
+      flash_interval = getRespawnFlashInterval(config);
+      meterVal = config.max_hp;
     }
     else {
       //unknown state
       fgColor = CRGB::Black;
       flash_interval = FlashInterval::FLASH_NONE;
-      meterVal = 0;      
+      meterVal=config.max_hp;      
     }
 
-    setMeterValues(&leftMeter,currentConfig.max_hp, meterVal, fgColor,  flash_interval);
-    setMeterValues(&rightMeter,currentConfig.max_hp, meterVal, fgColor,  flash_interval);    
+    setMeterValues(&leftMeter,meterVal, METER_MAX, fgColor,  flash_interval);
+    setMeterValues(&rightMeter,meterVal, METER_MAX, fgColor,  flash_interval);    
 
     long m = millis();
     updateLedMeter(&leftMeter, m );
     updateLedMeter(&rightMeter, m);
+    FastLED.show();
+    //Log.traceln("Update Meters :%l ms", millis()-m);
 
 }
-void cardScanned(){
-    blinkLedsWithColor(CARDREAD_CONFIRM_NUM_BLINKS, CRGB::Blue, CARDREAD_CONFIRM_BLINK_MS);
+
+void checkDead(LifeConfig &config){
+  if (! notifiedDead ){
+      if ( config.state == LifeStage::DEAD){
+          rtttl::begin(BUZZER_PIN,DEAD_MUSIC);
+          notifiedDead = true;
+      }
+  }
+  
 }
 
-void updateUI(long current_time_millis){
+void uiHandleCardScanned( LifeConfig &config, long current_time_millis){
+    blinkLedsWithColor(config,CARDREAD_CONFIRM_NUM_BLINKS, CRGB::Blue, CARDREAD_CONFIRM_BLINK_MS);
+}
+
+void uiUpdate(LifeConfig &config,long current_time_millis){
     rtttl::play();
-    updateDisplay();
-    updateLEDs();
-    FastLED.delay(10);
+    checkDead(config);
+    if ( current_time_millis - last_oled_update > OLED_UPDATE_INTERVAL_MS ){
+        updateDisplay(config, current_time_millis);
+        last_oled_update = current_time_millis;
+    }
+
+    updateLEDs(config, current_time_millis);
 }

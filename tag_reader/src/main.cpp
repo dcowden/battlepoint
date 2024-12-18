@@ -1,27 +1,34 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
-#include <TeamNFC.h>
+#include "HitTracker.h"
 #include <Controls.h>
 #include <UI.h>
-#include <Card.h>
+#include <CardReader.h>
 #include "gsl/gsl-lite.hpp"
 #include <Pins.h>
 
-LifeConfig currentConfig;
 
+long last_ui_update = 0;
+const long ui_update_interval=500L;
+
+LifeConfig currentConfig;
+const long WIRE_CLOCK_SPD = 100000;
 void onBigHit(){
   if ( currentConfig.state == LifeStage::ALIVE ){  
+    long m = millis();
     Log.traceln("LittleHit");
-    big_hit(currentConfig, millis());
-    start_invuln(currentConfig, millis());
+    trackerBigHit(currentConfig, m);
+    trackerStartInvuln(currentConfig, m);
+    uiHandleBigHit(m);
   }
 }
 
 void onLittleHit(){
   if ( currentConfig.state == LifeStage::ALIVE ){
+    long m = millis();    
     Log.traceln("BigHit");
-    little_hit(currentConfig,millis() );
-    start_invuln(currentConfig, millis());
+    trackerLittleHit(currentConfig,m );
+    trackerStartInvuln(currentConfig, m);
   }  
 }
 
@@ -31,23 +38,21 @@ void setup(void)
   Log.begin(LOG_LEVEL_INFO, &Serial, true);
   Log.warning("Starting...");  
   Wire.begin();
-  Wire.setClock(100000);
+  Wire.setClock(400000L);
   Log.noticeln("WIRE [OK]");
-
   initInputs();
   registerLittleHitHandler(onLittleHit);
   registerBigHitHandler(onBigHit);
   Log.noticeln("BTNS [OK]");
-
-  initDisplay();
-  initNFC();
+  trackerInit(currentConfig, millis()); 
+  uiInit(currentConfig, millis() );
+  cardReaderInit();
   Log.noticeln("DONE [OK]");  
 }
 
 
 void handleClassCard( ClassCard &card ){
-    Log.warningln("Class Card");
-    
+    Log.warningln("Class Card");    
     currentConfig.max_hp = card.max_hp;
     currentConfig.big_hit = card.big_hit;
     currentConfig.little_hit = card.little_hit;
@@ -55,24 +60,15 @@ void handleClassCard( ClassCard &card ){
     currentConfig.invuln_ms = card.invuln_ms;
     currentConfig.player_class = card.player_class;
     currentConfig.team = card.team;
-    requestRespawn(currentConfig, millis() );    
+    trackerRequestRespawn(currentConfig, millis() );    
 }
 
 void handleMedicCard( MedicCard &card ){
-   medic(currentConfig, card.hp, millis() );
+   trackerApplyMedic(currentConfig, card.hp, millis() );
 }
 
 void handleFlagCard ( FlagCard &card){
   Log.warning("picked up flag");
-}
-
-void handleRespawnCard(NFCCard &card){
-  Log.warningln("Requesting Respawn for existing Class");
-  requestRespawn(currentConfig, millis() );
-}
-
-void handleMedicCard(NFCCard &card){
-
 }
 
 void handleCard(NFCCard &card){
@@ -90,38 +86,16 @@ void handleCard(NFCCard &card){
   }
 }
 
-
-//status:
-//need to get rid of calls to TeamNFC functions from inside Card code:
-// 1. split out LifeConfig and ClassConfig -- nfc is only reading a card
-// 2. nfc should simply return struct of what we got-- either a card or whatever
-//   2.1 need to define structs for that.  
-// 3. main should update the model(s) and then update the UI
-
 void loop() 
 {
-  NFCCard card = readNFC();
+  NFCCard card = cardReaderTryCardIfPresent();
   if ( card.type != NFCCardType::NONE){
     handleCard(card);
-  }
+    uiHandleCardScanned(currentConfig, millis() );
+ }
 
+  updateInputs(); 
+  trackerUpdateLifeModel(currentConfig, millis() ); //updating the model
+  uiUpdate(currentConfig, millis() );
 
-    /*
-    if ( readNFC(currentConfig) ){
-      cardScanned();
-    }
-
-    Something like
-    ClassConfig newConfig;
-    newConfig = readNFC();
-    if ( newConfig.type = Config){
-        requestRespawn()
-    }
-    else if (  newConfig.type == Medic)
-        addPoints
-    */
-
-    updateInputs(); //react to button presses: updates mode and Ui 
-    updateLifeStatus(currentConfig, millis() ); //updating the model
-    updateUI(millis()); //updating the UI
 }

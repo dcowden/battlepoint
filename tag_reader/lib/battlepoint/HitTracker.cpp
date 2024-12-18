@@ -1,27 +1,18 @@
-#include <TeamNFC.h>
+#include "HitTracker.h"
 #include <ArduinoLog.h>
 #include <Arduino.h>
+#include "NFCCards.h"
 
-void setDefaults( NFCCard &card){
-    card.type = NFCCardType::UNKNOWN;
-}
-
-void setDefaults( ClassCard &card){  
-  card.big_hit=1;
-  card.little_hit=1;
-  card.max_hp=1;
-  card.player_class = PlayerClass::PC_ANONYMOUS;
-  card.invuln_ms=1000;
-  card.respawn_ms=1000;
-  card.team = TeamChar::T_NONE;    
-}
-void setDefaults( MedicCard &card){
-    card.hp = 1;    
-}
-
-void setDefaults( FlagCard &card){
-    card.value = 1;
-    card.team = TeamChar::T_NONE;
+void trackerInit ( LifeConfig &config, long current_timeMillis){
+    config.big_hit=1;
+    config.little_hit=1;
+    config.max_hp=6;
+    config.hp = 6;
+    config.invuln_end_time_ms=1000;
+    config.respawn_ms=1000;
+    config.team=TeamChar::T_NONE;
+    config.player_class=PlayerClass::PC_ANONYMOUS;
+    config.state = LifeStage::INIT;
 }
 
 void doRespawn( LifeConfig &config , long current_time_millis){
@@ -41,27 +32,27 @@ void doKill( LifeConfig &config , long current_time_millis){
     config.respawnRequested = false;
 }
 
-void requestRespawn(LifeConfig &config , long current_time_millis){
+void trackerRequestRespawn(LifeConfig &config , long current_time_millis){
     config.respawnRequested = true;
     if ( config.state == LifeStage::INIT){
        doKill(config, current_time_millis);
     }
 }
 
-void start_invuln(LifeConfig &config , long current_time_millis){
+void trackerStartInvuln(LifeConfig &config , long current_time_millis){
     config.state = LifeStage::INVULNERABLE;
     config.invuln_end_time_ms = current_time_millis + config.invuln_ms;
 }
 
-void end_invuln(LifeConfig &config , long current_time_millis){
+void trackerEndInvuln(LifeConfig &config , long current_time_millis){
     config.state = LifeStage::ALIVE;
     config.invuln_end_time_ms = START_TIME_NOTSTARTED;
 }
 
-void updateLifeStatus(LifeConfig &config, long current_time_millis){
+void trackerUpdateLifeModel(LifeConfig &config, long current_time_millis){
     if ( config.state == LifeStage::INVULNERABLE){
         if (current_time_millis > config.invuln_end_time_ms){
-            end_invuln(config,current_time_millis);
+            trackerEndInvuln(config,current_time_millis);
         }
     }
 
@@ -91,7 +82,7 @@ void updateLifeStatus(LifeConfig &config, long current_time_millis){
     }
 }
 
-const char * lifeStatus( LifeConfig &config ){
+const char * trackerLifeStatus( LifeConfig &config ){
     if ( config.state == LifeStage::RESPAWNING){
         return "RESP";
     }
@@ -104,15 +95,40 @@ const char * lifeStatus( LifeConfig &config ){
     else if ( config.state == LifeStage::ALIVE){
         return "ALIV";
     }
+    else if ( config.state == LifeStage::INIT){
+        return "INIT";
+    }
     else{
         return "UNKN";
     }
 }
 
+const char * playerClassName( int player_class ){
+    if (player_class == PlayerClass::PC_SOLDIER){
+        return "Soldier";
+    }
+    else if ( player_class == PlayerClass::PC_HEAVY){
+        return "Heavy";
+    }
+    else if ( player_class == PlayerClass::PC_MEDIC){
+        return "Medic";
+    }
+    else if ( player_class== PlayerClass::PC_SCOUT){
+        return "Scout";
+    }
+    else if ( player_class == PlayerClass::PC_SNIPER){
+        return "Sniper";
+    }
+    else{
+        return "None";
+    }
+}
+
+
 void logLife(LifeConfig &config){
   Log.noticeln("DMG: %d/%d",config.big_hit, config.little_hit);
   Log.noticeln("HP: %d/%d, config.hp, config.max_hp");
-  Log.noticeln("STS: %s", lifeStatus(config)); 
+  Log.noticeln("STS: %s", trackerLifeStatus(config)); 
 }
 
 
@@ -120,22 +136,22 @@ void adjust_hp(LifeConfig &config, int delta,long current_time_millis){
     if ( config.state == LifeStage::ALIVE){
         config.hp += delta; 
         config.hp = constrain(config.hp,0,config.max_hp);
-        updateLifeStatus(config,current_time_millis);
+        trackerUpdateLifeModel(config,current_time_millis);
     }
     else{
         Log.warningln("Can't add health when not alive.");
     }
 }
 
-void medic(LifeConfig &config, int add_hp, long current_time_millis){
+void trackerApplyMedic(LifeConfig &config, int add_hp, long current_time_millis){
     Log.warningln("Adding %d hp.", add_hp);
     adjust_hp(config, add_hp, current_time_millis);    
 }
 
-void big_hit(LifeConfig &config, long current_time_millis){
+void trackerBigHit(LifeConfig &config, long current_time_millis){
     adjust_hp(config, -config.big_hit, current_time_millis);
 }
 
-void little_hit(LifeConfig &config, long current_time_millis){
+void trackerLittleHit(LifeConfig &config, long current_time_millis){
     adjust_hp(config, -config.little_hit, current_time_millis);    
 }
