@@ -33,6 +33,7 @@ typedef struct {
     int big_hit=3;
     int little_hit=1;
     long respawn_ms=10000;
+    long invuln_ms=5000;
 
     //state
     long spawn_time = START_TIME_NOTSTARTED;
@@ -109,12 +110,14 @@ void medic(LifeConfig &config, int add_hp){
     }
 }
 
-void big_hit(LifeConfig &config){
+bool big_hit(LifeConfig &config){
     config.hp -= config.big_hit;
+    return config.hp > 0;
 }
 
-void little_hit(LifeConfig &config){
+bool little_hit(LifeConfig &config){
     config.hp -= config.little_hit;
+    return config.hp > 0;
 }
 
 

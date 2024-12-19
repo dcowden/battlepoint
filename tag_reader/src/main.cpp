@@ -18,7 +18,7 @@
 
 
 #define BATTLEPOINT_VERSION "1.1.3"
-#define SIDE_LED_SIZE 8
+#define SIDE_LED_SIZE 7
 #define RIGHT_LED_PIN 12
 #define LEFT_LED_PIN 14
 #define BIG_HIT_PIN 26  //32
@@ -79,22 +79,31 @@ void delayWithSound(int millis_to_wait){
   }
 }
 
+int getNumInvulnBlinks(){
+   return (int)(config.invuln_ms / INVULN_BLINK_RATE);
+}
+
 void doLittleClick(){
   if ( config.state == LifeStage::ALIVE){  
     //Log.noticeln("LittleHit");
-    little_hit(config);
+    bool isStillAlive = little_hit(config);
     //updateLife(config,millis());
     rtttl::begin(BUZZER_PIN, LITTLE_HIT);
-    blinkLedsWithColor(NUM_INVULN_BLINKS, CRGB::Yellow, INVULN_BLINK_RATE);
+    if ( isStillAlive ){
+      blinkLedsWithColor(getNumInvulnBlinks(), CRGB::Yellow, INVULN_BLINK_RATE);
+    }
   }
 }
 void doBigClick(){
   if ( config.state == LifeStage::ALIVE ){
     //Log.noticeln("BigHit");
-    big_hit(config);
+    bool isStillAlive =  big_hit(config);
     //updateLife(config,milis());
     rtttl::begin(BUZZER_PIN, BIG_HIT);
-    blinkLedsWithColor(NUM_INVULN_BLINKS, CRGB::Red, INVULN_BLINK_RATE);
+    if ( isStillAlive ){
+      blinkLedsWithColor(getNumInvulnBlinks(), CRGB::Red, INVULN_BLINK_RATE);
+    }
+    
   }  
 }
 void bigHitButtonClick(Button2& b){
@@ -146,7 +155,7 @@ void updateMeters(CRGB fgColor, int val ){
 }
 
 int getMeterVal(){
-  return config.hp+1;
+  return config.hp;
 }
 
 void blinkLedsWithColor(int numBlinks, CRGB color, int blink_rate_millis){
@@ -352,15 +361,18 @@ void handleCard(){
       config.respawn_ms = respawn_ms;
     }    
 
+    long invuln_ms = doc["invuln_ms"];
+    if ( invuln_ms){
+      Log.infoln("Card invuln_ms=%l ",invuln_ms);
+      config.invuln_ms = invuln_ms;
+    }  
+
     requestRespawn(config, millis());      
   }
   else if ( card_type == NFCCardType::FLAG ){
     Log.warning("picked up flag");
   }
-  //else if ( card_type == NFCCardType::CLASS){
-  //  Log.warningln("Respawning..");
-  //  respawn(config,millis());
-  //}
+
   else if ( card_type == NFCCardType::MEDIC){
     int hp_to_add = doc["add_hp"];
     if ( hp_to_add ){
