@@ -318,7 +318,8 @@ void setup(void)
   printLifeConfig();
 }
 
-void handleCard(){
+
+void handleCard(LifeConfig &config){
 
   Log.noticeln("Before ReConfig: ");   printLifeConfig();
   int card_type = doc["card_type"];
@@ -328,7 +329,14 @@ void handleCard(){
   }
 
   if ( card_type == NFCCardType::CLASS){
-    Log.warningln("Handling Class Card");
+    if ( config.state == LifeStage::ALIVE){
+        Log.infoln("Can't respawn while alive");
+        rtttl::begin(BUZZER_PIN,CARD_NO_SCAN);  
+        return;
+    }
+    else{
+      Log.warningln("Handling Class Card");
+    }
 
     int class_id = class_id["class_id"];
     
@@ -370,10 +378,27 @@ void handleCard(){
     requestRespawn(config, millis());      
   }
   else if ( card_type == NFCCardType::FLAG ){
+    if ( config.state != LifeStage::ALIVE){
+        Log.infoln("Flags only work when alive");
+        rtttl::begin(BUZZER_PIN,CARD_NO_SCAN);  
+        return;
+    }
+    else{
+      Log.warningln("Handling Flag Card");
+    }    
     Log.warning("picked up flag");
   }
 
   else if ( card_type == NFCCardType::MEDIC){
+    if ( config.state != LifeStage::ALIVE){
+        Log.infoln("Medic Cards only work when alive");
+        rtttl::begin(BUZZER_PIN,CARD_NO_SCAN);  
+        return;
+    }
+    else{
+      Log.warningln("Handling Medic Card");
+    }
+
     int hp_to_add = doc["add_hp"];
     if ( hp_to_add ){
 
@@ -430,12 +455,7 @@ void readNFC()
                 Log.errorln(error.f_str());
             }   
             else{
-              if ( config.state == LifeStage::ALIVE){
-                rtttl::begin(BUZZER_PIN,CARD_NO_SCAN);                  
-              }
-              else{
-                handleCard();
-              } 
+              handleCard(config);
             }
         } 
     
