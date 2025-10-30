@@ -1,0 +1,30 @@
+# Core framework (includes FastAPI and Uvicorn)
+nicegui>=1.4.0
+
+# Async support
+aiohttp>=3.8.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Bluetooth support (optional, for real hardware)
+bleak>=0.21.0  # Cross-platform Bluetooth LE library
+
+# Sound support (optional)
+pygame>=2.5.0  # For sound playback
+# OR
+# sounddevice>=0.4.6
+# soundfile>=0.12.1
+
+# Data persistence
+# (uses built-in json, no extra requirements)
+
+# ============================================================================
+# requirements-dev.txt (additional development dependencies)
+# ============================================================================
+
+black>=23.0.0  # Code formatting
+pylint>=2.17.0  # Linting
+mypy>=1.4.0  # Type checking
+pytest-cov>=4.1.0  # Test coverage
