@@ -1,0 +1,8 @@
+module mcp6001:
+  value = "MCP6001T-I/OT"
+  footprint = "Package_TO_SOT_SMD:SOT-23-5"
+  vcc : pin
+  gnd : pin
+  in_plus : pin
+  in_minus : pin
+  out : pin

@@ -1,0 +1,7 @@
+module bat54s:
+  value = "BAT54S-7-F"
+  footprint = "Package_TO_SOT_SMD:SOT-23"
+  a1 : pin
+  k1 : pin
+  a2 : pin
+  k2 : pin

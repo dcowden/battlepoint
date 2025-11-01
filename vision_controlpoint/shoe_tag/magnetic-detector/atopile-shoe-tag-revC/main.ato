@@ -1,0 +1,99 @@
+import std
+import local.opamps.mcp6001 as opamp
+import local.comparators.tlv3691 as comp
+import local.diodes.bat54s as diode
+import local.connectors.jst_sh_1x4 as sh4
+import local.connectors.jst_sh_1x2 as sh2
+
+module shoe_tag_frontend:
+  power.vcc : net
+  power.gnd : net
+
+  # Connectors
+  j_coil = sh2.jst_sh_1x2(name="J2_COIL")
+  j_xiao = sh4.jst_sh_1x4(name="J1_XIAO")
+
+  # Active parts
+  u1 = opamp.mcp6001()
+  u2 = comp.tlv3691()
+  d1 = diode.bat54s()
+
+  # Passives (0603 unless noted)
+  rin1  = std.resistor(value=5.1k)
+  rgain = std.resistor(value=100k)
+  rin   = std.resistor(value=1M)
+  rfilt = std.resistor(value=10k)
+  rhys  = std.resistor(value=1M)
+
+  cin = std.capacitor(value=100n)
+  cf  = std.capacitor(value=10u, voltage=6.3V)
+  cres = std.capacitor(value=220n, package="1210")  # tune after measuring L
+
+  r1 = std.resistor(value=100k)
+  r2 = std.resistor(value=100k)
+  r3 = std.resistor(value=22k)
+  r4 = std.resistor(value=100k)
+
+  # Nets
+  net AC_SENSE, ENV_PRE, ENV, VREF, IN_ZONE, MID1
+
+  # Power
+  connect power.vcc to j_xiao.pin1, u1.vcc, u2.vcc
+  connect power.gnd to j_xiao.pin2, u1.gnd, u2.gnd
+
+  # Coil & resonance
+  connect j_coil.pin1 to cres.pin1
+  connect j_coil.pin2 to cres.pin2
+  connect j_coil.pin1 to cin.pin1
+  connect cin.pin2 to AC_SENSE
+  connect AC_SENSE to rin.pin1
+  connect rin.pin2 to power.gnd
+
+  # Op-amp inverting gain ~20
+  connect AC_SENSE to u1.in_minus via rin1.pin1
+  connect u1.in_minus to rin1.pin2
+  connect u1.out to rgain.pin1
+  connect rgain.pin2 to u1.in_minus
+  connect u1.in_plus to power.gnd
+
+  # Precision rectifier using BAT54S
+  connect u1.out to d1.k1
+  connect d1.a1 to ENV_PRE
+  connect ENV_PRE to d1.k2
+  connect d1.a2 to power.gnd
+
+  # Envelope RC
+  connect ENV_PRE to rfilt.pin1
+  connect rfilt.pin2 to ENV
+  connect ENV to cf.pin1
+  connect cf.pin2 to power.gnd
+
+  # Comparator and reference
+  connect ENV to u2.in_plus
+
+  connect power.vcc to r1.pin1
+  connect r1.pin2 to MID1
+  connect MID1 to r2.pin1
+  connect r2.pin2 to power.gnd
+
+  connect MID1 to r3.pin1
+  connect r3.pin2 to VREF
+  connect VREF to r4.pin1
+  connect r4.pin2 to power.gnd
+
+  connect VREF to u2.in_minus
+
+  # Hysteresis
+  connect u2.out to rhys.pin1
+  connect rhys.pin2 to u2.in_plus
+
+  # Outputs
+  connect u2.out to j_xiao.pin3   # IN_ZONE
+  connect ENV to j_xiao.pin4      # ENV analog
+
+  annotate "IN_ZONE" on j_xiao.pin3
+  annotate "ENV" on j_xiao.pin4
+  annotate "3V3" on j_xiao.pin1
+  annotate "GND" on j_xiao.pin2
+  annotate "COIL+" on j_coil.pin1
+  annotate "COIL-" on j_coil.pin2

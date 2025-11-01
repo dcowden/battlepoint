@@ -1,0 +1,15 @@
+
+(kicad_pcb (version 20221018) (generator pcbnew)
+ (general (thickness 1.6))
+ (paper "A4")
+ (layers
+  (0 "F.Cu" signal)
+  (31 "B.Cu" signal)
+  (36 "B.SilkS" user)
+  (37 "F.SilkS" user)
+  (38 "B.Mask" user)
+  (39 "F.Mask" user)
+  (44 "Edge.Cuts" user))
+ (setup (pad_to_mask_clearance 0))
+ (gr_rect (start 0 0) (end 50 35) (layer "Edge.Cuts") (width 0.1))
+)

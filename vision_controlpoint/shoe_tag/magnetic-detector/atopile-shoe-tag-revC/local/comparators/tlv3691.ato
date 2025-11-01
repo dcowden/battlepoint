@@ -1,0 +1,8 @@
+module tlv3691:
+  value = "TLV3691IDBVR"
+  footprint = "Package_TO_SOT_SMD:SOT-23-5"
+  vcc : pin
+  gnd : pin
+  in_plus : pin
+  in_minus : pin
+  out : pin

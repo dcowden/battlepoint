@@ -1,0 +1,227 @@
+"""
+Magnetic Field Detector Circuit for Shoe Spiral
+Resonated coil → precision rectifier → envelope detector → comparator → ESP32-C3
+"""
+
+from "generics/interfaces.ato" import Power, Signal
+from "generics/resistors.ato" import Resistor
+from "generics/capacitors.ato" import Capacitor
+from "generics/diodes.ato" import Diode
+
+module MagneticDetector:
+    """Main magnetic field detector module"""
+    
+    # Power interface (3.3V from XIAO)
+    power = new Power
+    power.voltage = 3.3V +/- 10%
+    
+    # Signal outputs
+    signal in_zone ~ Signal  # Digital output to GPIO
+    signal env_out ~ Signal  # Analog envelope output (optional ADC)
+    
+    # Spiral coil connections
+    signal spiral_plus ~ Signal
+    signal spiral_minus ~ Signal
+    
+    # Internal nodes
+    signal ac_sense ~ Signal
+    signal env_pre ~ Signal
+    signal env ~ Signal
+    signal vref ~ Signal
+    signal mid1 ~ Signal
+    
+    # Op-amp (U1) - MCP6001T-I/OT
+    component u1:
+        footprint = "Package_TO_SOT_SMD:SOT-23-5"
+        lcsc_id = "C7954"  # MCP6001T-I/OT
+        mpn = "MCP6001T-I/OT"
+        
+        # Pinout for SOT-23-5
+        signal OUT ~ pin 1  # Output
+        signal GND ~ pin 2  # VSS
+        signal IN_P ~ pin 3  # Non-inverting input
+        signal IN_N ~ pin 4  # Inverting input
+        signal VDD ~ pin 5  # VDD
+    
+    # Comparator (U2) - TLV3691IDBVR or MCP6541T-E/OT
+    component u2:
+        footprint = "Package_TO_SOT_SMD:SOT-23-5"
+        lcsc_id = "C112087"  # TLV3691IDBVR
+        mpn = "TLV3691IDBVR"
+        
+        signal OUT ~ pin 1
+        signal GND ~ pin 2
+        signal IN_P ~ pin 3  # Non-inverting
+        signal IN_N ~ pin 4  # Inverting (reference)
+        signal VDD ~ pin 5
+    
+    # Dual Schottky (D1) - BAT54S-7-F
+    component d1:
+        footprint = "Package_TO_SOT_SMD:SOT-23"
+        lcsc_id = "C8598"  # BAT54S
+        mpn = "BAT54S-7-F"
+        
+        signal A1 ~ pin 1  # Anode 1
+        signal A2 ~ pin 2  # Anode 2 (common)
+        signal C1 ~ pin 3  # Cathode 1
+    
+    # Resonance capacitor (CRES)
+    cres = new Capacitor
+    cres.value = 0.22uF +/- 10%
+    cres.package = "1210"
+    cres.footprint = "Capacitor_SMD:C_1210_3225Metric"
+    
+    # AC coupling capacitor
+    cin = new Capacitor
+    cin.value = 100nF +/- 10%
+    cin.package = "0603"
+    cin.footprint = "Capacitor_SMD:C_0603_1608Metric"
+    
+    # Envelope filter capacitor
+    cf = new Capacitor
+    cf.value = 10uF +/- 20%
+    cf.package = "0805"
+    cf.footprint = "Capacitor_SMD:C_0805_2012Metric"
+    
+    # Input bias resistor
+    rin = new Resistor
+    rin.value = 1Mohm +/- 5%
+    rin.package = "0603"
+    rin.footprint = "Resistor_SMD:R_0603_1608Metric"
+    
+    # Inverting input resistor
+    rin1 = new Resistor
+    rin1.value = 5.1kohm +/- 1%
+    rin1.package = "0603"
+    rin1.footprint = "Resistor_SMD:R_0603_1608Metric"
+    
+    # Feedback gain resistor
+    rgain = new Resistor
+    rgain.value = 100kohm +/- 1%
+    rgain.package = "0603"
+    rgain.footprint = "Resistor_SMD:R_0603_1608Metric"
+    
+    # Envelope filter resistor
+    rf = new Resistor
+    rf.value = 10kohm +/- 5%
+    rf.package = "0603"
+    rf.footprint = "Resistor_SMD:R_0603_1608Metric"
+    
+    # Reference divider resistors
+    r1 = new Resistor
+    r1.value = 100kohm +/- 1%
+    r1.package = "0603"
+    r1.footprint = "Resistor_SMD:R_0603_1608Metric"
+    
+    r2 = new Resistor
+    r2.value = 100kohm +/- 1%
+    r2.package = "0603"
+    r2.footprint = "Resistor_SMD:R_0603_1608Metric"
+    
+    r3 = new Resistor
+    r3.value = 22kohm +/- 1%
+    r3.package = "0603"
+    r3.footprint = "Resistor_SMD:R_0603_1608Metric"
+    
+    r4 = new Resistor
+    r4.value = 100kohm +/- 1%
+    r4.package = "0603"
+    r4.footprint = "Resistor_SMD:R_0603_1608Metric"
+    
+    # Hysteresis resistor
+    rhys = new Resistor
+    rhys.value = 1Mohm +/- 5%
+    rhys.package = "0603"
+    rhys.footprint = "Resistor_SMD:R_0603_1608Metric"
+    
+    # Connector to XIAO (J1) - 1x4 JST-SH
+    component j1:
+        footprint = "Connector_JST:JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical"
+        mpn = "BM04B-SRSS-TB"
+        
+        signal P1 ~ pin 1  # 3V3
+        signal P2 ~ pin 2  # GND
+        signal P3 ~ pin 3  # IN_ZONE
+        signal P4 ~ pin 4  # ENV (analog)
+    
+    # Connector to spiral coil (J2) - 1x2 JST-SH
+    component j2:
+        footprint = "Connector_JST:JST_SH_BM02B-SRSS-TB_1x02-1MP_P1.00mm_Vertical"
+        mpn = "BM02B-SRSS-TB"
+        
+        signal P1 ~ pin 1  # SPIRAL+
+        signal P2 ~ pin 2  # SPIRAL-
+    
+    # Power connections
+    power.vcc ~ u1.VDD
+    power.vcc ~ u2.VDD
+    power.vcc ~ j1.P1
+    power.gnd ~ u1.GND
+    power.gnd ~ u2.GND
+    power.gnd ~ j1.P2
+    
+    # Spiral coil connections
+    spiral_plus ~ j2.P1
+    spiral_minus ~ j2.P2
+    
+    # Resonance capacitor across coil
+    cres.p1 ~ spiral_plus
+    cres.p2 ~ spiral_minus
+    
+    # AC coupling from coil to sense node
+    cin.p1 ~ spiral_plus
+    cin.p2 ~ ac_sense
+    
+    # Bias resistor
+    rin.p1 ~ ac_sense
+    rin.p2 ~ power.gnd
+    
+    # Op-amp configuration (inverting amplifier)
+    u1.IN_P ~ power.gnd  # Non-inverting to ground for inverting config
+    u1.IN_N ~ ac_sense
+    rin1.p1 ~ ac_sense
+    rin1.p2 ~ u1.IN_N
+    rgain.p1 ~ u1.OUT
+    rgain.p2 ~ u1.IN_N
+    
+    # Precision rectifier using dual Schottky
+    # D1A: cathode to op-amp OUT, anode to ENV_PRE
+    d1.C1 ~ u1.OUT
+    d1.A2 ~ env_pre
+    
+    # D1B: cathode to ENV_PRE, anode to GND
+    # (using A1 as second cathode, A2 as common node)
+    d1.A1 ~ power.gnd
+    
+    # Envelope filter
+    rf.p1 ~ env_pre
+    rf.p2 ~ env
+    cf.p1 ~ env
+    cf.p2 ~ power.gnd
+    
+    # Comparator reference voltage divider
+    # First stage: 3V3 → R1 → MID1 → R2 → GND (creates ~1.65V)
+    r1.p1 ~ power.vcc
+    r1.p2 ~ mid1
+    r2.p1 ~ mid1
+    r2.p2 ~ power.gnd
+    
+    # Second stage: MID1 → R3 → VREF → R4 → GND (creates ~0.3V)
+    r3.p1 ~ mid1
+    r3.p2 ~ vref
+    r4.p1 ~ vref
+    r4.p2 ~ power.gnd
+    
+    # Comparator connections
+    u2.IN_P ~ env
+    u2.IN_N ~ vref
+    
+    # Hysteresis feedback
+    rhys.p1 ~ u2.OUT
+    rhys.p2 ~ u2.IN_P
+    
+    # Output connections
+    in_zone ~ u2.OUT
+    in_zone ~ j1.P3
+    env_out ~ env
+    env_out ~ j1.P4

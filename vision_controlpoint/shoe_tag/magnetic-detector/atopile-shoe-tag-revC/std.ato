@@ -1,0 +1,11 @@
+module resistor(value, package="0603"):
+  footprint = "Resistor_SMD:R_0603_1608Metric"
+  pin1 : pin
+  pin2 : pin
+  annotate f"R {value}"
+
+module capacitor(value, voltage=None, package="0603"):
+  footprint = "Capacitor_SMD:C_0603_1608Metric" if package=="0603" else "Capacitor_SMD:C_1210_3225Metric"
+  pin1 : pin
+  pin2 : pin
+  annotate f"C {value}"

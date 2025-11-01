@@ -1,0 +1,4 @@
+module jst_sh_1x2(name="JST_SH_1x2"):
+  footprint = "Connector_JST:JST_SH_B2B-SH-B_1x02-1MP_P1.00mm_Vertical"
+  pin1 : pin
+  pin2 : pin
