@@ -4,7 +4,7 @@ Following the patterns from platformio_cpp_tests
 """
 
 import pytest
-from battlepoint_game import (
+from battlepoint_app import (
     Team, GameMode, TeamColor,
     get_team_color, team_text, team_text_char, game_mode_text, BluetoothScanner,
     Clock, RealClock, TestClock,

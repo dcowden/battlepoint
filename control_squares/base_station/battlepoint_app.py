@@ -1,991 +1,215 @@
 """
 BattlePoint - Real-life Team Fortress 2 Game
-Python/NiceGUI Implementation
+Python/NiceGUI Implementation with BLE Scanner
 """
 
 from enum import Enum
 from dataclasses import dataclass
-from typing import Optional, List, Callable
-import time
+from typing import Optional, List, Callable, Dict
+from battlepoint_core import Clock, Team, BluetoothTag, TagType, EventManager, Team, TeamColor, Proximity, GameOptions, LedMeter,GameMode,team_text,RealClock,ControlPoint
+from battlepoint_game import create_game,BaseGame
 import asyncio
 import os
 import json
 import random
 import pygame
 import aiohttp
+import sys
+import time
+import threading
+from bleak import BleakScanner
 from nicegui import ui, app
 
+# Windows-specific fix
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 
 # ========================================================================
-# LED METER (Python port of the C LedMeter)
+# ENHANCED BLE SCANNER (merged from ble_scanner.py)
 # ========================================================================
 
-class LedMeter:
+class EnhancedBLEScanner:
     """
-    Python version of the C LedMeter.
-    No actual LEDs here – instead we expose a renderable state for the UI.
+    BLE scanner that:
+    - On Windows: runs Bleak in its *own* event loop inside a background thread
+      (this matches your working CLI pattern and avoids the "Thread is configured
+       for Windows GUI but callbacks are not working." crash from HTTP handlers)
+    - On Linux: just scans in the main asyncio loop like usual.
     """
-    def __init__(self, name: str, led_count: int):
-        self.name = name
-        self._value = 0
-        self._max_value = max(1, led_count)  # avoid div-by-zero
-        self._led_count = led_count
-        self._fg_color = '#000000'
-        self._bg_color = '#000000'
-        self._reversed = False
 
-    def init(self):
-        pass
-
-    def reverse(self):
-        self._reversed = not self._reversed
-
-    def setValue(self, value: int):
-        self._value = max(0, min(int(value), self._max_value))
-
-    def setToMax(self):
-        self.setValue(self._max_value)
-
-    def setToMin(self):
-        self.setValue(0)
-
-    def setMaxValue(self, value: int):
-        self._max_value = max(1, int(value))
-        if self._value > self._max_value:
-            self._value = self._max_value
-
-    def fgColor(self, color_hex: str):
-        self._fg_color = color_hex
-
-    def bgColor(self, color_hex: str):
-        self._bg_color = color_hex
-
-    def getValue(self) -> int:
-        return self._value
-
-    def getMaxValue(self) -> int:
-        return self._max_value
-
-    def to_dict(self) -> dict:
-        if self._max_value <= 0:
-            pct = 0.0
-        else:
-            pct = (self._value / self._max_value) * 100.0
-        return {
-            'name': self.name,
-            'value': self._value,
-            'max': self._max_value,
-            'percent': pct,
-            'fg': self._fg_color,
-            'bg': self._bg_color,
-            'reversed': self._reversed,
-        }
-
-
-# ============================================================================
-# CONSTANTS AND ENUMS
-# ============================================================================
-
-class Team(Enum):
-    RED = 1
-    BLU = 2
-    NOBODY = 3
-    BOTH = 4
-
-
-class GameMode(Enum):
-    KOTH = 0  # King of the Hill
-    AD = 1    # Attack/Defend
-    CP = 2    # Control Point
-
-
-class TeamColor:
-    RED = '#FF0000'
-    BLUE = '#0000FF'
-    BLACK = '#000000'
-    AQUA = '#00FFFF'
-    PURPLE = '#800080'
-    YELLOW = '#FFFF00'
-
-
-# ============================================================================
-# UTILITY FUNCTIONS
-# ============================================================================
-
-def get_team_color(team: Team) -> str:
-    if team == Team.NOBODY:
-        return TeamColor.BLACK
-    elif team == Team.BLU:
-        return TeamColor.BLUE
-    elif team == Team.RED:
-        return TeamColor.RED
-    else:
-        return TeamColor.AQUA
-
-
-def team_text(team: Team) -> str:
-    if team == Team.RED:
-        return "RED"
-    elif team == Team.BLU:
-        return "BLU"
-    elif team == Team.BOTH:
-        return "R&B"
-    elif team == Team.NOBODY:
-        return "---"
-    return "???"
-
-
-def team_text_char(team: Team) -> str:
-    if team == Team.RED:
-        return 'R'
-    elif team == Team.BLU:
-        return 'B'
-    elif team == Team.BOTH:
-        return '+'
-    elif team == Team.NOBODY:
-        return '-'
-    return '?'
-
-
-def game_mode_text(mode: GameMode) -> str:
-    if mode == GameMode.KOTH:
-        return "KOTH"
-    elif mode == GameMode.AD:
-        return "AD"
-    elif mode == GameMode.CP:
-        return "CP"
-    return "??"
-
-
-# ============================================================================
-# CLOCK ABSTRACTION
-# ============================================================================
-
-class Clock:
-    def milliseconds(self) -> int:
-        raise NotImplementedError
-
-    def seconds_since(self, start_millis: int) -> int:
-        return (self.milliseconds() - start_millis) // 1000
-
-
-class RealClock(Clock):
-    def milliseconds(self) -> int:
-        return int(time.time() * 1000)
-
-
-class TestClock(Clock):
-    def __init__(self):
-        self._time = 0
-
-    def milliseconds(self) -> int:
-        return self._time
-
-    def set_time(self, millis: int):
-        self._time = millis
-
-    def add_millis(self, millis: int):
-        self._time += millis
-
-    def add_seconds(self, seconds: int):
-        self._time += seconds * 1000
-
-
-# ============================================================================
-# BLUETOOTH TAG IMPLEMENTATION (Expanded)
-# ============================================================================
-
-class TagType(Enum):
-    PLAYER = 1
-    CONTROL_SQUARE = 2
-    HEALTH_SQUARE = 3
-
-
-@dataclass
-class BluetoothTag:
-    id: int
-    tag_type: TagType
-    team: Team = Team.NOBODY
-    last_seen: int = 0
-    rssi: int = 0
-
-    def is_active(self, current_time: int, timeout_ms: int = 1000) -> bool:
-        return (current_time - self.last_seen) < timeout_ms
-
-
-class BluetoothScanner:
-    def __init__(self, clock: Clock):
+    def __init__(self, clock):
         self.clock = clock
-        self.tags: dict[int, BluetoothTag] = {}
-        self.service_uuid = "YOUR_SERVICE_UUID_HERE"
-        self._scanning = False
+        self.devices: Dict[str, dict] = {}
 
+        # runtime state
+        self._scanner: Optional[BleakScanner] = None
+        self._scanning: bool = False
+        self._want_scan: bool = False  # windows thread will watch this
+        self._lock = threading.Lock()
+
+        self._is_windows = (sys.platform == "win32")
+
+        # windows-only thread + loop
+        self._thread: Optional[threading.Thread] = None
+        self._thread_loop: Optional[asyncio.AbstractEventLoop] = None
+
+        if self._is_windows:
+            # start the scanner thread immediately so endpoints can just set flags
+            self._start_windows_thread()
+
+    # ─────────────────────────────────────────────
+    # WINDOWS THREAD SETUP
+    # ─────────────────────────────────────────────
+    def _start_windows_thread(self):
+        if self._thread is not None:
+            return
+
+        def _runner():
+            # this is now the scanner thread
+            # IMPORTANT: set event loop policy here too
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            self._thread_loop = loop
+            loop.run_until_complete(self._windows_scanner_main())
+
+        self._thread = threading.Thread(target=_runner, daemon=True)
+        self._thread.start()
+        print("[BLE] Windows scanner thread started")
+
+    async def _windows_scanner_main(self):
+        """
+        Runs forever in the scanner thread. Watches _want_scan and starts/stops
+        the real Bleak scanner from *here*, not from HTTP handlers.
+        """
+        self._scanner = BleakScanner(detection_callback=self._detection_callback)
+
+        while True:
+            try:
+                if self._want_scan and not self._scanning:
+                    try:
+                        await self._scanner.start()
+                        self._scanning = True
+                        print("[BLE] (win) started scanning")
+                    except Exception as e:
+                        print(f"[BLE] (win) error starting scan: {e!r}")
+                        self._scanning = False
+                        # don't spin too hard
+                        await asyncio.sleep(1.0)
+
+                elif not self._want_scan and self._scanning:
+                    try:
+                        await self._scanner.stop()
+                    except Exception as e:
+                        print(f"[BLE] (win) error stopping scan: {e!r}")
+                    self._scanning = False
+                    print("[BLE] (win) stopped scanning")
+
+            except Exception as e:
+                # never let this loop die
+                print(f"[BLE] (win) main loop error: {e!r}")
+
+            await asyncio.sleep(0.2)
+
+    # ─────────────────────────────────────────────
+    # COMMON CALLBACK
+    # ─────────────────────────────────────────────
+    def _detection_callback(self, device, advertisement_data):
+        name = device.name
+        if not name:
+            return
+
+        address = device.address
+        rssi = advertisement_data.rssi
+        current_time = time.time()
+
+        mfg_data_str = "N/A"
+        if advertisement_data.manufacturer_data:
+            for _, data_bytes in advertisement_data.manufacturer_data.items():
+                try:
+                    mfg_data_str = data_bytes.decode('ascii')
+                except UnicodeDecodeError:
+                    mfg_data_str = data_bytes.hex()
+                break
+
+        with self._lock:
+            self.devices[address] = {
+                'name': name,
+                'rssi': rssi,
+                'address': address,
+                'manufacturer_data': mfg_data_str,
+                'last_seen': current_time,
+            }
+
+    # ─────────────────────────────────────────────
+    # PUBLIC API (called from FastAPI / NiceGUI)
+    # ─────────────────────────────────────────────
     async def start_scanning(self):
-        self._scanning = True
+        """
+        Called from your endpoint.
+        On Windows: just set a flag; real start happens in the scanner thread.
+        On Linux: actually start Bleak here.
+        """
+        if self._is_windows:
+            self._want_scan = True
+            return
+
+        # non-windows: do the simple thing
+        if self._scanning:
+            return
+        try:
+            self._scanner = BleakScanner(detection_callback=self._detection_callback)
+            await self._scanner.start()
+            self._scanning = True
+            print("[BLE] (linux) scanning started")
+        except Exception as e:
+            print(f"[BLE] (linux) error starting scan: {e!r}")
 
     async def stop_scanning(self):
-        self._scanning = False
+        """
+        Called from your endpoint.
+        """
+        if self._is_windows:
+            self._want_scan = False
+            return
 
-    def parse_tag_data(self, raw_data: bytes) -> Optional[BluetoothTag]:
-        if len(raw_data) < 4:
-            return None
+        if not self._scanning or not self._scanner:
+            return
         try:
-            tag_type = TagType(raw_data[0])
-            tag_id = (raw_data[1] << 8) | raw_data[2]
-            team = Team(raw_data[3]) if raw_data[3] in [1, 2] else Team.NOBODY
-            return BluetoothTag(
-                id=tag_id,
-                tag_type=tag_type,
-                team=team,
-                last_seen=self.clock.milliseconds()
-            )
-        except (ValueError, IndexError):
-            return None
-
-    def get_active_tags(self, tag_type: Optional[TagType] = None) -> List[BluetoothTag]:
-        current_time = self.clock.milliseconds()
-        active = [tag for tag in self.tags.values() if tag.is_active(current_time)]
-        if tag_type:
-            active = [tag for tag in active if tag.tag_type == tag_type]
-        return active
-
-    def get_players_near_control_point(self, control_point_id: int) -> dict[Team, int]:
-        counts = {Team.RED: 0, Team.BLU: 0}
-        for tag in self.get_active_tags(TagType.PLAYER):
-            if tag.team in [Team.RED, Team.BLU]:
-                counts[tag.team] += 1
-        return counts
-
-
-# ============================================================================
-# COOLDOWN TIMER
-# ============================================================================
-
-class CooldownTimer:
-    def __init__(self, interval_ms: int, clock: Clock):
-        self.interval_ms = interval_ms
-        self.clock = clock
-        self.last_event = -interval_ms
-
-    def can_run(self) -> bool:
-        current = self.clock.milliseconds()
-        if (current - self.last_event) >= self.interval_ms:
-            self.last_event = current
-            return True
-        return False
-
-    def is_in_cooldown(self) -> bool:
-        return not self.can_run()
-
-
-# ============================================================================
-# GAME OPTIONS
-# ============================================================================
-
-@dataclass
-class GameOptions:
-    mode: GameMode = GameMode.KOTH
-    capture_seconds: int = 20
-    capture_button_threshold_seconds: int = 5
-    time_limit_seconds: int = 60
-    start_delay_seconds: int = 5
-
-    def time_limit_millis(self) -> int:
-        return self.time_limit_seconds * 1000
-
-    def validate(self):
-        if self.capture_seconds >= self.time_limit_seconds:
-            self.capture_seconds = self.time_limit_seconds - 1
-        if self.capture_button_threshold_seconds >= self.capture_seconds:
-            self.capture_button_threshold_seconds = self.capture_seconds - 1
-
-
-# ============================================================================
-# SIMPLE METER
-# ============================================================================
-
-class SimpleMeter:
-    def __init__(self):
-        self._value = 0
-        self._max_value = 100
-
-    def get_value(self) -> int:
-        return self._value
-
-    def get_max_value(self) -> int:
-        return self._max_value
-
-    def set_value(self, value: int):
-        self._value = max(0, min(value, self._max_value))
-
-    def set_max_value(self, max_value: int):
-        self._max_value = max_value
-
-    def set_to_max(self):
-        self._value = self._max_value
-
-    def set_to_min(self):
-        self._value = 0
-
-
-# ============================================================================
-# PROXIMITY
-# ============================================================================
-
-class Proximity:
-    def __init__(self, game_options: GameOptions, clock: Clock):
-        self.game_options = game_options
-        self.clock = clock
-        self.last_red_press = -1
-        self.last_blu_press = -1
-
-    def red_button_press(self):
-        self.last_red_press = self.clock.milliseconds()
-
-    def blu_button_press(self):
-        self.last_blu_press = self.clock.milliseconds()
-
-    def update(self, red_close: bool, blu_close: bool):
-        if red_close:
-            self.red_button_press()
-        if blu_close:
-            self.blu_button_press()
-
-    def is_red_close(self) -> bool:
-        if self.last_red_press < 0:
-            return False
-        threshold_ms = self.game_options.capture_button_threshold_seconds * 1000
-        return (self.clock.milliseconds() - self.last_red_press) < threshold_ms
-
-    def is_blu_close(self) -> bool:
-        if self.last_blu_press < 0:
-            return False
-        threshold_ms = self.game_options.capture_button_threshold_seconds * 1000
-        return (self.clock.milliseconds() - self.last_blu_press) < threshold_ms
-
-    def is_team_close(self, team: Team) -> bool:
-        if team == Team.RED:
-            return self.is_red_close()
-        elif team == Team.BLU:
-            return self.is_blu_close()
-        return False
-
-
-# ============================================================================
-# EVENT MANAGER
-# ============================================================================
-
-class EventManager:
-    def __init__(self, clock: Clock, sound_system=None):
-        self.clock = clock
-        self.capture_timer = CooldownTimer(20000, clock)
-        self.contest_timer = CooldownTimer(20000, clock)
-        self.overtime_timer = CooldownTimer(5000, clock)
-        self.start_time_timer = CooldownTimer(900, clock)
-        self.end_time_timer = CooldownTimer(900, clock)
-        self.cp_alert_interval_ms = 5000
-        self.events: list[str] = []
-        self.sound_system = sound_system
-
-    def init(self, cp_alert_interval_seconds: int):
-        self.cp_alert_interval_ms = cp_alert_interval_seconds * 1000
-
-    def _add_event(self, event: str):
-        self.events.append(event)
-        print(f"[EVENT] {event}")
-
-    def _play(self, snd_id: int):
-        if self.sound_system:
-            self.sound_system.play(snd_id)
-
-    # === match C ===
-    def control_point_being_captured(self, team: Team):
-        if self.capture_timer.can_run():
-            self._add_event(f"Control Point Being Captured by {team_text(team)}")
-            # C: SND_SOUNDS_0014_ANNOUNCER_LAST_FLAG
-            self._play(3)
-
-    def control_point_contested(self):
-        if self.contest_timer.can_run():
-            self._add_event("Control Point is Contested!")
-            # C: SND_SOUNDS_0002_ANNOUNCER_ALERT_CENTER_CONTROL_BEING_CONTESTED
-            self._play(2)
-
-    def control_point_captured(self, team: Team):
-        self._add_event(f"Control Point Captured by {team_text(team)}")
-        # C: SND_SOUNDS_0025_ANNOUNCER_WE_CAPTURED_CONTROL
-        self._play(14)
-
-    def starting_game(self):
-        self._add_event("Starting Game")
-        # C: _player->play(SND_SOUNDS_0021_ANNOUNCER_TIME_ADDED);
-        # our map: 10 -> "0021_announcer_time_added.mp3"
-        self._play(10)
-
-    def game_started(self):
-        self._add_event("Game Started")
-        # C: SND_SOUNDS_0022_ANNOUNCER_TOURNAMENT_STARTED4
-        self._play(11)
-
-    def victory(self, team: Team):
-        self._add_event(f"Victory for {team_text(team)}!")
-        # C: SND_SOUNDS_0023_ANNOUNCER_VICTORY
-        self._play(12)
-
-    def overtime(self):
-        if self.overtime_timer.can_run():
-            self._add_event("OVERTIME!")
-            # C: SND_SOUNDS_0017_ANNOUNCER_OVERTIME2
-            self._play(6)
-
-    def cancelled(self):
-        self._add_event("Game Cancelled")
-        # C: _player->play(SND_SOUNDS_0028_ENGINEER_SPECIALCOMPLETED10);
-        self._play(17)
-
-    def starts_in_seconds(self, secs: int):
-        if self.start_time_timer.can_run():
-            if secs in [30, 20, 10, 5, 4, 3, 2, 1, 60]:
-                self._add_event(f"Game starts in {secs} seconds")
-                starts_map = {
-                    60: 34,
-                    30: 30,
-                    20: 28,
-                    10: 26,
-                    5: 33,
-                    4: 32,
-                    3: 31,
-                    2: 29,
-                    1: 27,
-                }
-                sid = starts_map.get(secs)
-                if sid:
-                    self._play(sid)
-
-    def ends_in_seconds(self, secs: int):
-        if self.end_time_timer.can_run():
-            if secs in [120, 60, 30, 20, 10, 5, 4, 3, 2, 1]:
-                self._add_event(f"Game ends in {secs} seconds")
-                ends_map = {
-                    120: 38,
-                    60: 44,
-                    30: 40,
-                    20: 37,
-                    10: 35,
-                    5: 43,
-                    4: 42,
-                    3: 41,
-                    2: 39,
-                    1: 36,
-                }
-                sid = ends_map.get(secs)
-                if sid:
-                    self._play(sid)
-
-
-
-# ============================================================================
-# CONTROL POINT
-# ============================================================================
-
-class ControlPoint:
-    def __init__(self, event_manager: EventManager, clock: Clock):
-        self.event_manager = event_manager
-        self.clock = clock
-        self._owner = Team.NOBODY
-        self._on = Team.NOBODY
-        self._capturing = Team.NOBODY
-        self._value = 0
-        self._contested = False
-        self._seconds_to_capture = 20
-        self._last_update_time = 0
-        self._enable_red_capture = True
-        self._enable_blu_capture = True
-        self._should_contest_message = True
-
-    def init(self, seconds_to_capture: int):
-        self._seconds_to_capture = seconds_to_capture
-        self._capturing = Team.NOBODY
-        self._on = Team.NOBODY
-        self._owner = Team.NOBODY
-        self._value = 0
-        self._contested = False
-        self._last_update_time = self.clock.milliseconds()
-        self._enable_red_capture = True
-        self._enable_blu_capture = True
-        self._should_contest_message = True
-
-    def set_red_capture(self, enabled: bool):
-        self._enable_red_capture = enabled
-
-    def set_blu_capture(self, enabled: bool):
-        self._enable_blu_capture = enabled
-
-    def get_owner(self) -> Team:
-        return self._owner
-
-    def get_on(self) -> Team:
-        return self._on
-
-    def get_capturing(self) -> Team:
-        return self._capturing
-
-    def get_value(self) -> int:
-        return self._value
-
-    def is_contested(self) -> bool:
-        return self._contested
-
-    def captured(self) -> bool:
-        return (self._owner != Team.NOBODY and
-                (self._on == Team.NOBODY or self._on == self._owner) and
-                self._value <= 0)
-
-    def captured_by(self, team: Team) -> bool:
-        return self.captured() and self._owner == team
-
-    def set_owner(self, team: Team):
-        self._owner = team
-
-    def update(self, proximity: Proximity):
-        red_on = proximity.is_red_close()
-        blu_on = proximity.is_blu_close()
-
-        self._contested = False
-        is_one_team_on = False
-
-        if red_on and not blu_on:
-            self._on = Team.RED
-            is_one_team_on = True
-        elif blu_on and not red_on:
-            self._on = Team.BLU
-            is_one_team_on = True
-        elif blu_on and red_on:
-            self._on = Team.BOTH
-            self._contested = True
-            if self._should_contest_message:
-                self.event_manager.control_point_contested()
-                self._should_contest_message = False
-        else:
-            self._on = Team.NOBODY
-
-        if not self._contested:
-            self._should_contest_message = True
-
-        if self._capturing == Team.NOBODY and is_one_team_on:
-            if self._owner == Team.NOBODY or self._on != self._owner:
-                can_capture = ((self._on == Team.RED and self._enable_red_capture) or
-                               (self._on == Team.BLU and self._enable_blu_capture))
-                if can_capture:
-                    self._capturing = self._on
-                    self.event_manager.control_point_being_captured(self._capturing)
-
-        millis_since_last = self.clock.milliseconds() - self._last_update_time
-
-        if is_one_team_on:
-            if self._capturing == self._on:
-                self._inc_capture(millis_since_last)
-            elif self._capturing != self._on:
-                self._dec_capture(millis_since_last)
-        elif self._on == Team.NOBODY:
-            self._dec_capture(millis_since_last)
-
-        self._check_capture()
-        self._last_update_time = self.clock.milliseconds()
-
-    def _inc_capture(self, millis: int):
-        self._value += millis
-        capture_ms = self._seconds_to_capture * 1000
-        if self._value > capture_ms:
-            self._value = capture_ms
-
-    def _dec_capture(self, millis: int):
-        self._value -= millis
-        if self._value <= 0:
-            self._capturing = Team.NOBODY
-            self._value = 0
-
-    def _check_capture(self):
-        if self._value >= self._seconds_to_capture * 1000:
-            self._owner = self._capturing
-            self._capturing = Team.NOBODY
-            self._value = 0
-            self.event_manager.control_point_captured(self._owner)
-
-    def get_owner_color(self) -> str:
-        return get_team_color(self._owner)
-
-    def get_capturing_color(self) -> str:
-        if self._contested:
-            return TeamColor.PURPLE
-        return get_team_color(self._capturing)
-
-    def get_capture_progress_percent(self) -> float:
-        if self._seconds_to_capture == 0:
-            return 0
-        return (self._value / (self._seconds_to_capture * 1000)) * 100
-
-
-# ============================================================================
-# BASE GAME CLASS
-# ============================================================================
-
-# ========================================================================
-# PYTHON PORT OF THE ORIGINAL C/ARDUINO GAME LOGIC
-# ========================================================================
-
-class BaseGame:
-    """
-    Port of the C/Arduino Game logic you pasted.
-    This class depends on:
-      - control_point: must have update(...), get_owner(), captured_by(team), get_capturing(), is_contested(), get_capture_progress_percent()
-      - event_manager: must have game_started(), cancelled(), victory(team), overtime(), ends_in_seconds(sec)
-      - options: GameOptions with mode, capture_seconds, time_limit_seconds, etc.
-      - clock: must have milliseconds()
-    """
-
-    NOT_STARTED = -100  # same idea as C
-
-    def __init__(self):
-        self.control_point = None
-        self.options: GameOptions | None = None
-        self.event_manager: EventManager | None = None
-        self.proximity: Proximity | None = None
-        self.clock: Clock | None = None
-
-        self.owner_meter: LedMeter | None = None
-        self.capture_meter: LedMeter | None = None
-        self.timer1: LedMeter | None = None
-        self.timer2: LedMeter | None = None
-
-        self._winner: Team = Team.NOBODY
-        self._red_millis: int = 0
-        self._blu_millis: int = 0
-        self._last_update_ms: int = 0
-        self._start_time_ms: int = self.NOT_STARTED
-        self._should_announce_overtime: bool = True
-
-    # ------------------------------------------------------------
-    # init like C: wires deps, then reset
-    # ------------------------------------------------------------
-    def init(self,
-             control_point: ControlPoint,
-             options: GameOptions,
-             event_manager: EventManager,
-             owner_meter: LedMeter,
-             capture_meter: LedMeter,
-             timer1: LedMeter,
-             timer2: LedMeter,
-             clock: Clock,
-             proximity: Proximity | None = None):
-        self.control_point = control_point
-        self.options = options
-        self.event_manager = event_manager
-        self.owner_meter = owner_meter
-        self.capture_meter = capture_meter
-        self.timer1 = timer1
-        self.timer2 = timer2
-        self.clock = clock
-        self.proximity = proximity
-        self.reset_game()
-
-    # ------------------------------------------------------------
-    def reset_game(self):
-        self._winner = Team.NOBODY
-        self._red_millis = 0
-        self._blu_millis = 0
-        now = self.clock.milliseconds()
-        self._last_update_ms = now
-        self._start_time_ms = self.NOT_STARTED
-
-        # meters set to time limit just like C
-        self.timer1.setMaxValue(self.options.time_limit_seconds)
-        self.timer2.setMaxValue(self.options.time_limit_seconds)
-
-        # subclass can set colors etc.
-        self.game_type_init()
-
-        # sync meters right away
-        self.update_display()
-
-    # ------------------------------------------------------------
-    def start(self):
-        # exactly like C: init meters, event mgr, control point
-        self.timer1.init()
-        self.timer2.init()
-        self.event_manager.init(self.options.capture_button_threshold_seconds)
-        self.control_point.init(self.options.capture_seconds)
-
-        # let the actual game class (KothGame, ADGame, CPGame) own colors
-        # C does this in each gameTypeInit()/start()
-        self.game_type_init()
-
-        self._winner = Team.NOBODY
-        self._red_millis = 0
-        self._blu_millis = 0
-        self._last_update_ms = self.clock.milliseconds()
-        self._start_time_ms = self.clock.milliseconds()
-        self._should_announce_overtime = True
-
-        # C reverses timer1, timer2 in Game ctor/start
-        self.timer1.reverse()
-        self.timer2.reverse()
-
-        # meters show time limit
-        self.timer1.setMaxValue(self.options.time_limit_seconds)
-        self.timer2.setMaxValue(self.options.time_limit_seconds)
-
-        # announce
-        self.event_manager.game_started()
-
-    # ------------------------------------------------------------
-    def end(self):
-        # C version: winner = NOBODY and cancelled()
-        self._winner = Team.NOBODY
-        self.event_manager.cancelled()
-        self._start_time_ms = self.NOT_STARTED
-
-    # ------------------------------------------------------------
-    def is_over(self) -> bool:
-        return self._winner != Team.NOBODY
-
-    def is_running(self) -> bool:
-        # C/Arduino: return !isOver()
-        return not self.is_over()
-
-    # ------------------------------------------------------------
-    def get_accumulated_seconds(self, team: Team) -> int:
-        if team == Team.RED:
-            return self._red_millis // 1000
-        elif team == Team.BLU:
-            return self._blu_millis // 1000
-        return 0
-
-    def get_winner(self) -> Team:
-        return self._winner
-
-    def get_remaining_seconds_for_team(self, team: Team) -> int:
-        # like C: (timeLimitMillis - teamMillis) / 1000
-        limit_ms = self.options.time_limit_seconds * 1000
-        if team == Team.RED:
-            return max(0, (limit_ms - self._red_millis) // 1000)
-        elif team == Team.BLU:
-            return max(0, (limit_ms - self._blu_millis) // 1000)
-        return 0
-
-    def get_remaining_seconds(self) -> int:
-        # C: if winner set -> 0 else gameTypeRemainingSeconds
-        if self._winner != Team.NOBODY:
-            return 0
-        # for KOTH and AD we can define as “global” remaining, but
-        # in C they call ends_in_seconds for the relevant team,
-        # so here we just give the max of both to avoid UI showing 0 too early
-        red_left = self.get_remaining_seconds_for_team(Team.RED)
-        blu_left = self.get_remaining_seconds_for_team(Team.BLU)
-        return max(red_left, blu_left)
-
-
-    # ------------------------------------------------------------
-    def game_type_init(self):
-        """Hook for subclasses – mirrors C's gameTypeInit()."""
-        pass
-
-    # ------------------------------------------------------------
-    def update_display(self):
-        """What C does at the end of update(): write to meters."""
-        # capture meter = CP percent
-        cp_pct = self.control_point.get_capture_progress_percent()
-        self.capture_meter.setMaxValue(100)
-        self.capture_meter.setValue(int(cp_pct))
-
-        # owner meter: in the C code you sometimes just show owner/max.
-        owner = self.control_point.get_owner()
-        self.owner_meter.fgColor(get_team_color(owner))
-        if owner == Team.NOBODY:
-            self.owner_meter.setToMin()
-        else:
-            self.owner_meter.setToMax()
-
-        # timers: show remaining for each team
-        red_left = self.get_remaining_seconds_for_team(Team.RED)
-        blu_left = self.get_remaining_seconds_for_team(Team.BLU)
-        self.timer1.setValue(red_left)
-        self.timer2.setValue(blu_left)
-
-    # ------------------------------------------------------------
-    def _end_game_with_winner(self, winner: Team):
-        self._winner = winner
-        self.event_manager.victory(winner)
-        self._start_time_ms = self.NOT_STARTED
-
-    # ------------------------------------------------------------
-    def update(self):
-        """Subclasses must implement EXACT per-mode logic (KOTH / AD / CP)."""
-        raise NotImplementedError
-
-
-# ============================================================================
-# GAME MODES
-# ============================================================================
-
-class KothGame(BaseGame):
-    def game_type_init(self):
-        # C:
-        # _controlPoint->setOwner(Team::NOBODY);
-        # _timer1Meter->setColors(BLUE, BLACK);
-        # _timer2Meter->setColors(RED,  BLACK);
-        self.control_point.set_owner(Team.NOBODY)
-        self.timer1.fgColor(TeamColor.BLUE)
-        self.timer1.bgColor(TeamColor.BLACK)
-        self.timer2.fgColor(TeamColor.RED)
-        self.timer2.bgColor(TeamColor.BLACK)
-
-    def update(self):
-        if self.is_over():
-            return
-
-        self.control_point.update(self.proximity)
-
-        now = self.clock.milliseconds()
-        millis_since_last = now - self._last_update_ms
-
-        # accumulate for owner
-        owner = self.control_point.get_owner()
-        if owner == Team.RED:
-            self._red_millis += millis_since_last
-        elif owner == Team.BLU:
-            self._blu_millis += millis_since_last
-
-        # now get remaining like C
-        red_left = self.get_remaining_seconds_for_team(Team.RED)
-        blu_left = self.get_remaining_seconds_for_team(Team.BLU)
-
-        # victory / OT like C
-        if blu_left <= 0 and self.control_point.captured_by(Team.BLU):
-            self._end_game_with_winner(Team.BLU)
-            self.update_display()
-            self._last_update_ms = now
-            return
-        if red_left <= 0 and self.control_point.captured_by(Team.RED):
-            self._end_game_with_winner(Team.RED)
-            self.update_display()
-            self._last_update_ms = now
-            return
-
-        # overtime
-        if blu_left <= 0 and self.control_point.get_capturing() == Team.RED:
-            if self._should_announce_overtime:
-                self.event_manager.overtime()
-                self._should_announce_overtime = False
-        if red_left <= 0 and self.control_point.get_capturing() == Team.BLU:
-            if self._should_announce_overtime:
-                self.event_manager.overtime()
-                self._should_announce_overtime = False
-
-        # ends-in-seconds only for current owner, like C
-        if owner == Team.BLU:
-            self.event_manager.ends_in_seconds(blu_left)
-        elif owner == Team.RED:
-            self.event_manager.ends_in_seconds(red_left)
-
-        self.update_display()
-        self._last_update_ms = now
-
-    def update_display(self):
-        # C:
-        # timer1 = BLU remaining
-        # timer2 = RED remaining
-        self.timer1.setValue(self.get_remaining_seconds_for_team(Team.BLU))
-        self.timer2.setValue(self.get_remaining_seconds_for_team(Team.RED))
-        self.capture_meter.setMaxValue(100)
-        self.capture_meter.setValue(int(self.control_point.get_capture_progress_percent()))
-        # owner meter
-        owner = self.control_point.get_owner()
-        self.owner_meter.fgColor(get_team_color(owner))
-        if owner == Team.NOBODY:
-            self.owner_meter.setToMin()
-        else:
-            self.owner_meter.setToMax()
-
-
-class ADGame(BaseGame):
-    def game_type_init(self):
-        # C behavior
-        self.control_point.set_red_capture(False)
-        self.control_point.set_owner(Team.RED)
-        self.timer1.fgColor(TeamColor.YELLOW)
-        self.timer1.bgColor(TeamColor.BLACK)
-        self.timer2.fgColor(TeamColor.YELLOW)
-        self.timer2.bgColor(TeamColor.BLACK)
-
-    def start(self):
-        # keep BaseGame.start() logic, but we already set colors above
-        super().start()
-        # ensure CP is RED at start
-        self.control_point.set_owner(Team.RED)
-        self.control_point.set_red_capture(False)
-
-    def update_display(self):
-        # C: both timers show SAME remaining
-        remaining = self.get_remaining_seconds()
-        self.timer1.setValue(remaining)
-        self.timer2.setValue(remaining)
-        # capture + owner same as C
-        self.capture_meter.setMaxValue(100)
-        self.capture_meter.setValue(int(self.control_point.get_capture_progress_percent()))
-        owner = self.control_point.get_owner()
-        self.owner_meter.fgColor(get_team_color(owner))
-        if owner == Team.NOBODY:
-            self.owner_meter.setToMin()
-        else:
-            self.owner_meter.setToMax()
-
-
-
-class CPGame(BaseGame):
-    def update(self):
-        if self.is_over():
-            return
-
-        self.control_point.update(self.proximity)
-
-        now = self.clock.milliseconds()
-        millis_since_last = now - self._last_update_ms
-
-        # whoever owns it accumulates
-        owner = self.control_point.get_owner()
-        if owner == Team.RED:
-            self._red_millis += millis_since_last
-        elif owner == Team.BLU:
-            self._blu_millis += millis_since_last
-
-        # CP game: ends when global time is up – winner = most time
-        elapsed_s = (now - self._start_time_ms) // 1000
-        if elapsed_s > self.options.time_limit_seconds:
-            if self._red_millis > self._blu_millis:
-                self._end_game_with_winner(Team.RED)
-            else:
-                self._end_game_with_winner(Team.BLU)
-            self.update_display()
-            self._last_update_ms = now
-            return
-
-        self.update_display()
-        self._last_update_ms = now
-
-
-# ============================================================================
-# GAME FACTORY
-# ============================================================================
-
-def create_game(mode: GameMode) -> BaseGame:
-    if mode == GameMode.KOTH:
-        return KothGame()
-    elif mode == GameMode.AD:
-        return ADGame()
-    elif mode == GameMode.CP:
-        return CPGame()
-    return KothGame()
+            await self._scanner.stop()
+        finally:
+            self._scanning = False
+            self._scanner = None
+            print("[BLE] (linux) scanning stopped")
+
+    # ─────────────────────────────────────────────
+    # READ METHODS
+    # ─────────────────────────────────────────────
+    def get_devices_summary(self) -> dict:
+        with self._lock:
+            current_time = time.time()
+            device_list = []
+            for address, info in self.devices.items():
+                device_list.append({
+                    'name': info['name'],
+                    'rssi': info['rssi'],
+                    'address': info['address'],
+                    'last_seen_ms': int((current_time - info['last_seen']) * 1000),
+                    'manufacturer_data': info['manufacturer_data'],
+                })
+
+        device_list.sort(key=lambda d: d['rssi'], reverse=True)
+
+        return {
+            'scanning': (self._want_scan if self._is_windows else self._scanning),
+            'device_count': len(device_list),
+            'devices': device_list,
+        }
+
+    def get_active_tags(self, tag_type=None) -> List:
+        # you had this for compatibility – keep as a no-op list
+        return []
 
 
 # ========================================================================
@@ -1006,7 +230,7 @@ class GameBackend:
         self.event_manager = EventManager(self.clock, sound_system=None)
         self.proximity = Proximity(self.game_options, self.clock)
         self.control_point = ControlPoint(self.event_manager, self.clock)
-        self.scanner = BluetoothScanner(self.clock)
+        self.scanner = EnhancedBLEScanner(self.clock)
 
         self.owner_meter = LedMeter('owner', 20)
         self.capture_meter = LedMeter('capture', 20)
@@ -1161,7 +385,7 @@ class GameBackend:
                 # show remaining as value so UI can show percent correctly
                 m.setValue(remaining)
 
-            # announce “Game starts in X seconds” from backend too
+            # announce "Game starts in X seconds" from backend too
             if remaining != self._last_announced_second:
                 self.event_manager.starts_in_seconds(remaining)
                 self._last_announced_second = remaining
@@ -1259,7 +483,7 @@ class GameBackend:
             return {
                 'running': self._running,
                 'phase': 'running' if self._running else 'ended',
-                'remaining_seconds': remaining_seconds,  # ← THIS is the one UI must show
+                'remaining_seconds': remaining_seconds,
                 'time_limit_seconds': self.game_options.time_limit_seconds,
                 'red_remaining_seconds': red_left,
                 'blu_remaining_seconds': blu_left,
@@ -1343,7 +567,7 @@ class SettingsManager:
 # ============================================================================
 
 class SoundSystem:
-    def __init__(self, base_dir: str = "src/sounds"):
+    def __init__(self, base_dir: str = "sounds"):
         self.enabled = True
         self.volume = 10
         self.base_dir = base_dir
@@ -1494,7 +718,6 @@ class EnhancedGameBackend(GameBackend):
 
         # settings + BT
         self.settings_manager = SettingsManager()
-        self.bluetooth_scanner = BluetoothScanner(self.clock)
 
         # load saved settings, like the C code loads from EEPROM
         saved = self.settings_manager.load_settings()
@@ -1533,6 +756,19 @@ class EnhancedGameBackend(GameBackend):
         if not self._menu_music_on:
             self.sound_system.play_menu_track()
             self._menu_music_on = True
+
+    # ─────────────────────────────────────────────
+    # BLE SCANNER METHODS
+    # ─────────────────────────────────────────────
+    async def start_bluetooth_scanning(self):
+        # now safe on windows: it only sets a flag
+        await self.scanner.start_scanning()
+
+    async def stop_bluetooth_scanning(self):
+        await self.scanner.stop_scanning()
+
+    def get_ble_devices_summary(self) -> dict:
+        return self.scanner.get_devices_summary()
 
     # ─────────────────────────────────────────────
     # SETTINGS PASSTHROUGHS (needed by /api/settings/save)
@@ -1640,9 +876,19 @@ async def set_volume(volume: int):
     return {"volume": enhanced_backend.sound_system.volume}
 
 
+# ============================================================================
+# BLE SCANNER ENDPOINTS
+# ============================================================================
+
+@app.get("/api/bluetooth/devices")
+async def get_bluetooth_devices():
+    """Get all BLE devices currently being tracked."""
+    return enhanced_backend.get_ble_devices_summary()
+
+
 @app.get("/api/bluetooth/tags")
 async def get_bluetooth_tags():
-    tags = enhanced_backend.bluetooth_scanner.get_active_tags()
+    tags = enhanced_backend.scanner.get_active_tags()
     return {
         "tags": [
             {
@@ -1674,7 +920,7 @@ async def stop_bluetooth():
 
 from nicegui import ui, app
 import asyncio
-import aiohttp  # make sure this is here
+import aiohttp
 
 
 @ui.page('/')
@@ -1779,25 +1025,24 @@ async def game_ui():
         font-size: 1.4rem;
         color: #ddd;
       }
-      /* wide capture bar */
-    .bp-capture-shell {
+      .bp-capture-shell {
         width: min(60vw, 900px);
-        height: 64px;              /* was 32px */
+        height: 64px;
         background: #222;
         border: 2px solid #444;
         border-radius: 12px;
         overflow: hidden;
         position: relative;
-    }
-    .bp-capture-fill {
+      }
+      .bp-capture-fill {
         position: absolute;
         top: 0;
         left: 0;
-        height: 100%;              /* will now fill 64px */
+        height: 100%;
         width: 0%;
         background: #6600ff;
         transition: width 0.12s linear;
-    }
+      }
       .bp-bottom {
         height: 140px;
         display: flex;
@@ -1810,13 +1055,13 @@ async def game_ui():
         width: 100%;
         height: 100%;
       }
-        .bp-horiz-shell {
-            width: 100%;
-            height: 100%;
-            background: #000000;  /* black, like LEDs off */
-            position: relative;
-            overflow: hidden;
-        }
+      .bp-horiz-shell {
+        width: 100%;
+        height: 100%;
+        background: #000000;
+        position: relative;
+        overflow: hidden;
+      }
       .bp-horiz-red {
         position: absolute;
         top: 0;
@@ -1899,49 +1144,9 @@ async def game_ui():
     async def stop_game():
         await ui.run_javascript('fetch("/api/stop", {method: "POST"})')
 
-    # map event text -> sound id (same as before)
-    def sound_id_for_event(txt: str) -> int | None:
-        if txt.startswith("Control Point Being Captured by "):
-            return 3
-        if txt == "Control Point is Contested!":
-            return 2
-        if txt.startswith("Control Point Captured by "):
-            return 14
-        if txt == "Starting Game":
-            return 10
-        if txt == "Game Started":
-            return 11
-        if txt.startswith("Victory for "):
-            return 12
-        if txt == "OVERTIME!":
-            return 6
-        if txt == "Game Cancelled":
-            return 17
-
-        if txt.startswith("Game starts in "):
-            try:
-                secs = int(txt.replace("Game starts in ", "").replace(" seconds", ""))
-            except ValueError:
-                return None
-            m = {60: 34, 30: 30, 20: 28, 10: 26, 5: 33, 4: 32, 3: 31, 2: 29, 1: 27}
-            return m.get(secs)
-
-        if txt.startswith("Game ends in "):
-            try:
-                secs = int(txt.replace("Game ends in ", "").replace(" seconds", ""))
-            except ValueError:
-                return None
-            m = {120: 38, 60: 44, 30: 40, 20: 37, 10: 35, 5: 43, 4: 42, 3: 41, 2: 39, 1: 36}
-            return m.get(secs)
-        return None
-
     async def update_ui():
         session: aiohttp.ClientSession | None = None
         last_events: list[str] = []
-        last_countdown: int | None = None
-
-        # which countdown seconds should speak
-        countdown_calls = {60, 30, 20, 10, 5, 4, 3, 2, 1}
 
         while True:
             try:
@@ -1992,8 +1197,6 @@ async def game_ui():
                 cd = state.get('countdown_remaining', 0)
                 game_clock.set_text(f'{cd}')
                 status_label.set_text('COUNTDOWN...')
-                # backend already played the countdown sound via EventManager
-                last_countdown = cd
 
             else:
                 # prefer the real match clock if present
@@ -2012,11 +1215,9 @@ async def game_ui():
             cp_capturing.set_text(f"Capturing: {cp.get('capturing', '---')}")
             cp_contested.set_text(f"Contested: {cp.get('contested', False)}")
 
-            # EVENTS -> SERVER SOUNDS (for non-countdown stuff)
-            # EVENTS: just display them; backend already played sounds
+            # EVENTS
             new_events = state.get('events', [])
             if new_events != last_events:
-                # you could update a log here if you had one on this page
                 last_events = new_events
 
             await asyncio.sleep(0.1)
@@ -2066,37 +1267,126 @@ def settings_ui():
 
 
 # ============================================================================
-# DEBUG PAGE
+# DEBUG PAGE (ENHANCED WITH BLE SCANNER)
 # ============================================================================
 
 @ui.page('/debug')
 def debug_ui():
     ui.colors(primary='#1976D2')
 
-    with ui.column().classes('w-full p-8 max-w-4xl mx-auto gap-4'):
+    with ui.column().classes('w-full p-8 max-w-6xl mx-auto gap-4'):
         ui.label('Debug Console').classes('text-3xl font-bold')
         ui.button('← Back to Game', on_click=lambda: ui.navigate.to('/'))
 
+        # BLE SCANNER SECTION
         with ui.card().classes('w-full p-4'):
-            ui.label('Event Log').classes('text-xl font-bold mb-2')
+            with ui.row().classes('w-full justify-between items-center mb-4'):
+                ui.label('🔵 Bluetooth LE Scanner').classes('text-2xl font-bold')
+                with ui.row().classes('gap-2'):
+                    start_scan_btn = ui.button('▶ Start Scan', on_click=lambda: start_ble_scan()).props('color=green')
+                    stop_scan_btn = ui.button('⏹ Stop Scan', on_click=lambda: stop_ble_scan()).props('color=red')
+                    stop_scan_btn.set_visibility(False)
+
+            ble_status = ui.label('Status: Not scanning').classes('text-lg mb-2')
+            device_count_label = ui.label('Tracking 0 device(s)').classes('text-md text-gray-400 mb-4')
+
+            ble_columns = [
+                {'name': 'name', 'label': 'Device Name', 'field': 'name', 'align': 'left', 'sortable': True},
+                {'name': 'rssi', 'label': 'RSSI (dBm)', 'field': 'rssi', 'align': 'center', 'sortable': True},
+                {'name': 'address', 'label': 'Address', 'field': 'address', 'align': 'left'},
+                {'name': 'last_seen', 'label': 'Last Seen (ms ago)', 'field': 'last_seen_ms', 'align': 'center', 'sortable': True},
+                {'name': 'mfg_data', 'label': 'Manufacturer Data', 'field': 'manufacturer_data', 'align': 'left'},
+            ]
+            ble_table = ui.table(columns=ble_columns, rows=[], row_key='address').classes('w-full')
+            ble_table.add_slot('body-cell-rssi', '''
+                <q-td :props="props">
+                    <q-badge :color="props.value > -60 ? 'green' : props.value > -80 ? 'orange' : 'red'">
+                        {{ props.value }}
+                    </q-badge>
+                </q-td>
+            ''')
+
+        # EVENT LOG SECTION
+        with ui.card().classes('w-full p-4'):
+            ui.label('📋 Event Log').classes('text-xl font-bold mb-2')
             event_log = ui.log().classes('w-full h-64')
 
+        # GAME STATE SECTION
         with ui.card().classes('w-full p-4'):
-            ui.label('Game State').classes('text-xl font-bold mb-2')
-            state_display = ui.json_editor({'content': {'json': {}}}).classes('w-full')
+            ui.label('⚙️ Game State').classes('text-xl font-bold mb-2')
+            state_display = ui.json_editor({}).classes('w-full')
 
+        # ─────────────────────────────────────────────
+        # ACTIONS
+        # ─────────────────────────────────────────────
+        async def start_ble_scan():
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                await session.post('http://localhost:8080/api/bluetooth/start')
+            start_scan_btn.set_visibility(False)
+            stop_scan_btn.set_visibility(True)
+            ble_status.set_text('Status: Scanning...')
+            ble_status.classes('text-green-400', remove='text-gray-400')
+            ui.notify('BLE scanning started', type='positive')
+
+        async def stop_ble_scan():
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                await session.post('http://localhost:8080/api/bluetooth/stop')
+            start_scan_btn.set_visibility(True)
+            stop_scan_btn.set_visibility(False)
+            ble_status.set_text('Status: Not scanning')
+            ble_status.classes('text-gray-400', remove='text-green-400')
+            ui.notify('BLE scanning stopped', type='info')
+
+        # ─────────────────────────────────────────────
+        # PERIODIC UPDATER
+        # ─────────────────────────────────────────────
         async def update_debug():
             import aiohttp
             async with aiohttp.ClientSession() as session:
+                last_events: list[str] = []
                 while True:
                     try:
+                        # game state
                         async with session.get('http://localhost:8080/api/state') as resp:
                             state = await resp.json()
-                            state_display.update({'content': {'json': state}})
-                            for e in state.get('events', [])[-5:]:
-                                event_log.push(e)
-                    except Exception:
-                        pass
+                            state_display.value = state
+                            state_display.update()
+
+                            new_events = state.get('events', [])[-5:]
+                            if new_events != last_events:
+                                for e in new_events:
+                                    event_log.push(e)
+                                last_events = new_events
+
+                        # BLE
+                        async with session.get('http://localhost:8080/api/bluetooth/devices') as resp:
+                            ble_data = await resp.json()
+
+                            if ble_data.get('scanning'):
+                                if ble_status.text != 'Status: Scanning...':
+                                    ble_status.set_text('Status: Scanning...')
+                                    ble_status.classes('text-green-400', remove='text-gray-400')
+                                    start_scan_btn.set_visibility(False)
+                                    stop_scan_btn.set_visibility(True)
+                            else:
+                                if ble_status.text != 'Status: Not scanning':
+                                    ble_status.set_text('Status: Not scanning')
+                                    ble_status.classes('text-gray-400', remove='text-green-400')
+                                    start_scan_btn.set_visibility(True)
+                                    stop_scan_btn.set_visibility(False)
+
+                            device_count = ble_data.get('device_count', 0)
+                            device_count_label.set_text(f'Tracking {device_count} device(s)')
+
+                            devices = ble_data.get('devices', [])
+                            ble_table.rows = devices
+                            ble_table.update()
+
+                    except Exception as e:
+                        print(f"Debug update error: {e}")
+
                     await asyncio.sleep(0.5)
 
         ui.timer(0.5, update_debug, once=False)

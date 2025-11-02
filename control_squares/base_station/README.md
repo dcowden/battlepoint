@@ -62,7 +62,7 @@ pip install -r requirements.txt
 ### 4. Run the application
 
 ```bash
-python battlepoint_game.py
+python battlepoint_app.py
 ```
 
 ### 5. Access the UI

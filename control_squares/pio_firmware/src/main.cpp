@@ -1,0 +1,475 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include <math.h>
+
+// ------------------ BLE ------------------
+#include <NimBLEDevice.h>
+
+// ------------------ NeoPixel -------------
+#include <Adafruit_NeoPixel.h>
+
+// ============================================================================
+// --------------------- USER / HW CONFIG -------------------------------------
+// ============================================================================
+
+// NOTE: on XIAO ESP32-C3 SDA/SCL are 4/5.
+// If you actually use I2C on 4/5, move the LED to another pin.
+#define LED_PIN        4
+#define NUM_LEDS       1
+
+Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+// your tile name
+static const char* TILE_ID = "SQ-01";
+
+// shared service UUID (goes in SCAN_RSP, not ADV)
+static const char* SHARED_SERVICE_UUID_STR = "12345678-1234-1234-1234-1234567890ab";
+
+// manufacturer to stick at the front (little-endian)
+static const uint16_t MFG_COMPANY_ID = 0xFFFF;
+
+// scan window when a player is present
+static const uint16_t SCAN_TIME_MS = 400;
+
+// TX power
+static const esp_power_level_t TILE_TX_POWER = ESP_PWR_LVL_P9;
+
+// ============================================================================
+// ------------------ QMC5883P -------------------------------------------------
+const int   QMC5883P_ADDR  = 0x2C;
+const float BASELINE_ALPHA = 0.05f;
+const float OUTPUT_ALPHA   = 0.10f;
+const unsigned long BASELINE_MS = 10000UL;
+
+const int MODE_REG   = 0x0A;
+const int CONFIG_REG = 0x0B;
+const int X_LSB_REG  = 0x01;
+
+float baseX = 0, baseY = 0, baseZ = 0;
+bool  baselineInit  = false;
+bool  baselineDone  = false;
+unsigned long tStart = 0;
+
+bool  outputEmaInit = false;
+float fDx = 0, fDy = 0, fDz = 0, fDt = 0;
+
+// presence thresholds
+const float MIN_ON_DT   = 400.0f;
+const float STRONG_DT   = 1100.0f;
+const float OFF_HYST_DT = 300.0f;
+
+// ============================================================================
+// ------------------- LED wrapper --------------------------------------------
+class StatusLED {
+public:
+  StatusLED(uint16_t count)
+  : _count(count), _r(0), _g(0), _b(0), _haveColor(false) {}
+
+  void begin(uint8_t brightness = 64) {
+    strip.begin();
+    strip.setBrightness(brightness);
+    off();
+  }
+
+  void set(uint8_t r, uint8_t g, uint8_t b) {
+    if (!_haveColor || r != _r || g != _g || b != _b) {
+      _r = r; _g = g; _b = b;
+      _haveColor = true;
+      strip.setPixelColor(0, strip.Color(r, g, b));
+      strip.show();
+      Serial.printf("LED -> %s (%u,%u,%u)\n", colorName(r, g, b), r, g, b);
+    }
+  }
+
+  void off()    { set(0, 0, 0); }
+  void red()    { set(255, 0, 0); }
+  void yellow() { set(255, 180, 0); }
+  void green()  { set(0, 180, 0); }
+  void blue()   { set(0, 0, 255); }
+
+private:
+  uint16_t _count;
+  uint8_t  _r, _g, _b;
+  bool     _haveColor;
+
+  const char* colorName(uint8_t r, uint8_t g, uint8_t b) {
+    if (r == 0 && g == 0 && b == 0) return "Black";
+    if (r > 220 && g < 60  && b < 60)  return "Red";
+    if (g > 160 && r < 80  && b < 80)  return "Green";
+    if (b > 160 && r < 80  && g < 80)  return "Blue";
+    if (r > 200 && g > 120 && b < 80)  return "Yellow";
+    if (r > 200 && b > 200)            return "Magenta";
+    if (g > 150 && b > 150)            return "Cyan";
+    if (r > 180 && g > 180 && b > 180) return "White";
+    return "Custom";
+  }
+};
+
+StatusLED statusLed(NUM_LEDS);
+
+// ============================================================================
+// ------------------- QMC funcs ----------------------------------------------
+void initQMC5883P() {
+  Wire.begin();
+  // continuous 200 Hz
+  Wire.beginTransmission(QMC5883P_ADDR);
+  Wire.write(MODE_REG);
+  Wire.write(0xCF);
+  Wire.endTransmission();
+
+  // set/reset on, ±8G
+  Wire.beginTransmission(QMC5883P_ADDR);
+  Wire.write(CONFIG_REG);
+  Wire.write(0x08);
+  Wire.endTransmission();
+}
+
+bool readQMC5883PData(int16_t &x, int16_t &y, int16_t &z) {
+  Wire.beginTransmission(QMC5883P_ADDR);
+  Wire.write(X_LSB_REG);
+  if (Wire.endTransmission(false) != 0) return false;
+
+  Wire.requestFrom(QMC5883P_ADDR, 6);
+  if (Wire.available() != 6) return false;
+
+  uint8_t x_lsb = Wire.read();
+  uint8_t x_msb = Wire.read();
+  uint8_t y_lsb = Wire.read();
+  uint8_t y_msb = Wire.read();
+  uint8_t z_lsb = Wire.read();
+  uint8_t z_msb = Wire.read();
+
+  x = (int16_t)((x_msb << 8) | x_lsb);
+  y = (int16_t)((y_msb << 8) | y_lsb);
+  z = (int16_t)((z_msb << 8) | z_lsb);
+  return true;
+}
+
+float magnitude3D(float x, float y, float z) {
+  return sqrtf(x * x + y * y + z * z);
+}
+
+// ============================================================================
+// --------------- simple MFG builder: "TILE,PLAYER,STRENGTH" -----------------
+static std::string buildManufacturerData_simple(const char* playerId, float strength) {
+    std::string m;
+    // 2-byte company ID
+    m.push_back((char)(MFG_COMPANY_ID & 0xFF));
+    m.push_back((char)((MFG_COMPANY_ID >> 8) & 0xFF));
+
+    // turn strength into an int we can print
+    int s = (int)(strength + 0.5f);
+    if (s < 0) s = 0;
+    if (s > 9999) s = 9999;   // keep BLE payload small
+
+    char buf[48];
+    // TILE,PLAYER,STRENGTH
+    snprintf(buf, sizeof(buf), "%s,%s,%d",
+             TILE_ID,
+             playerId,
+             s);
+
+    m.append(buf);
+    return m;
+}
+
+// ============================================================================
+// ------------------- Reporter (BLE) -----------------------------------------
+class BleReporter {
+public:
+  enum State {
+    IDLE,
+    SCANNING,
+    ADVERTISING
+  };
+
+  BleReporter()
+  : _state(IDLE),
+    _pScan(nullptr),
+    _scanStart(0),
+    _bestRssi(-999),
+    _haveCurrentTag(false),
+    _lastAdvUpdate(0),
+    _seq(0),
+    _lastPlayerPresent(false) {}
+
+  void begin() {
+    NimBLEDevice::init(TILE_ID);
+    NimBLEDevice::setPower(TILE_TX_POWER);
+
+    _pScan = NimBLEDevice::getScan();
+    _pScan->setActiveScan(true);
+    _pScan->setInterval(100);
+    _pScan->setWindow(100);
+    _pScan->setDuplicateFilter(false);
+  }
+
+  void update(bool playerPresent, float strength) {
+    unsigned long now = millis();
+
+    // no player → tear down
+    if (!playerPresent) {
+      if (_state == SCANNING) {
+        _pScan->stop();
+        _pScan->clearResults();
+      }
+      if (_state == ADVERTISING) {
+        stopAdvertising();
+      }
+      _state = IDLE;
+      _lastPlayerPresent = false;
+      return;
+    }
+
+    // rising edge → scan
+    if (playerPresent && !_lastPlayerPresent) {
+      startScan(now);
+      _lastPlayerPresent = true;
+      return;
+    }
+
+    switch (_state) {
+      case IDLE:
+        startScan(now);
+        break;
+
+      case SCANNING: {
+        if (now - _scanStart >= SCAN_TIME_MS) {
+          _pScan->stop();
+
+          NimBLEScanResults results = _pScan->getResults();
+          pickBestFromResults(results);
+          _pScan->clearResults();
+
+          startAdvertising();
+          _state = ADVERTISING;
+        }
+      } break;
+
+      case ADVERTISING: {
+        if (now - _lastAdvUpdate >= 100) {
+          _lastAdvUpdate = now;
+          _seq++;
+          updateAdvPacket(strength);   // <-- now passes REAL strength
+        }
+      } break;
+    }
+  }
+
+private:
+  State _state;
+  NimBLEScan* _pScan;
+  unsigned long _scanStart;
+
+  int    _bestRssi;
+  String _bestTagName;
+  bool   _haveCurrentTag;
+
+  unsigned long _lastAdvUpdate;
+  uint8_t _seq;
+  bool _lastPlayerPresent;
+
+  void startScan(unsigned long now) {
+    Serial.println("BLE: startScan()");
+    _bestRssi = -999;
+    _bestTagName = "";
+    _haveCurrentTag = false;
+
+    _pScan->start(0, false);
+    _scanStart = now;
+    _state = SCANNING;
+  }
+
+  void pickBestFromResults(const NimBLEScanResults &results) {
+    Serial.println("BLE: selecting best PT-*");
+    for (int i = 0; i < results.getCount(); i++) {
+      const NimBLEAdvertisedDevice* dev = results.getDevice(i);
+      if (!dev) continue;
+
+      int rssi = dev->getRSSI();
+      std::string nm = dev->getName();
+
+      Serial.printf("%s: %d\n", nm.c_str(), rssi);
+
+      bool nameOk = (!nm.empty() && nm.rfind("PT-", 0) == 0);
+      if (!nameOk) continue;
+
+      if (rssi > _bestRssi) {
+        _bestRssi = rssi;
+        _bestTagName = String(nm.c_str());
+        _haveCurrentTag = true;
+      }
+    }
+  }
+
+  void startAdvertising() {
+    Serial.printf("BLE: advertising player %s\n",
+                  _haveCurrentTag ? _bestTagName.c_str() : "PT-UNK");
+
+    NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
+
+    // ADV: just flags + mfg
+    NimBLEAdvertisementData advData;
+    advData.setFlags(0x04);  // non-connectable, LE only
+
+    std::string mfg = buildManufacturerData_simple(
+        _haveCurrentTag ? _bestTagName.c_str() : "PT-UNK",
+        0.0f                    // first packet, 0 strength
+    );
+    advData.setManufacturerData(mfg);
+
+    // SCAN_RSP: UUID + name
+    NimBLEAdvertisementData respData;
+    respData.setCompleteServices(NimBLEUUID(SHARED_SERVICE_UUID_STR));
+    respData.setName(TILE_ID);
+
+    uint16_t intervalMs = 40;
+    uint16_t units = (uint16_t)((float)intervalMs / 0.625f + 0.5f);
+    adv->setMinInterval(units);
+    adv->setMaxInterval(units);
+
+    adv->setAdvertisementData(advData);
+    adv->setScanResponseData(respData);
+
+    adv->start();
+    _lastAdvUpdate = millis();
+  }
+
+  void stopAdvertising() {
+    Serial.println("BLE: stopAdvertising()");
+    NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
+    adv->stop();
+  }
+
+  void updateAdvPacket(float strength) {
+    NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
+    if (!adv->isAdvertising()) return;
+
+    // DO NOT SCALE TO BYTE ANYMORE
+    // we pass the real number to the string builder
+    NimBLEAdvertisementData advData;
+    advData.setFlags(0x04);
+
+    std::string mfg = buildManufacturerData_simple(
+        _haveCurrentTag ? _bestTagName.c_str() : "PT-UNK",
+        strength                   // <-- real float/int here
+    );
+    advData.setManufacturerData(mfg);
+
+    // leave scan response alone
+    adv->setAdvertisementData(advData);
+  }
+};
+
+// global reporter
+BleReporter reporter;
+
+// ============================================================================
+// ------------------- GLOBAL PRESENCE STATE ----------------------------------
+bool  g_playerPresent = false;
+float g_lastDt = 0.0f;
+
+// ============================================================================
+// ------------------- Arduino setup / loop -----------------------------------
+void setup() {
+  Serial.begin(115200);
+  delay(200);
+
+  statusLed.begin(64);
+  statusLed.off();
+
+  initQMC5883P();
+  tStart = millis();
+  Serial.println("Building baseline...");
+
+  reporter.begin();
+}
+
+void loop() {
+  int16_t rx, ry, rz;
+  if (!readQMC5883PData(rx, ry, rz)) {
+    delay(10);
+    return;
+  }
+
+  float x = rx;
+  float y = ry;
+  float z = rz;
+
+  unsigned long now = millis();
+
+  // baseline phase
+  if (!baselineDone) {
+    if (!baselineInit) {
+      baseX = x; baseY = y; baseZ = z;
+      baselineInit = true;
+    } else {
+      baseX = BASELINE_ALPHA * x + (1 - BASELINE_ALPHA) * baseX;
+      baseY = BASELINE_ALPHA * y + (1 - BASELINE_ALPHA) * baseY;
+      baseZ = BASELINE_ALPHA * z + (1 - BASELINE_ALPHA) * baseZ;
+    }
+
+    Serial.println(F(">baseline_building:1"));
+    statusLed.off();
+
+    if (now - tStart >= BASELINE_MS) {
+      baselineDone = true;
+      Serial.println(F("=== Baseline established ==="));
+      Serial.print(F("base_x: ")); Serial.println(baseX, 2);
+      Serial.print(F("base_y: ")); Serial.println(baseY, 2);
+      Serial.print(F("base_z: ")); Serial.println(baseZ, 2);
+      Serial.println(F("==========================="));
+    }
+    delay(10);
+    return;
+  }
+
+  // run phase
+  float dx = x - baseX;
+  float dy = y - baseY;
+  float dz = z - baseZ;
+  float dt = magnitude3D(dx, dy, dz);
+  float rawMag = magnitude3D(x, y, z);
+
+  if (!outputEmaInit) {
+    fDx = dx;
+    fDy = dy;
+    fDz = dz;
+    fDt = dt;
+    outputEmaInit = true;
+  } else {
+    fDx = OUTPUT_ALPHA * dx + (1 - OUTPUT_ALPHA) * fDx;
+    fDy = OUTPUT_ALPHA * dy + (1 - OUTPUT_ALPHA) * fDy;
+    fDz = OUTPUT_ALPHA * dz + (1 - OUTPUT_ALPHA) * fDz;
+    fDt = OUTPUT_ALPHA * dt + (1 - OUTPUT_ALPHA) * fDt;
+  }
+
+  g_lastDt = fDt;
+
+  // presence FSM
+  if (!g_playerPresent) {
+    if (fDt >= MIN_ON_DT) {
+      g_playerPresent = true;
+    }
+  } else {
+    if (fDt <= OFF_HYST_DT) {
+      g_playerPresent = false;
+    }
+  }
+
+  // LED state
+  if (!g_playerPresent) {
+    statusLed.red();
+  } else {
+    if (fDt >= STRONG_DT) {
+      statusLed.green();
+    } else {
+      statusLed.yellow();
+    }
+  }
+
+  // BLE FSM
+  reporter.update(g_playerPresent, fDt);
+
+  delay(10); // ~100 Hz
+}
