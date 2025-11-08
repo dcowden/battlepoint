@@ -596,17 +596,66 @@ class SoundSystem:
         return path
 
     def play(self, sound_id: int):
+        """
+        Play a sound.
+
+        - Normal sounds: play immediately (interrupt current music).
+        - Menu tracks (self._menu_tracks): lowest priority
+          - If something is playing, queue them.
+          - If nothing is playing, start them in a loop.
+        """
         if not self.enabled or not self.ok:
             return
+
         path = self._load_path(sound_id)
         if not path:
             return
+
         try:
-            pygame.mixer.music.load(path)
-            pygame.mixer.music.play()
-            print(f"[SOUND] Playing {sound_id}: {path}")
+            if sound_id in self._menu_tracks:
+                # Menu music: never interrupt, always lowest priority.
+                if pygame.mixer.music.get_busy():
+                    pygame.mixer.music.queue(path)
+                    print(f"[SOUND] Queued menu track {sound_id}: {path}")
+                else:
+                    pygame.mixer.music.load(path)
+                    pygame.mixer.music.play(loops=-1)
+                    print(f"[SOUND] Looping menu track {sound_id}: {path}")
+            else:
+                # High-priority / normal SFX or VO: play immediately.
+                pygame.mixer.music.load(path)
+                pygame.mixer.music.play()
+                print(f"[SOUND] Playing {sound_id}: {path}")
         except Exception as e:
             print(f"[SOUND] ERROR playing {path}: {e}")
+
+
+
+    def queue(self, sound_id: int):
+        """Queue a track to play after the current one finishes.
+
+        - If something is already playing via mixer.music, we queue.
+        - If nothing is playing, we just play it immediately (fallback).
+        """
+        if not self.enabled or not self.ok:
+            return
+
+        path = self._load_path(sound_id)
+        if not path:
+            return
+
+        try:
+            if pygame.mixer.music.get_busy():
+                pygame.mixer.music.queue(path)
+                print(f"[SOUND] Queued {sound_id}: {path}")
+            else:
+                # Nothing playing: just start it now.
+                pygame.mixer.music.load(path)
+                pygame.mixer.music.play()
+                print(f"[SOUND] Queue-fallback playing {sound_id}: {path}")
+        except Exception as e:
+            print(f"[SOUND] ERROR queueing {sound_id} ({path}): {e}")
+
 
     def loop(self, sound_id: int):
         if not self.enabled or not self.ok:
@@ -622,10 +671,17 @@ class SoundSystem:
             print(f"[SOUND] ERROR looping {path}: {e}")
 
     def play_menu_track(self):
+        """Request a menu/background track.
+
+        Always treated as lowest priority:
+        - Queued if something is already playing.
+        - Loops if nothing is playing.
+        """
         if not self.enabled or not self.ok:
             return
         snd_id = random.choice(self._menu_tracks)
-        self.loop(snd_id)
+        self.play(snd_id)
+
 
     def set_volume(self, volume: int):
         self.volume = max(0, min(30, volume))
@@ -770,6 +826,10 @@ class GameBackend:
         else:
             self.proximity.update(counts.get('red', 0) > 0, counts.get('blu', 0) > 0)
 
+    def on_game_ended(self):
+        """Hook for subclasses when a game ends naturally (victory)."""
+        pass
+
     def update(self):
         now_ms = self.clock.milliseconds()
 
@@ -794,51 +854,54 @@ class GameBackend:
                 self._do_start_game_now()
             return
 
-        # PROXIMITY
+        # If not running, do nothing. NO proximity, NO control point updates.
+        if self._phase != GamePhase.RUNNING or not self.game:
+            return
+
+        # PROXIMITY (only while running)
         try:
             self._update_proximity()
         except Exception:
             traceback.print_exc()
 
-        # CONTROL POINT
+        # CONTROL POINT (only while running)
         self.control_point.update(self.proximity)
 
-        # RUNNING
-        if self._phase == GamePhase.RUNNING and self.game:
-            self.game.update()
+        # GAME LOGIC
+        self.game.update()
 
-            cp = self.control_point
-            cp_pct = cp.get_capture_progress_percent()
-            self.capture_meter.setMaxValue(100)
-            self.capture_meter.setValue(int(cp_pct))
+        cp = self.control_point
+        cp_pct = cp.get_capture_progress_percent()
+        self.capture_meter.setMaxValue(100)
+        self.capture_meter.setValue(int(cp_pct))
 
-            if cp.is_contested():
-                self.capture_meter.fgColor(TeamColor.PURPLE)
+        if cp.is_contested():
+            self.capture_meter.fgColor(TeamColor.PURPLE)
+            self.capture_meter.bgColor(TeamColor.BLACK)
+        else:
+            cap_team = cp.get_capturing()
+            if cap_team == Team.RED:
+                self.capture_meter.fgColor(TeamColor.RED)
+                self.capture_meter.bgColor(TeamColor.BLACK)
+            elif cap_team == Team.BLU:
+                self.capture_meter.fgColor(TeamColor.BLUE)
                 self.capture_meter.bgColor(TeamColor.BLACK)
             else:
-                cap_team = cp.get_capturing()
-                if cap_team == Team.RED:
+                owner = cp.get_owner()
+                if owner == Team.RED:
                     self.capture_meter.fgColor(TeamColor.RED)
-                    self.capture_meter.bgColor(TeamColor.BLACK)
-                elif cap_team == Team.BLU:
+                elif owner == Team.BLU:
                     self.capture_meter.fgColor(TeamColor.BLUE)
-                    self.capture_meter.bgColor(TeamColor.BLACK)
                 else:
-                    owner = self.control_point.get_owner()
-                    if owner == Team.RED:
-                        self.capture_meter.fgColor(TeamColor.RED)
-                    elif owner == Team.BLU:
-                        self.capture_meter.fgColor(TeamColor.BLUE)
-                    else:
-                        self.capture_meter.fgColor('#555555')
-                    self.capture_meter.bgColor(TeamColor.BLACK)
+                    self.capture_meter.fgColor('#555555')
+                self.capture_meter.bgColor(TeamColor.BLACK)
 
-            if self.game.is_over():
-                self._phase = GamePhase.ENDED
-                self._running = False
-
-        # ENDED / IDLE: nothing extra
-        return
+        if self.game.is_over():
+            self._phase = GamePhase.ENDED
+            self._running = False
+            # optionally: stop BLE, restart menu music here if you want true "hard stop"
+            self._ensure_ble(False)
+            self.on_game_ended()
 
     def get_state(self) -> dict:
         meters = {
@@ -942,6 +1005,13 @@ class EnhancedGameBackend(GameBackend):
         self.manual_control: bool = False  # False: BLE drives proximity
         self.manual_red_on: bool = False
         self.manual_blu_on: bool = False
+
+    def on_game_ended(self):
+        # Natural end: winner decided, phase already set to ENDED.
+        # Restart menu music if it's not already playing.
+        if not self._menu_music_on:
+            self.sound_system.play_menu_track()
+            self._menu_music_on = True
 
     # ----- manual control API -----
 

@@ -205,6 +205,7 @@ import asyncio as _asyncio  # alias
 async def game_ui():
     ui.colors(primary='#1976D2')
 
+
     ui.add_head_html("""
     <style>
       html, body {
@@ -226,9 +227,9 @@ async def game_ui():
         background: #111;
         display: flex;
         align-items: center;
-        justify-content: space_between;
+        justify-content: center;
         padding: 0 1rem;
-        gap: 1rem;
+        gap: 4 rem;
       }
       .bp-topbar-left,
       .bp-topbar-center,
@@ -239,15 +240,16 @@ async def game_ui():
       }
       .bp-topbar-center { justify-content: center; }
       .bp-main {
-        height: calc(100vh - 52px - 240px);
+        height: calc(100vh - 52px - 170px);
         display: flex;
         flex-direction: row;
         justify-content: space-between;
         align-items: center;
+        overflow: hidden;
       }
       .bp-side {
         width: 20vw;
-        min-width: 140px;
+        min-width: 200px;
         height: 100%;
         display: flex;
         flex-direction: column;
@@ -256,7 +258,7 @@ async def game_ui():
         justify-content: center;
       }
       .bp-vert-shell {
-        width: 350px;
+        width: 270px;
         height: 100vh;
         max-height: calc(100vh - 52px - 160px);
         background: #222;
@@ -265,6 +267,17 @@ async def game_ui():
         position: relative;
         overflow: hidden;
       }
+      
+        .bp-status-row {
+          display: flex;
+          flex-wrap: wrap;          /* lets them wrap on narrow screens */
+          gap: 1.5rem;              /* space between items */
+          align-items: baseline;
+          justify-content: center;  /* center under the capture bar */
+          color: #ddd;
+          font-size: 1.2rem;
+        }
+            
       .bp-vert-fill {
         position: absolute;
         bottom: 0;
@@ -284,24 +297,28 @@ async def game_ui():
         gap: 1.0rem;
       }
       .bp-clock {
-        font-size: min(25rem, 25vh);
+        flex: 1 1 auto;
+        font-size: clamp(10rem, 40rem, 80rem);
         line-height: 1;
         font-weight: 400;
         color: #fff;
         text-align: center;
+        max-height: 64%;
       }
       .bp-status {
-        font-size: 4.4rem;
+        font-size: 1.4rem;
         color: #ddd;
       }
       .bp-capture-shell {
         width: min(60vw, 900px);
-        height: 180px;
+        flex-shrink: 0; 
+        height: 150px;
         background: #222;
         border: 2px solid #444;
         border-radius: 12px;
         overflow: hidden;
         position: relative;
+        margin: 2.5rem;
       }
       .bp-capture-fill {
         position: absolute;
@@ -313,11 +330,11 @@ async def game_ui():
         transition: width 0.12s linear;
       }
       .bp-bottom {
-        height: 240px;
+        height: 150px;
         display: flex;
         flex-direction: column;
         gap: 0.4rem;
-        padding: 0.4rem 0.8rem 0.4rem 0.8rem;
+        padding: 1.4rem;
       }
       .bp-bottom-wrapper {
         position: relative;
@@ -369,6 +386,7 @@ async def game_ui():
 
                 start_btn = ui.button('START').props('color=green')
                 stop_btn = ui.button('STOP').props('color=orange')
+                stop_btn.set_visibility(False)
 
             with ui.element('div').classes('bp-topbar-right'):
                 ui.button('Game', on_click=lambda: ui.navigate.to('/')).props('flat color=white')
@@ -384,12 +402,16 @@ async def game_ui():
 
             with ui.element('div').classes('bp-center'):
                 game_clock = ui.label('0:00').classes('bp-clock')
-                status_label = ui.label('Waiting...').classes('bp-status')
+
                 with ui.element('div').classes('bp-capture-shell'):
                     capture_fill = ui.element('div').classes('bp-capture-fill')
-                cp_owner = ui.label('Owner: ---').classes('text-white')
-                cp_capturing = ui.label('Capturing: ---').classes('text-white')
-                cp_contested = ui.label('Contested: False').classes('text-white')
+
+                # one horizontal row, still separate variables
+                with ui.element('div').classes('bp-status-row'):
+                    status_label = ui.label('Waiting...').classes('bp-status-label')
+                    cp_owner = ui.label('Owner: ---').classes('bp-status-label')
+                    cp_capturing = ui.label('Capturing: ---').classes('bp-status-label')
+                    cp_contested = ui.label('Contested: False').classes('bp-status-label')
 
             with ui.element('div').classes('bp-side'):
                 ui.label('RED').classes('text-4xl font-bold text-red-400')
@@ -643,6 +665,18 @@ async def game_ui():
                             traceback.print_exc()
                         winner_dismissed['flag'] = False
                         last_winner_key['key'] = None
+
+                # Toggle START / STOP visibility based on backend state
+                running = bool(state.get('running', False))
+                if phase in ('running', 'countdown') or running:
+                    # Game in progress: show STOP, hide START
+                    start_btn.set_visibility(False)
+                    stop_btn.set_visibility(True)
+                else:
+                    # Idle or ended: show START, hide STOP
+                    start_btn.set_visibility(True)
+                    stop_btn.set_visibility(False)
+
 
                 meters = state.get('meters', {})
 
