@@ -127,12 +127,13 @@ MAX_PLAYERS_PER_TEAM = 3  # clamp
 class Proximity:
     """
     Proximity with per-team player counts (0..3) and the same 'linger' threshold
-    behavior you had before. If we haven't seen an update within the threshold,
-    the effective count falls to 0.
+    behavior as before.
 
     Back-compat:
-      - update(red_close: bool, blu_close: bool) still works (treated as 1-or-0)
-      - is_red_close() / is_blu_close() delegate to "effective_count > 0"
+      - update(red_close: bool, blu_close: bool) still works (1-or-0)
+      - red_button_press() / blu_button_press() are kept for UI & old code:
+        they simulate "one player present" for that team using the numeric path.
+      - is_red_close() / is_blu_close() use effective_count > 0.
     """
 
     def __init__(self, game_options: GameOptions, clock: Clock):
@@ -148,7 +149,7 @@ class Proximity:
     # ---- new API ----
     def update_counts(self, red_count: int, blu_count: int):
         now = self.clock.milliseconds()
-        #print(f"Proximity Update@{now}: BlueOn={blu_count}, RedOn={red_count}")
+
         red_count = max(0, min(MAX_PLAYERS_PER_TEAM, int(red_count)))
         blu_count = max(0, min(MAX_PLAYERS_PER_TEAM, int(blu_count)))
 
@@ -160,9 +161,27 @@ class Proximity:
         self._observed_red_count = red_count
         self._observed_blu_count = blu_count
 
-    # ---- back-compat shim ----
+    # ---- back-compat shim (bool) ----
     def update(self, red_close: bool, blu_close: bool):
-        self.update_counts(1 if red_close else 0, 1 if blu_close else 0)
+        self.update_counts(1 if red_close else 0,
+                           1 if blu_close else 0)
+
+    # ---- UI button shims (used by /api/proximity/red|blue) ----
+    def red_button_press(self):
+        """
+        Simulate a RED player on the point.
+        Each call refreshes RED presence as count=1.
+        If you want 'while held' behavior, call this repeatedly from the UI
+        (e.g. via a timer) while the button is down.
+        """
+        self.update_counts(1, self.get_blu_count())
+
+    def blu_button_press(self):
+        """
+        Simulate a BLU player on the point.
+        Each call refreshes BLU presence as count=1.
+        """
+        self.update_counts(self.get_red_count(), 1)
 
     # ---- helpers ----
     def _threshold_ms(self) -> int:
@@ -192,9 +211,10 @@ class Proximity:
     def is_team_close(self, team: Team) -> bool:
         if team == Team.RED:
             return self.is_red_close()
-        elif team == Team.BLU:
+        if team == Team.BLU:
             return self.is_blu_close()
         return False
+
 
 
 
@@ -295,7 +315,7 @@ class EventManager:
         self.clock = clock
         self.capture_timer = CooldownTimer(20000, clock)
         self.contest_timer = CooldownTimer(20000, clock)
-        self.overtime_timer = CooldownTimer(5000, clock)
+        self.overtime_timer = CooldownTimer(20000, clock)
         self.start_time_timer = CooldownTimer(900, clock)
         self.end_time_timer = CooldownTimer(900, clock)
         self.cp_alert_interval_ms = 5000
@@ -304,6 +324,11 @@ class EventManager:
         self.events: list[GameEvent] = []
 
         self.sound_system = sound_system
+
+        # one-shot latches (per game)
+        self._starts_announced: set[int] = set()
+        self._ends_announced: set[int] = set()
+        self._starting_game_announced: bool = False
 
     def init(self, cp_alert_interval_seconds: int):
         self.cp_alert_interval_ms = cp_alert_interval_seconds * 1000
@@ -316,6 +341,12 @@ class EventManager:
     def _play(self, snd_id: int):
         if self.sound_system:
             self.sound_system.play(snd_id)
+
+    def _reset_game_latches(self):
+        """Reset one-shot sound guards at the start of each game."""
+        self._starts_announced.clear()
+        self._ends_announced.clear()
+        self._starting_game_announced = False
 
     # === match C ===
     def control_point_being_captured(self, team: Team):
@@ -333,10 +364,18 @@ class EventManager:
         self._play(14)
 
     def starting_game(self):
-        # <<< you asked for this: clear when game starts
+        # treat this as "new game" boundary: reset one-shot latches
+        self._reset_game_latches()
+
+        # (optional) clear old events when a new game starts
         self.events.clear()
+
         self._add_event("Starting Game")
-        self._play(10)
+
+        # ensure this sound is only played once per game
+        if not self._starting_game_announced:
+            self._play(10)
+            self._starting_game_announced = True
 
     def game_started(self):
         self._add_event("Game Started")
@@ -356,8 +395,10 @@ class EventManager:
         self._play(17)
 
     def starts_in_seconds(self, secs: int):
-        if self.start_time_timer.can_run():
-            if secs in [30, 20, 10, 5, 4, 3, 2, 1, 60]:
+        # only fire specific countdown calls once per game per second-mark
+        tracked = [60, 30, 20, 10, 5, 4, 3, 2, 1]
+        if secs in tracked and secs not in self._starts_announced:
+            if self.start_time_timer.can_run():
                 self._add_event(f"Game starts in {secs} seconds")
                 starts_map = {
                     60: 34,
@@ -373,10 +414,14 @@ class EventManager:
                 sid = starts_map.get(secs)
                 if sid:
                     self._play(sid)
+                # latch this second so it doesn't fire again this game
+                self._starts_announced.add(secs)
 
     def ends_in_seconds(self, secs: int):
-        if self.end_time_timer.can_run():
-            if secs in [120, 60, 30, 20, 10, 5, 4, 3, 2, 1]:
+        # only fire specific countdown calls once per game per second-mark
+        tracked = [120, 60, 30, 20, 10, 5, 4, 3, 2, 1]
+        if secs in tracked and secs not in self._ends_announced:
+            if self.end_time_timer.can_run():
                 self._add_event(f"Game ends in {secs} seconds")
                 ends_map = {
                     120: 38,
@@ -393,12 +438,15 @@ class EventManager:
                 sid = ends_map.get(secs)
                 if sid:
                     self._play(sid)
+                # latch this second so it doesn't fire again this game
+                self._ends_announced.add(secs)
 
     # ---- simple API from EventManager side ----
     def get_events(self, limit: int = 100) -> list[GameEvent]:
         if limit <= 0:
             return self.events[:]
         return self.events[-limit:]
+
 
 class ControlPoint:
     def __init__(self, event_manager: EventManager, clock: Clock):

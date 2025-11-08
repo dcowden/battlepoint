@@ -827,14 +827,14 @@ def test_ble_scanner_counts_from_cs_ads():
             'rssi': -50,
             'address': 'AA:BB:CC:DD:EE:01',
             'last_seen': now,
-            'manufacturer_data': 'PLB-07',
+            'manufacturer_data': 'B,CS-01,PLB-07,999',
         }
         s.devices["AA:BB:CC:DD:EE:02"] = {
             'name': 'CS-02',
             'rssi': -60,
             'address': 'AA:BB:CC:DD:EE:02',
             'last_seen': now,
-            'manufacturer_data': 'PLR-02,-72',
+            'manufacturer_data': 'R,CS-01,PLR-02,-72',
         }
         s.devices["AA:BB:CC:DD:EE:03"] = {
             'name': 'Random',
