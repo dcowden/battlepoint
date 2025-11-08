@@ -26,6 +26,7 @@ class BaseGame:
         self.timer1: LedMeter | None = None
         self.timer2: LedMeter | None = None
         self.clock: Clock | None = None
+        self._last_end_announce_second = -1  # (won't be used after the change, but safe)
 
         self._winner: Team = Team.NOBODY
         self._red_accum_ms: int = 0
@@ -65,6 +66,8 @@ class BaseGame:
         # just like C: timer max = time limit
         self.timer1.setMaxValue(self.options.time_limit_seconds)
         self.timer2.setMaxValue(self.options.time_limit_seconds)
+
+        self.control_point.init(self.options.capture_seconds)
         self.game_type_init()
         self.update_display()
 
@@ -117,9 +120,6 @@ class BaseGame:
         if not self.is_running():
             return
 
-        # DO NOT update the control point here.
-        # Tests update the real ControlPoint separately.
-
         self._update_accumulated_time()
 
         winner = self.check_victory()
@@ -130,7 +130,12 @@ class BaseGame:
 
         # send "ends in" like C
         if self.events:
-            self.events.ends_in_seconds(self.get_remaining_seconds())
+            rem = self.get_remaining_seconds()
+            #print(f"Remaining seconds: {rem}")
+            #if rem != self._last_end_announce_second:
+            #    self.events.ends_in_seconds(rem)
+            #    self._last_end_announce_second = rem
+            self.events.ends_in_seconds(rem)
 
         self.update_display()
 

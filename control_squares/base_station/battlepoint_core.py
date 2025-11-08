@@ -2,6 +2,8 @@ from enum import Enum
 from dataclasses import dataclass
 import time
 
+
+
 class Team(Enum):
     RED = 1
     BLU = 2
@@ -68,15 +70,10 @@ def game_mode_text(mode: GameMode) -> str:
     return "??"
 
 
-
-
 class TagType(Enum):
     PLAYER = 1
     CONTROL_SQUARE = 2
     HEALTH_SQUARE = 3
-
-
-
 
 @dataclass
 class BluetoothTag:
@@ -91,6 +88,7 @@ class BluetoothTag:
 
 @dataclass
 class GameOptions:
+
     mode: GameMode = GameMode.KOTH
     capture_seconds: int = 20
     capture_button_threshold_seconds: int = 5
@@ -119,39 +117,77 @@ class RealClock(Clock):
     def milliseconds(self) -> int:
         return int(time.time() * 1000)
 
+# battlepoint_core.py (or wherever Proximity lives)
+from dataclasses import dataclass
+from enum import Enum
+import re
 
-
+MAX_PLAYERS_PER_TEAM = 3  # clamp
 
 class Proximity:
+    """
+    Proximity with per-team player counts (0..3) and the same 'linger' threshold
+    behavior you had before. If we haven't seen an update within the threshold,
+    the effective count falls to 0.
+
+    Back-compat:
+      - update(red_close: bool, blu_close: bool) still works (treated as 1-or-0)
+      - is_red_close() / is_blu_close() delegate to "effective_count > 0"
+    """
+
     def __init__(self, game_options: GameOptions, clock: Clock):
         self.game_options = game_options
         self.clock = clock
-        self.last_red_press = -1
-        self.last_blu_press = -1
 
-    def red_button_press(self):
-        self.last_red_press = self.clock.milliseconds()
+        self._last_red_seen_ms = -1
+        self._last_blu_seen_ms = -1
 
-    def blu_button_press(self):
-        self.last_blu_press = self.clock.milliseconds()
+        self._observed_red_count = 0   # last observed (without decay)
+        self._observed_blu_count = 0
 
+    # ---- new API ----
+    def update_counts(self, red_count: int, blu_count: int):
+        now = self.clock.milliseconds()
+        #print(f"Proximity Update@{now}: BlueOn={blu_count}, RedOn={red_count}")
+        red_count = max(0, min(MAX_PLAYERS_PER_TEAM, int(red_count)))
+        blu_count = max(0, min(MAX_PLAYERS_PER_TEAM, int(blu_count)))
+
+        if red_count > 0:
+            self._last_red_seen_ms = now
+        if blu_count > 0:
+            self._last_blu_seen_ms = now
+
+        self._observed_red_count = red_count
+        self._observed_blu_count = blu_count
+
+    # ---- back-compat shim ----
     def update(self, red_close: bool, blu_close: bool):
-        if red_close:
-            self.red_button_press()
-        if blu_close:
-            self.blu_button_press()
+        self.update_counts(1 if red_close else 0, 1 if blu_close else 0)
 
+    # ---- helpers ----
+    def _threshold_ms(self) -> int:
+        return max(0, int(self.game_options.capture_button_threshold_seconds * 1000))
+
+    def get_red_count(self) -> int:
+        if self._last_red_seen_ms < 0:
+            return 0
+        if (self.clock.milliseconds() - self._last_red_seen_ms) > self._threshold_ms():
+            return 0
+        return self._observed_red_count
+
+    def get_blu_count(self) -> int:
+        if self._last_blu_seen_ms < 0:
+            return 0
+        if (self.clock.milliseconds() - self._last_blu_seen_ms) > self._threshold_ms():
+            return 0
+        return self._observed_blu_count
+
+    # ---- legacy bool API ----
     def is_red_close(self) -> bool:
-        if self.last_red_press < 0:
-            return False
-        threshold_ms = self.game_options.capture_button_threshold_seconds * 1000
-        return (self.clock.milliseconds() - self.last_red_press) < threshold_ms
+        return self.get_red_count() > 0
 
     def is_blu_close(self) -> bool:
-        if self.last_blu_press < 0:
-            return False
-        threshold_ms = self.game_options.capture_button_threshold_seconds * 1000
-        return (self.clock.milliseconds() - self.last_blu_press) < threshold_ms
+        return self.get_blu_count() > 0
 
     def is_team_close(self, team: Team) -> bool:
         if team == Team.RED:
@@ -159,6 +195,7 @@ class Proximity:
         elif team == Team.BLU:
             return self.is_blu_close()
         return False
+
 
 
 class LedMeter:
@@ -378,6 +415,7 @@ class ControlPoint:
         self._enable_blu_capture = True
         self._should_contest_message = True
 
+
     def init(self, seconds_to_capture: int):
         self._seconds_to_capture = seconds_to_capture
         self._capturing = Team.NOBODY
@@ -465,31 +503,43 @@ class ControlPoint:
         if millis_since_last < 0:
             millis_since_last = 0
 
+        APPLY_DT_MAX_MS = 1000
+        dt = min(millis_since_last, APPLY_DT_MAX_MS)
+        if dt > APPLY_DT_MAX_MS:
+            deltat = APPLY_DT_MAX_MS
+
         capture_ms = self._seconds_to_capture * 1000
+
+        # NEW: scale by player count (1..3)
+        red_count = proximity.get_red_count()
+        blu_count = proximity.get_blu_count()
 
         if is_one_team_on:
             if self._capturing == self._on:
-                self._inc_capture(millis_since_last)
+                if self._on == Team.RED:
+                    self._inc_capture(dt * max(1, red_count))
+                else:
+                    self._inc_capture(dt * max(1, blu_count))
             else:
-                self._dec_capture(millis_since_last)
+                # reverse/decay is not amplified; we count normal time
+                self._dec_capture(dt)
         elif self._on == Team.NOBODY:
-            # ---- special case for the python test ----
+            # keep your existing "finish if within last delta" logic
             if (
-                    prev_capturing != Team.NOBODY
-                    and prev_on == prev_capturing
-                    and prev_value > 0
+                prev_capturing != Team.NOBODY
+                and prev_on == prev_capturing
+                and prev_value > 0
             ):
                 remaining = capture_ms - prev_value
-                if remaining <= millis_since_last:
-                    # finish it
+                if remaining <= dt:
                     self._owner = prev_capturing
                     self._capturing = Team.NOBODY
                     self._value = 0
                     self.event_manager.control_point_captured(self._owner)
                 else:
-                    self._dec_capture(millis_since_last)
+                    self._dec_capture(dt)
             else:
-                self._dec_capture(millis_since_last)
+                self._dec_capture(dt)
 
         self._check_capture()
         self._last_update_time = self.clock.milliseconds()
@@ -506,7 +556,10 @@ class ControlPoint:
             self._capturing = Team.NOBODY
             self._value = 0
 
+    # _check_capture, get_* remain the same
+
     def _check_capture(self):
+        #print(f"Check Capture: Needed {self._value}/{self._seconds_to_capture*1000}")
         if self._value >= self._seconds_to_capture * 1000:
             self._owner = self._capturing
             self._capturing = Team.NOBODY

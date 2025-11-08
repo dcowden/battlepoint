@@ -58,7 +58,7 @@ bool  outputEmaInit = false;
 float fDx = 0, fDy = 0, fDz = 0, fDt = 0;
 
 // presence thresholds
-const float MIN_ON_DT   = 400.0f;
+const float MIN_ON_DT   = 300.0f;
 const float STRONG_DT   = 1100.0f;
 const float OFF_HYST_DT = 300.0f;
 

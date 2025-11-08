@@ -6,6 +6,7 @@ Following the patterns from platformio_cpp_tests
 import pytest
 from battlepoint_core import get_team_color,team_text_char,game_mode_text, CooldownTimer, BluetoothTag, TagType, EventManager, Team, TeamColor, Proximity, GameOptions, LedMeter,GameMode,team_text,RealClock,ControlPoint
 from battlepoint_game import KothGame,CPGame,ADGame,BaseGame
+from battlepoint_app import EnhancedBLEScanner
 from test_stubs import MockEventManager,MockControlPoint, MockClock
 import time
 
@@ -39,6 +40,12 @@ class _TestProximity:
 
     def is_blu_close(self) -> bool:
         return self._blu
+
+    def get_red_count(self):
+        return 0
+
+    def get_blu_count(self):
+        return 0
 
 
 # ---------------------------------------------------------------------------
@@ -735,6 +742,113 @@ def test_full_game_flow_like_python():
 
     assert game.is_over()
     assert game.get_winner() == Team.RED
+
+def test_proximity_counts_and_decay():
+    go = GameOptions()
+    go.capture_button_threshold_seconds = 1
+    clk = MockClock()
+    p = Proximity(go, clk)
+
+    p.update_counts(2, 0)
+    assert p.get_red_count() == 2
+    assert p.is_red_close()
+    assert not p.is_blu_close()
+
+    # after 900 ms still within threshold
+    clk.add_millis(900)
+    assert p.get_red_count() == 2
+
+    # after another 200 ms, decay to 0
+    clk.add_millis(200)
+    assert p.get_red_count() == 0
+    assert not p.is_red_close()
+
+def test_control_point_capture_scales_with_players():
+    clk = MockClock()
+    em = MockEventManager()
+    cp = ControlPoint(em, clk)
+
+    go = GameOptions()
+    go.capture_button_threshold_seconds = 5  # keep counts alive
+    p = Proximity(go, clk)
+
+    cp.init(1)  # 1 second total to capture
+
+    # 1 player red for 200ms -> ~20% progress
+    p.update_counts(1, 0)
+    cp.update(p)
+    clk.add_millis(200)
+    cp.update(p)
+    pct_one = cp.get_capture_progress_percent()
+    assert 15 <= pct_one <= 25
+
+    # reset CP
+    cp.init(1)
+
+    # 3 players red for 200ms -> ~60% progress
+    p.update_counts(3, 0)
+    cp.update(p)
+    clk.add_millis(200)
+    cp.update(p)
+    pct_three = cp.get_capture_progress_percent()
+    assert 50 <= pct_three <= 70
+    assert pct_three > pct_one * 2  # should be ~3x
+
+def test_control_point_contested_no_progress():
+    clk = MockClock()
+    em = MockEventManager()
+    cp = ControlPoint(em, clk)
+
+    go = GameOptions()
+    go.capture_button_threshold_seconds = 5
+    p = Proximity(go, clk)
+
+    cp.init(1)
+    p.update_counts(2, 1)  # both on
+    cp.update(p)
+    clk.add_millis(300)
+    cp.update(p)
+
+    assert cp.is_contested()
+    assert cp.get_capture_progress_percent() == 0
+
+import time
+
+def test_ble_scanner_counts_from_cs_ads():
+    clk = MockClock()
+    s = EnhancedBLEScanner(clk)
+
+    now = time.time()  # fresh timestamp
+
+    with s._lock:
+        s.devices.clear()
+        s.devices["AA:BB:CC:DD:EE:01"] = {
+            'name': 'CS-01',
+            'rssi': -50,
+            'address': 'AA:BB:CC:DD:EE:01',
+            'last_seen': now,
+            'manufacturer_data': 'PLB-07',
+        }
+        s.devices["AA:BB:CC:DD:EE:02"] = {
+            'name': 'CS-02',
+            'rssi': -60,
+            'address': 'AA:BB:CC:DD:EE:02',
+            'last_seen': now,
+            'manufacturer_data': 'PLR-02,-72',
+        }
+        s.devices["AA:BB:CC:DD:EE:03"] = {
+            'name': 'Random',
+            'rssi': -40,
+            'address': 'AA:BB:CC:DD:EE:03',
+            'last_seen': now,  # value doesn’t matter; name isn’t CS-*
+            'manufacturer_data': 'junk',
+        }
+
+    counts = s.get_player_counts()
+    assert counts['blu'] == 1
+    assert counts['red'] == 1
+
+
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
