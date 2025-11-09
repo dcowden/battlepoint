@@ -380,13 +380,6 @@ async def game_ui():
                 ui.label('BattlePoint').classes('text-white text-lg font-bold')
 
             with ui.element('div').classes('bp-topbar-center'):
-                # RED toggle: OFF = grey, ON = red
-                red_toggle = ui.toggle(
-                    options=['R OFF', 'R ON'],
-                    value='R OFF',
-                ).props(
-                    'dense push toggle-color=red color=grey-8 text-color=white'
-                )
 
                 # BLU toggle: OFF = grey, ON = blue
                 blue_toggle = ui.toggle(
@@ -395,6 +388,16 @@ async def game_ui():
                 ).props(
                     'dense push toggle-color=blue color=grey-8 text-color=white'
                 )
+
+                # RED toggle: OFF = grey, ON = red
+                red_toggle = ui.toggle(
+                    options=['R OFF', 'R ON'],
+                    value='R OFF',
+                ).props(
+                    'dense push toggle-color=red color=grey-8 text-color=white'
+                )
+
+
 
                 start_btn = ui.button('START').props('color=green')
                 stop_btn = ui.button('STOP').props('color=orange')
@@ -776,15 +779,23 @@ async def game_ui():
 # ========================================================================
 
 @ui.page('/settings')
-async def settings_ui():
+async def settings_ui(from_page: str = '', admin: str = ''):
     ui.colors(primary='#1976D2')
+    came_from_mobile = (from_page == 'mobile')
 
     num_to_mode = {0: 'KOTH', 1: 'AD', 2: 'CP'}
     mode_to_num = {'KOTH': 0, 'AD': 1, 'CP': 2}
 
     with ui.column().classes('w-full p-8 max-w-2xl mx-auto'):
         ui.label('Game Settings').classes('text-3xl font-bold mb-4')
-        ui.button('← Back to Game', on_click=lambda: ui.navigate.to('/')).classes('mb-4')
+        def go_back():
+            if came_from_mobile:
+                target = f'/mobile?admin={admin}' if admin else '/mobile'
+                ui.navigate.to(target)
+            else:
+                ui.navigate.to('/')
+
+        ui.button('← Back to Game', on_click=go_back).classes('mb-4')
 
         mode_select = ui.select(
             ['KOTH', 'AD', 'CP'],
@@ -851,12 +862,19 @@ async def settings_ui():
 # ========================================================================
 
 @ui.page('/debug')
-def debug_ui():
+def debug_ui(from_page: str = '', admin: str = ''):
     ui.colors(primary='#1976D2')
-
+    came_from_mobile = (from_page == 'mobile')
     with ui.column().classes('w-full p-8 max-w-6xl mx-auto gap-4'):
         ui.label('Debug Console').classes('text-3xl font-bold')
-        ui.button('← BACK TO GAME', on_click=lambda: ui.navigate.to('/'))
+        def go_back():
+            if came_from_mobile:
+                target = f'/mobile?admin={admin}' if admin else '/mobile'
+                ui.navigate.to(target)
+            else:
+                ui.navigate.to('/')
+
+        ui.button('← BACK TO GAME', on_click=go_back)
 
         # Manual control switch
         with ui.row().classes('items-center gap-4'):
@@ -1055,6 +1073,437 @@ def debug_ui():
             print(f"Debug update error: {e}")
 
     ui.timer(0.5, update_debug_once, once=False)
+
+ADMIN_PASSWORD = 'battleadmin'  # change this to whatever you want
+
+ADMIN_PASSWORD = 'battleadmin'  # change as needed
+
+
+@ui.page('/mobile')
+async def mobile_ui(admin: str = ''):
+    is_admin = (admin == ADMIN_PASSWORD)
+    ui.colors(primary='#1976D2')
+
+    ui.add_head_html("""
+    <style>
+      html, body, #app {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .bp-m-root {
+        width: 90vw;
+        height: 95vh;
+        display: flex;
+        flex-direction: column;
+        background: #000;
+        color: #fff;
+        box-sizing: border-box;
+      }
+
+      /* ── TOP BAR ── */
+      .bp-m-topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.9rem;  /* more gap between clusters */
+        padding: 0.4rem 0.8rem 0.25rem 0.8rem;
+        background: #000;
+        box-sizing: border-box;
+      }
+      .bp-m-title {
+        font-weight: 700;
+        font-size: 1.05rem;
+        margin-right: 0.4rem;
+      }
+      .bp-m-btn-flat {
+        font-size: 0.7rem;
+        padding: 0 0.5rem;
+        min-height: 22px;
+      }
+      .bp-m-btn-main {
+        font-size: 0.8rem;
+        padding: 0 0.7rem;
+        min-height: 26px;
+      }
+
+      /* ── MAIN COLUMN ── */
+      .bp-m-main {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.4rem;
+        padding: 0.15rem 0.8rem 0.15rem 0.8rem;
+        box-sizing: border-box;
+      }
+
+      .bp-m-clock {
+        text-align: center;
+        font-weight: 300;
+        line-height: 1;
+        /* noticeably bigger: */
+        font-size: clamp(5rem, 9rem, 11rem);
+        margin: 1.2rem ;
+      }
+
+      .bp-m-bar-label {
+        font-size: 0.65rem;
+        color: #aaa;
+        letter-spacing: 0.06em;
+        margin-bottom: 0.08rem;
+      }
+
+      .bp-m-capture-shell,
+      .bp-m-owner-shell {
+        width: 100%;
+        height: 32px;  /* same height */
+        background: #222;
+        border-radius: 12px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .bp-m-capture-fill,
+      .bp-m-owner-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 0%;
+        transition: width 0.15s linear;
+      }
+      .bp-m-capture-fill { background: #6600ff; }
+      .bp-m-owner-fill   { background: #ff0000; }
+
+      .bp-m-status-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.45rem;
+        font-size: 0.75rem;
+        color: #ccc;
+        margin: 0.25rem 0 0.15rem 0;
+      }
+
+      /* ── RED / BLU METERS ── */
+      .bp-m-meters-row {
+        flex: 1 1 auto;                     /* take ALL remaining space */
+        display: flex;
+        flex-direction: row;
+        gap: 0.75rem;
+        align-items: stretch;
+        justify-content: center;
+        padding: 0.2rem 0 0.1rem 0;
+        box-sizing: border-box;
+        margin: 1.0rem;
+      }
+
+      .bp-m-team-meter {
+        flex: 1 1 0;
+        max-width: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.18rem;
+      }
+
+      .bp-m-team-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+      }
+
+      .bp-m-vert-shell {
+        flex: 1 1 auto;                     /* fill vertical space */
+        width: 100%;
+        max-width: 160px;
+        margin: 0 auto;                     /* centered in its half */
+        background: #222;
+        border-radius: 18px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .bp-m-vert-fill {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 0%;
+        transition: height 0.15s linear;
+      }
+
+      /* ── ADMIN TOGGLES AT BOTTOM ── */
+      .bp-m-bottom-admin {
+        width: 100%;
+        padding: 0.25rem 0.8rem 0.45rem 0.8rem;
+        box-sizing: border-box;
+        display: flex;
+        justify-content: center;
+        gap: 0.6rem;
+      }
+      .bp-m-toggle {
+        font-size: 0.6rem;
+      }
+    </style>
+    """)
+
+    with ui.element('div').classes('bp-m-root') as root:
+
+        # ───────── TOP BAR ─────────
+        with ui.element('div').classes('bp-m-topbar'):
+            ui.label('BattlePoint').classes('bp-m-title')
+
+            if is_admin:
+                with ui.row().classes('gap-0.6 items-center'):
+                    start_btn = ui.button('START').props(
+                        'color=green unelevated'
+                    ).classes('bp-m-btn-main')
+                    stop_btn = ui.button('STOP').props(
+                        'color=orange unelevated'
+                    ).classes('bp-m-btn-main')
+                    stop_btn.set_visibility(False)
+
+                with ui.row().classes('gap-0.9 items-center'):
+                    ui.button(
+                        'SETTINGS',
+                        on_click=lambda: ui.navigate.to(
+                            f'/settings?from_page=mobile&admin={ADMIN_PASSWORD}'
+                        ),
+                    ).props('flat color=white dense').classes('bp-m-btn-flat')
+
+                    ui.button(
+                        'DEBUG',
+                        on_click=lambda: ui.navigate.to(
+                            f'/debug?from_page=mobile&admin={ADMIN_PASSWORD}'
+                        ),
+                    ).props('flat color=white dense').classes('bp-m-btn-flat')
+
+        # ───────── MAIN CONTENT ─────────
+        with ui.element('div').classes('bp-m-main'):
+
+            # Big clock
+            game_clock = ui.label('0:00').classes('bp-m-clock')
+
+            # CAPTURE
+            with ui.column().classes('w-full'):
+                ui.label('CAPTURE').classes('bp-m-bar-label')
+                with ui.element('div').classes('bp-m-capture-shell'):
+                    capture_fill = ui.element('div').classes('bp-m-capture-fill')
+
+            # Slight spacer
+            ui.separator().style('opacity:0; height:6px;')
+
+            # OWNERSHIP
+            with ui.column().classes('w-full'):
+                ui.label('OWNERSHIP').classes('bp-m-bar-label')
+                with ui.element('div').classes('bp-m-owner-shell'):
+                    owner_fill = ui.element('div').classes('bp-m-owner-fill')
+
+            # Status text
+            with ui.element('div').classes('bp-m-status-row'):
+                status_label = ui.label('Waiting...')
+                cp_owner = ui.label('Owner: ---')
+                cp_capturing = ui.label('Capturing: ---')
+                cp_contested = ui.label('Contested: False')
+
+            # BLU (left) and RED (right) meters
+            with ui.element('div').classes('bp-m-meters-row'):
+
+                with ui.element('div').classes('bp-m-team-meter'):
+                    ui.label('BLU').classes('bp-m-team-label text-blue-400')
+                    with ui.element('div').classes('bp-m-vert-shell'):
+                        red_fill = ui.element('div').classes('bp-m-vert-fill').style(
+                            'background:#ff0000;'
+                        )
+
+                with ui.element('div').classes('bp-m-team-meter'):
+                    ui.label('RED').classes('bp-m-team-label text-red-400')
+                    with ui.element('div').classes('bp-m-vert-shell'):
+                        blue_fill = ui.element('div').classes('bp-m-vert-fill').style(
+                            'background:#0066ff;'
+                        )
+
+
+        # ───────── BOTTOM ADMIN TOGGLES ─────────
+        if is_admin:
+            with ui.element('div').classes('bp-m-bottom-admin'):
+                blue_toggle = ui.toggle(
+                    ['B OFF', 'B ON'], value='B OFF',
+                ).props(
+                    'dense push toggle-color=blue color=grey-8 text-color=white'
+                ).classes('bp-m-toggle')
+
+                red_toggle = ui.toggle(
+                    ['R OFF', 'R ON'], value='R OFF',
+                ).props(
+                    'dense push toggle-color=red color=grey-8 text-color=white'
+                ).classes('bp-m-toggle')
+
+
+
+    # ───────── HTTP SESSION ─────────
+    page_session = {'session': None}
+
+    async def get_page_session() -> aiohttp.ClientSession:
+        s = page_session.get('session')
+        if s is None or s.closed:
+            s = aiohttp.ClientSession()
+            page_session['session'] = s
+        return s
+
+    async def close_page_session():
+        s = page_session.get('session')
+        if s and not s.closed:
+            await s.close()
+        page_session['session'] = None
+
+    # ───────── ADMIN HANDLERS ─────────
+    if is_admin:
+
+        async def start_game_click(_e=None):
+            s = await get_page_session()
+            await s.post('http://localhost:8080/api/start')
+
+        async def stop_game_click(_e=None):
+            s = await get_page_session()
+            await s.post('http://localhost:8080/api/stop')
+
+        start_btn.on('click', start_game_click)
+        stop_btn.on('click', stop_game_click)
+
+        async def _handle_team_toggle(team: str, toggle, on_label: str):
+            s = await get_page_session()
+            new_val = (toggle.value == on_label)
+            endpoint = 'red' if team == 'red' else 'blu'
+            await s.post(
+                f'http://localhost:8080/api/manual/{endpoint}/{str(new_val).lower()}'
+            )
+
+        async def on_red_toggle(_e):
+            await _handle_team_toggle('red', red_toggle, 'R ON')
+
+        async def on_blue_toggle(_e):
+            await _handle_team_toggle('blu', blue_toggle, 'B ON')
+
+        red_toggle.on('update:model-value', on_red_toggle)
+        blue_toggle.on('update:model-value', on_blue_toggle)
+
+    # ───────── POLLING LOOP ─────────
+
+    def _alive(el) -> bool:
+        try:
+            _ = el.client
+            return True
+        except RuntimeError:
+            return False
+
+    async def update_ui():
+        try:
+            while _alive(game_clock):
+                try:
+                    s = await get_page_session()
+                    async with s.get('http://localhost:8080/api/state') as resp:
+                        state = await resp.json()
+                except Exception:
+                    await asyncio.sleep(0.4)
+                    continue
+
+                phase = state.get('phase', 'idle')
+                running = bool(state.get('running', False))
+                winner = state.get('winner')
+
+                # Clock + status
+                if phase == 'countdown':
+                    cd = int(state.get('countdown_remaining', 0) or 0)
+                    if _alive(game_clock):
+                        game_clock.set_text(f'{cd}')
+                    if _alive(status_label):
+                        status_label.set_text('COUNTDOWN...')
+                else:
+                    rem = int(state.get('remaining_seconds', 0) or 0)
+                    if _alive(game_clock):
+                        game_clock.set_text(f'{rem // 60}:{rem % 60:02d}')
+                    if _alive(status_label):
+                        if running:
+                            status_label.set_text('GAME RUNNING')
+                        elif winner:
+                            status_label.set_text(f'Winner: {winner}')
+                        else:
+                            status_label.set_text('Waiting...')
+
+                meters = state.get('meters', {})
+
+                # BLU vertical (left)
+                m2 = meters.get('timer2')
+                if m2 and _alive(blue_fill):
+                    blue_fill.style(
+                        f'height:{m2.get("percent", 0)}%;'
+                        f'background:{m2.get("fg", "#0066ff")};'
+                        'transition:height 0.15s linear;'
+                    )
+
+                # RED vertical (right)
+                m1 = meters.get('timer1')
+                if m1 and _alive(red_fill):
+                    red_fill.style(
+                        f'height:{m1.get("percent", 0)}%;'
+                        f'background:{m1.get("fg", "#ff0000")};'
+                        'transition:height 0.15s linear;'
+                    )
+
+                # Capture bar
+                m_cap = meters.get('capture')
+                if m_cap and _alive(capture_fill):
+                    pct = m_cap.get('percent', 0)
+                    fg = m_cap.get('fg', '#6600ff')
+                    capture_fill.style(
+                        f'width:{pct}%; background:{fg}; '
+                        'transition:width 0.15s linear;'
+                    )
+
+                # Ownership bar
+                m_owner = meters.get('owner')
+                if m_owner and _alive(owner_fill):
+                    pct = m_owner.get('percent', 50)
+                    fg = m_owner.get('fg') or '#ff0000'
+                    if fg.lower() in ('#000000', 'black'):
+                        pct = 50
+                        fg = '#000000'
+                    owner_fill.style(
+                        f'width:{pct}%; background:{fg}; '
+                        'transition:width 0.15s linear;'
+                    )
+
+                # CP labels
+                cp = state.get('control_point', {})
+                if _alive(cp_owner):
+                    cp_owner.set_text(f'Owner: {cp.get("owner", "---")}')
+                if _alive(cp_capturing):
+                    cp_capturing.set_text(f'Capturing: {cp.get("capturing", "---")}')
+                if _alive(cp_contested):
+                    cp_contested.set_text(f'Contested: {cp.get("contested", False)}')
+
+                # Admin START/STOP visibility
+                if is_admin:
+                    if (phase in ('running', 'countdown')) or running:
+                        start_btn.set_visibility(False)
+                        stop_btn.set_visibility(True)
+                    else:
+                        start_btn.set_visibility(True)
+                        stop_btn.set_visibility(False)
+
+                await asyncio.sleep(0.2)
+        finally:
+            await close_page_session()
+
+    task = asyncio.create_task(update_ui())
+    root.on('disconnect', lambda _e: task.cancel())
+
+
 
 
 # ========================================================================
