@@ -926,7 +926,7 @@ class GameBackend:
                 elif capturing == Team.BLU:
                     capture_multiplier = max(1, prox.get_blu_count())
 
-        print(f"Capture Multiplier: {capture_multiplier}")
+        #print(f"Capture Multiplier: {capture_multiplier}")
 
         # COUNTDOWN
         if self._phase == GamePhase.COUNTDOWN:
