@@ -913,6 +913,21 @@ class GameBackend:
 
         events = [ev.to_display() for ev in self.event_manager.get_events(100)]
 
+        game = self.game
+        cp = self.control_point
+        prox = self.proximity
+        capture_multiplier = 0
+        if cp and prox:
+            capturing = cp.get_capturing()
+            contested = cp.is_contested()
+            if not contested:
+                if capturing == Team.RED:
+                    capture_multiplier = max(1, prox.get_red_count())
+                elif capturing == Team.BLU:
+                    capture_multiplier = max(1, prox.get_blu_count())
+
+        print(f"Capture Multiplier: {capture_multiplier}")
+
         # COUNTDOWN
         if self._phase == GamePhase.COUNTDOWN:
             now_ms = self.clock.milliseconds()
@@ -954,6 +969,7 @@ class GameBackend:
                     'on': team_text(self.control_point.get_on()),
                     'contested': self.control_point.is_contested(),
                     'progress': self.control_point.get_capture_progress_percent(),
+                    "capture_multiplier": capture_multiplier
                 },
                 'red_accumulated': self.game.get_accumulated_seconds(Team.RED),
                 'blu_accumulated': self.game.get_accumulated_seconds(Team.BLU),

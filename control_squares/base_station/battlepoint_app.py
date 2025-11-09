@@ -309,6 +309,18 @@ async def game_ui():
         font-size: 1.4rem;
         color: #ddd;
       }
+     .bp-capture-mult {
+       position: absolute;
+       top: 50%;
+       left: 50%;
+       transform: translate(-50%, -50%);
+       font-size: 10rem;
+       font-weight: 800;
+       color: #ffffff;
+       text-shadow: 0 0 12px rgba(0, 0, 0, 0.9);
+       pointer-events: none;
+     }
+      
       .bp-capture-shell {
         width: min(60vw, 900px);
         flex-shrink: 0; 
@@ -396,7 +408,7 @@ async def game_ui():
         # MAIN
         with ui.element('div').classes('bp-main'):
             with ui.element('div').classes('bp-side'):
-                ui.label('BLUE').classes('text-4xl font-bold text-blue-400')
+                ui.label('BLUE').classes('text-8xl font-bold text-blue-400')
                 with ui.element('div').classes('bp-vert-shell'):
                     red_fill = ui.element('div').classes('bp-vert-fill')
 
@@ -405,6 +417,7 @@ async def game_ui():
 
                 with ui.element('div').classes('bp-capture-shell'):
                     capture_fill = ui.element('div').classes('bp-capture-fill')
+                    capture_mult_label = ui.label('').classes('bp-capture-mult')
 
                 # one horizontal row, still separate variables
                 with ui.element('div').classes('bp-status-row'):
@@ -414,7 +427,7 @@ async def game_ui():
                     cp_contested = ui.label('Contested: False').classes('bp-status-label')
 
             with ui.element('div').classes('bp-side'):
-                ui.label('RED').classes('text-4xl font-bold text-red-400')
+                ui.label('RED').classes('text-8xl font-bold text-red-400')
                 with ui.element('div').classes('bp-vert-shell'):
                     blue_fill = ui.element('div').classes('bp-vert-fill')
 
@@ -734,6 +747,14 @@ async def game_ui():
                     cp_capturing.set_text(f"Capturing: {cp.get('capturing', '---')}")
                 if _alive(cp_contested):
                     cp_contested.set_text(f"Contested: {cp.get('contested', False)}")
+
+                mult = int(cp.get('capture_multiplier', 0) or 0)
+                if _alive(capture_mult_label):
+                    if mult > 0:
+                        capture_mult_label.set_text(f"x{mult}")
+                    else:
+                        capture_mult_label.set_text('')
+
 
                 new_events = state.get('events', [])
                 if new_events != last_events:

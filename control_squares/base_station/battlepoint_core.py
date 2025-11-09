@@ -554,7 +554,7 @@ class ControlPoint:
         APPLY_DT_MAX_MS = 1000
         dt = min(millis_since_last, APPLY_DT_MAX_MS)
         if dt > APPLY_DT_MAX_MS:
-            deltat = APPLY_DT_MAX_MS
+            dt = APPLY_DT_MAX_MS
 
         capture_ms = self._seconds_to_capture * 1000
 
