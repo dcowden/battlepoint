@@ -24,7 +24,7 @@ static const bool POSITIVE_Z_IS_BLUE = true;
 Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 // your tile name
-static const char* TILE_ID = "CS-01";
+static const char* TILE_ID = "CS-02";
 
 // shared service UUID (goes in SCAN_RSP, not ADV)
 static const char* SHARED_SERVICE_UUID_STR = "12345678-1234-1234-1234-1234567890ab";
