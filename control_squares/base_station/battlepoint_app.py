@@ -16,8 +16,8 @@ from typing import Optional, List, Dict
 import aiohttp
 import pygame
 from bleak import BleakScanner
-from nicegui import ui, app
-
+from nicegui import ui, app,Client
+from starlette.staticfiles import StaticFiles
 from battlepoint_core import (
     Clock,
     Team,
@@ -31,9 +31,9 @@ from battlepoint_core import (
     GameMode,
     team_text,
     RealClock,
-    ControlPoint,
+    ControlPoint
 )
-from battlepoint_game import create_game, BaseGame, EnhancedGameBackend
+from battlepoint_game import create_game, BaseGame, EnhancedGameBackend,SoundSystem,SOUND_MAP
 from ble_scanner import EnhancedBLEScanner
 
 # Windows-specific fix
@@ -43,14 +43,236 @@ if sys.platform == 'win32':
 GAME_LOOP_SECS = 100 / 1000  # 10 Hz
 
 # Single backend instance
-enhanced_backend = EnhancedGameBackend()
+
+app.mount('/sounds',StaticFiles(directory='sounds'), name='sounds')
+
+class BrowserSoundClient:
+    def __init__(self, client_id: int, audio: ui.audio):
+        self.client_id = client_id
+        self.audio = audio
+        self.enabled = False
+
+
+
+from typing import Dict, Optional
+import random
+
+from nicegui import ui, app, background_tasks, Client  # make sure background_tasks, Client are imported
+
+class BrowserSoundBus:
+    def __init__(self, base_url: str = '/sounds'):
+        self.base_url = base_url.rstrip('/')
+        self.clients: dict[str, Client] = {}
+        self.enabled: set[str] = set()
+        self.volume: int = 10
+        self.sound_map = SOUND_MAP
+        self._menu_tracks = list(range(18, 26))
+
+    def _src_for_id(self, sound_id: int) -> str | None:
+        fn = self.sound_map.get(sound_id)
+        if not fn:
+            print(f"[BROWSER_SOUND] unknown sound id {sound_id}")
+            return None
+        return f'{self.base_url}/{fn}'
+
+    def register_client(self, client: Client) -> None:
+        self.clients[client.id] = client
+        print(f"[BROWSER_SOUND] register client {client.id}")
+        with client:
+            if app.storage.user.get('bp_sound_enabled'):
+                self.enable_for_client(client.id, from_auto=True)
+
+    def unregister_client(self, client: Client) -> None:
+        cid = client.id
+        self.clients.pop(cid, None)
+        self.enabled.discard(cid)
+        print(f"[BROWSER_SOUND] unregister client {cid}")
+
+    def enable_for_client(self, client_id: str, from_auto: bool = False) -> None:
+        if client_id in self.clients:
+            self.enabled.add(client_id)
+            print(f"[BROWSER_SOUND] {'auto-' if from_auto else ''}enabled client {client_id}")
+
+    def disable_for_client(self, client_id: str) -> None:
+        self.enabled.discard(client_id)
+        print(f"[BROWSER_SOUND] disabled client {client_id}")
+
+    def set_volume(self, volume: int) -> None:
+        self.volume = max(0, min(30, int(volume)))
+        print(f"[BROWSER_SOUND] set_volume({self.volume})")
+
+    def _broadcast_js(self, js: str) -> None:
+        vol = self.volume / 30.0  # if needed in js
+        for cid in list(self.enabled):
+            client = self.clients.get(cid)
+            if not client:
+                self.enabled.discard(cid)
+                continue
+            try:
+                with client:
+                    client.run_javascript(js)
+            except Exception as e:
+                print(f"[BROWSER_SOUND] error on client {cid}: {e}")
+                self.enabled.discard(cid)
+
+    # ---- API used by backend ----
+
+    def stop(self) -> None:
+        # stop music channel on all
+        self._broadcast_js('window.bpAudio && bpAudio.stopChannel("music");')
+        print("[BROWSER_SOUND] stop() music")
+
+    def play_menu_track(self) -> None:
+        if not self._menu_tracks:
+            return
+        src = self._src_for_id(random.choice(self._menu_tracks))
+        if not src:
+            return
+        vol = self.volume / 30.0
+        self._broadcast_js(
+            f'window.bpAudio && bpAudio.playChannel("music", {{src: "{src}", volume: {vol:.3f}, loop: true}});'
+        )
+        print(f"[BROWSER_SOUND] play_menu_track {src}")
+
+    def loop(self, sound_id: int) -> None:
+        # if you ever need a looping announcer/etc, map to a channel
+        self.play(sound_id)
+
+    def queue(self, sound_id: int) -> None:
+        # for now, treat queue as stomp; if you truly need queueing,
+        # we can extend bpAudio with a FIFO.
+        self.play(sound_id)
+
+    def play(self, sound_id: int) -> None:
+        src = self._src_for_id(sound_id)
+        if not src:
+            return
+        vol = self.volume / 30.0
+
+        # decide channel behavior:
+        # - announcers: single 'announcer' channel, stomp previous
+        # - everything else: sfx (can overlap) or tune as needed
+        if sound_id in {10,11,12,19,21,25,31,29,27,40,37,35,43,42,41,39,36,3,2,14}:  # your announcer IDs etc.
+            js = f'window.bpAudio && bpAudio.playChannel("announcer", {{src: "{src}", volume: {vol:.3f}}});'
+        else:
+            js = f'window.bpAudio && bpAudio.sfx({{src: "{src}", volume: {vol:.3f}}});'
+
+        self._broadcast_js(js)
+        print(f"[BROWSER_SOUND] play {sound_id} -> {src}")
+browser_sound_bus = BrowserSoundBus( base_url='/sounds')
+
+def _on_connect(client: Client):
+    browser_sound_bus.register_client(client)
+
+def _on_disconnect(client: Client):
+    browser_sound_bus.unregister_client(client)
+
+app.on_connect(_on_connect)
+app.on_disconnect(_on_disconnect)
+
+
+def inject_howler_and_manager():
+    ui.add_head_html('''
+    <script src="https://cdn.jsdelivr.net/npm/howler@2.2.4/dist/howler.min.js"></script>
+    <script>
+    window.bpAudio = window.bpAudio || {
+      primed: false,
+
+      prime: async function() {
+        if (this.primed) return true;
+        try {
+          const s = new Howl({
+            src: ["data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQAAAAA="],
+            volume: 0.0,
+          });
+          await s.play();
+          this.primed = true;
+          return true;
+        } catch(e) {
+          console.warn("bpAudio prime failed", e);
+          return false;
+        }
+      },
+
+      channels: {},
+
+      playChannel: function(name, opts) {
+        try {
+          // stop previous on this channel
+          const existing = this.channels[name];
+          if (existing) {
+            try { existing.stop(); existing.unload(); } catch(e) {}
+          }
+          const howl = new Howl({
+            src: [opts.src],
+            volume: opts.volume ?? 1.0,
+            loop: !!opts.loop,
+          });
+          howl.play();
+          this.channels[name] = howl;
+        } catch(e) {
+          console.error("bpAudio.playChannel error", name, e);
+        }
+      },
+
+      stopChannel: function(name) {
+        const h = this.channels[name];
+        if (!h) return;
+        try { h.stop(); h.unload(); } catch(e) {}
+        delete this.channels[name];
+      },
+
+      // fire-and-forget sfx (can overlap)
+      sfx: function(opts) {
+        try {
+          const h = new Howl({
+            src: [opts.src],
+            volume: opts.volume ?? 1.0,
+            loop: false,
+          });
+          h.play();
+        } catch(e) {
+          console.error("bpAudio.sfx error", e);
+        }
+      },
+    };
+    </script>
+    ''')
+
+def attach_sound_opt_in():
+    inject_howler_and_manager()
+
+    client = ui.context.client
+
+    with client:
+        if app.storage.user.get('bp_sound_enabled'):
+            browser_sound_bus.enable_for_client(client.id, from_auto=True)
+            return
+
+    btn = ui.button('Enable sound').props('color=yellow-7 unelevated').classes('q-ml-md')
+
+    async def _enable_for_this_client():
+        ok = await ui.run_javascript('window.bpAudio ? window.bpAudio.prime() : true;', timeout=2.0)
+        if not ok:
+            ui.notify('Browser blocked audio. Tap again or check autoplay settings.', type='warning')
+            return
+
+        with ui.context.client:
+            app.storage.user['bp_sound_enabled'] = True
+        browser_sound_bus.enable_for_client(ui.context.client.id)
+        btn.set_visibility(False)
+        ui.notify('Game sounds enabled on this device.', type='positive')
+
+    btn.on('click', _enable_for_this_client)
 
 # ========================================================================
 # FASTAPI / NICEGUI ENDPOINTS
 # ========================================================================
 
-_game_loop_task = None
 
+
+_game_loop_task = None
+enhanced_backend = EnhancedGameBackend(sound_system = browser_sound_bus)
 
 async def game_loop():
     while True:
@@ -370,6 +592,7 @@ async def game_ui():
         transition: width 0.15s linear;
       }
     </style>
+    
     """)
 
     with ui.element('div').classes('bp-root'):
@@ -404,6 +627,7 @@ async def game_ui():
                 stop_btn.set_visibility(False)
 
             with ui.element('div').classes('bp-topbar-right'):
+                attach_sound_opt_in()
                 ui.button('Game', on_click=lambda: ui.navigate.to('/')).props('flat color=white')
                 ui.button('Settings', on_click=lambda: ui.navigate.to('/settings')).props('flat color=white')
                 ui.button('Debug', on_click=lambda: ui.navigate.to('/debug')).props('flat color=white')
@@ -880,6 +1104,7 @@ def debug_ui(from_page: str = '', admin: str = ''):
         with ui.row().classes('items-center gap-4'):
             manual_switch = ui.switch('Manual Proximity Control (use Red/Blue toggles on main screen)')
             manual_status = ui.label('').classes('text-sm text-gray-400')
+            attach_sound_opt_in()
 
         # BLE SCANNER CARD
         with ui.card().classes('w-full p-4'):
@@ -1076,9 +1301,6 @@ def debug_ui(from_page: str = '', admin: str = ''):
 
 ADMIN_PASSWORD = 'battleadmin'  # change this to whatever you want
 
-ADMIN_PASSWORD = 'battleadmin'  # change as needed
-
-
 @ui.page('/mobile')
 async def mobile_ui(admin: str = ''):
     is_admin = (admin == ADMIN_PASSWORD)
@@ -1091,12 +1313,13 @@ async def mobile_ui(admin: str = ''):
         padding: 0;
         background: #000;
         height: 100%;
-        overflow: hidden;
+        overflow-x: hidden;
+        overflow-y: auto;
       }
 
       .bp-m-root {
-        width: 90vw;
-        height: 95vh;
+        width: 100vw;
+        height: 90dvh;
         display: flex;
         flex-direction: column;
         background: #000;
@@ -1146,7 +1369,7 @@ async def mobile_ui(admin: str = ''):
         font-weight: 300;
         line-height: 1;
         /* noticeably bigger: */
-        font-size: clamp(5rem, 9rem, 11rem);
+        font-size: clamp(4rem, 6rem, 8rem);
         margin: 1.2rem ;
       }
 
@@ -1191,7 +1414,7 @@ async def mobile_ui(admin: str = ''):
 
       /* ── RED / BLU METERS ── */
       .bp-m-meters-row {
-        flex: 1 1 auto;                     /* take ALL remaining space */
+        flex: 0 0 auto;                    
         display: flex;
         flex-direction: row;
         gap: 0.75rem;
@@ -1199,7 +1422,7 @@ async def mobile_ui(admin: str = ''):
         justify-content: center;
         padding: 0.2rem 0 0.1rem 0;
         box-sizing: border-box;
-        margin: 1.0rem;
+        margin: 0.5rem;
       }
 
       .bp-m-team-meter {
@@ -1217,10 +1440,11 @@ async def mobile_ui(admin: str = ''):
       }
 
       .bp-m-vert-shell {
-        flex: 1 1 auto;                     /* fill vertical space */
+        flex: 0 0 auto;
+        height: clamp(64px, 20vh, 40vh);                    
         width: 100%;
         max-width: 160px;
-        margin: 0 auto;                     /* centered in its half */
+        margin: 0 auto;                    
         background: #222;
         border-radius: 18px;
         position: relative;
@@ -1238,6 +1462,7 @@ async def mobile_ui(admin: str = ''):
 
       /* ── ADMIN TOGGLES AT BOTTOM ── */
       .bp-m-bottom-admin {
+        flex: 0 0 auto;
         width: 100%;
         padding: 0.25rem 0.8rem 0.45rem 0.8rem;
         box-sizing: border-box;
@@ -1256,7 +1481,7 @@ async def mobile_ui(admin: str = ''):
         # ───────── TOP BAR ─────────
         with ui.element('div').classes('bp-m-topbar'):
             ui.label('BattlePoint').classes('bp-m-title')
-
+            attach_sound_opt_in()
             if is_admin:
                 with ui.row().classes('gap-0.6 items-center'):
                     start_btn = ui.button('START').props(
@@ -1517,4 +1742,4 @@ if __name__ in {"__main__", "__mp_main__"}:
             _game_loop_task = asyncio.create_task(game_loop())
 
     app.on_startup(start_game_loop)
-    ui.run(title='BattlePoint - TF2 Game', port=8080, reload=False)
+    ui.run(title='BattlePoint - TF2 Game', port=8080, storage_secret='battlepoint_secret', reload=False)

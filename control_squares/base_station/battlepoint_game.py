@@ -515,6 +515,59 @@ class SettingsManager:
 # SOUND SYSTEM
 # ========================================================================
 
+
+SOUND_MAP = {
+    1: "0001_announcer_alert.mp3",
+    2: "0002_announcer_alert_center_control_being_contested.mp3",
+    3: "0014_announcer_last_flag.mp3",
+    4: "0015_announcer_last_flag2.mp3",
+    5: "0016_announcer_overtime.mp3",
+    6: "0017_announcer_overtime2.mp3",
+    7: "0018_announcer_sd_monkeynaut_end_crash02.mp3",
+    8: "0019_announcer_stalemate.mp3",
+    9: "0020_announcer_success.mp3",
+    10: "0021_announcer_time_added.mp3",
+    11: "0022_announcer_tournament_started4.mp3",
+    12: "0023_announcer_victory.mp3",
+    13: "0024_announcer_warning.mp3",
+    14: "0025_announcer_we_captured_control.mp3",
+    15: "0026_announcer_we_lost_control.mp3",
+    16: "0027_announcer_you_failed.mp3",
+    17: "0028_engineer_specialcompleted10.mp3",
+    18: "0030_gamestartup2.mp3",
+    19: "0031_gamestartup4.mp3",
+    20: "0032_gamestartup5.mp3",
+    21: "0033_gamestartup6.mp3",
+    22: "0034_gamestartup7.mp3",
+    23: "0035_gamestartup8.mp3",
+    24: "0036_gamestartup15.mp3",
+    25: "0037_gamestartup16.mp3",
+    26: "announcer_begins_10sec.mp3",
+    27: "announcer_begins_1sec.mp3",
+    28: "announcer_begins_20sec.mp3",
+    29: "announcer_begins_2sec.mp3",
+    30: "announcer_begins_30sec.mp3",
+    31: "announcer_begins_3sec.mp3",
+    32: "announcer_begins_4sec.mp3",
+    33: "announcer_begins_5sec.mp3",
+    34: "announcer_begins_60sec.mp3",
+    35: "announcer_ends_10sec.mp3",
+    36: "announcer_ends_1sec.mp3",
+    37: "announcer_ends_20sec.mp3",
+    38: "announcer_ends_2min.mp3",
+    39: "announcer_ends_2sec.mp3",
+    40: "announcer_ends_30sec.mp3",
+    41: "announcer_ends_3sec.mp3",
+    42: "announcer_ends_4sec.mp3",
+    43: "announcer_ends_5sec.mp3",
+    44: "announcer_ends_60sec.mp3",
+    45: "announcer_ends_6sec.mp3",
+    46: "announcer_ends_7sec.mp3",
+    47: "announcer_ends_8sec.mp3",
+    48: "announcer_ends_9sec.mp3",
+    49: "announcer_time_added.mp3",
+}
+
 class SoundSystem:
     def __init__(self, base_dir: str = "sounds"):
         self.enabled = True
@@ -530,57 +583,7 @@ class SoundSystem:
             self.ok = False
             print(f"[SOUND] ERROR initializing pygame.mixer: {e}")
 
-        self.sound_map = {
-            1: "0001_announcer_alert.mp3",
-            2: "0002_announcer_alert_center_control_being_contested.mp3",
-            3: "0014_announcer_last_flag.mp3",
-            4: "0015_announcer_last_flag2.mp3",
-            5: "0016_announcer_overtime.mp3",
-            6: "0017_announcer_overtime2.mp3",
-            7: "0018_announcer_sd_monkeynaut_end_crash02.mp3",
-            8: "0019_announcer_stalemate.mp3",
-            9: "0020_announcer_success.mp3",
-            10: "0021_announcer_time_added.mp3",
-            11: "0022_announcer_tournament_started4.mp3",
-            12: "0023_announcer_victory.mp3",
-            13: "0024_announcer_warning.mp3",
-            14: "0025_announcer_we_captured_control.mp3",
-            15: "0026_announcer_we_lost_control.mp3",
-            16: "0027_announcer_you_failed.mp3",
-            17: "0028_engineer_specialcompleted10.mp3",
-            18: "0030_gamestartup2.mp3",
-            19: "0031_gamestartup4.mp3",
-            20: "0032_gamestartup5.mp3",
-            21: "0033_gamestartup6.mp3",
-            22: "0034_gamestartup7.mp3",
-            23: "0035_gamestartup8.mp3",
-            24: "0036_gamestartup15.mp3",
-            25: "0037_gamestartup16.mp3",
-            26: "announcer_begins_10sec.mp3",
-            27: "announcer_begins_1sec.mp3",
-            28: "announcer_begins_20sec.mp3",
-            29: "announcer_begins_2sec.mp3",
-            30: "announcer_begins_30sec.mp3",
-            31: "announcer_begins_3sec.mp3",
-            32: "announcer_begins_4sec.mp3",
-            33: "announcer_begins_5sec.mp3",
-            34: "announcer_begins_60sec.mp3",
-            35: "announcer_ends_10sec.mp3",
-            36: "announcer_ends_1sec.mp3",
-            37: "announcer_ends_20sec.mp3",
-            38: "announcer_ends_2min.mp3",
-            39: "announcer_ends_2sec.mp3",
-            40: "announcer_ends_30sec.mp3",
-            41: "announcer_ends_3sec.mp3",
-            42: "announcer_ends_4sec.mp3",
-            43: "announcer_ends_5sec.mp3",
-            44: "announcer_ends_60sec.mp3",
-            45: "announcer_ends_6sec.mp3",
-            46: "announcer_ends_7sec.mp3",
-            47: "announcer_ends_8sec.mp3",
-            48: "announcer_ends_9sec.mp3",
-            49: "announcer_time_added.mp3",
-        }
+        self.sound_map = SOUND_MAP
 
         self._menu_tracks = list(range(18, 26))
 
@@ -994,14 +997,18 @@ class GameBackend:
 class EnhancedGameBackend(GameBackend):
     """GameBackend + sound + settings + BLE + manual/ble proximity switch"""
 
-    def __init__(self):
+    def __init__(self,sound_system=None):
         super().__init__()
 
         # sound
-        self.sound_system = SoundSystem()
+        self.sound_system = None
         self._menu_music_on = False
 
         # re-bind event manager with sound, and control point
+        if sound_system is None:
+            self.sound_system = SoundSystem()
+        else:
+            self.sound_system = sound_system
         self.event_manager = EventManager(self.clock, self.sound_system)
         self.control_point = ControlPoint(self.event_manager, self.clock)
 
