@@ -475,7 +475,7 @@
         "wire_width": 6
       },
       {
-        "clearance": 0.6,
+        "clearance": 0.508,
         "diff_pair_gap": 0.25,
         "diff_pair_width": 0.2,
         "microvia_diameter": 0.3,
@@ -484,7 +484,7 @@
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 0,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 1.778,
+        "track_width": 1.524,
         "via_diameter": 0.6,
         "via_drill": 0.3
       }
