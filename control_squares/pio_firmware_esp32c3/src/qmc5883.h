@@ -1,0 +1,256 @@
+#pragma once
+#include <Arduino.h>
+#include <Wire.h>
+
+// ====== Known QMC variants & addresses ======
+enum class QMCType {
+  NONE,
+  P_2C,   // board at 0x2C
+  L_0D,   // QMC5883L-style at 0x0D
+};
+
+static QMCType g_qmc_type = QMCType::NONE;
+static uint8_t g_qmc_addr = 0x00;
+
+// --- P-style (0x2C) registers ---
+static const uint8_t P_ADDR       = 0x2C;
+static const uint8_t P_MODE_REG   = 0x0A;
+static const uint8_t P_CONFIG_REG = 0x0B;
+static const uint8_t P_X_LSB_REG  = 0x01;
+
+// --- L-style (0x0D) registers ---
+static const uint8_t L_ADDR          = 0x0D;
+static const uint8_t L_REG_X_LSB     = 0x00;
+static const uint8_t L_REG_CTRL1     = 0x09;
+static const uint8_t L_REG_CTRL2     = 0x0A;
+static const uint8_t L_REG_SET_RESET = 0x0B;
+
+// =====================================================
+// Optional I2C scan (handy for debugging)
+// =====================================================
+inline void i2c_scan() {
+  Serial.println("Scanning I2C bus...");
+  for (uint8_t addr = 1; addr < 127; addr++) {
+    Wire.beginTransmission(addr);
+    uint8_t err = Wire.endTransmission();
+    if (err == 0) {
+      Serial.print("  Found device at 0x");
+      Serial.println(addr, HEX);
+    }
+    delay(2);
+  }
+  Serial.println("Scan done.");
+}
+
+// =====================================================
+// Detect which QMC variant is present
+// =====================================================
+inline QMCType detect_qmc() {
+  // Check 0x2C first (P-style board)
+  Wire.beginTransmission(P_ADDR);
+  if (Wire.endTransmission() == 0) {
+    Serial.println("Detected QMC P-style at 0x2C");
+    g_qmc_addr = P_ADDR;
+    return QMCType::P_2C;
+  }
+
+  // Then check 0x0D (L-style)
+  Wire.beginTransmission(L_ADDR);
+  if (Wire.endTransmission() == 0) {
+    Serial.println("Detected QMC L-style at 0x0D");
+    g_qmc_addr = L_ADDR;
+    return QMCType::L_0D;
+  }
+
+  Serial.println("No known QMC device found (0x2C or 0x0D).");
+  return QMCType::NONE;
+}
+
+// =====================================================
+// P-style (0x2C) init & read
+// =====================================================
+inline bool init_qmc_p() {
+  Serial.println("Initializing QMC P-style (0x2C)...");
+
+  // continuous 200 Hz
+  Wire.beginTransmission(P_ADDR);
+  Wire.write(P_MODE_REG);
+  Wire.write(0xCF);
+  uint8_t err = Wire.endTransmission();
+  if (err != 0) {
+    Serial.print("  P: MODE_REG write failed, err=");
+    Serial.println(err);
+    return false;
+  }
+
+  // set/reset on, ±8G
+  Wire.beginTransmission(P_ADDR);
+  Wire.write(P_CONFIG_REG);
+  Wire.write(0x08);
+  err = Wire.endTransmission();
+  if (err != 0) {
+    Serial.print("  P: CONFIG_REG write failed, err=");
+    Serial.println(err);
+    return false;
+  }
+
+  Serial.println("  P: init OK");
+  return true;
+}
+
+inline bool read_qmc_p(int16_t &x, int16_t &y, int16_t &z) {
+  Wire.beginTransmission(P_ADDR);
+  Wire.write(P_X_LSB_REG);
+  uint8_t err = Wire.endTransmission(false); // repeated start
+  if (err != 0) {
+    Serial.print("  P: endTransmission err=");
+    Serial.println(err);
+    return false;
+  }
+
+  uint8_t n = Wire.requestFrom(P_ADDR, (uint8_t)6, (uint8_t)true);
+
+  if (n != 6 || Wire.available() < 6) {
+    return false;
+  }
+
+  uint8_t x_lsb = Wire.read();
+  uint8_t x_msb = Wire.read();
+  uint8_t y_lsb = Wire.read();
+  uint8_t y_msb = Wire.read();
+  uint8_t z_lsb = Wire.read();
+  uint8_t z_msb = Wire.read();
+
+  x = (int16_t)((x_msb << 8) | x_lsb);
+  y = (int16_t)((y_msb << 8) | y_lsb);
+  z = (int16_t)((z_msb << 8) | z_lsb);
+
+  return true;
+}
+
+// =====================================================
+// L-style (0x0D) init & read
+// =====================================================
+inline bool write_reg_l(uint8_t reg, uint8_t val) {
+  Wire.beginTransmission(L_ADDR);
+  Wire.write(reg);
+  Wire.write(val);
+  uint8_t err = Wire.endTransmission();
+  if (err != 0) {
+    Serial.print("  L: write_reg err=");
+    Serial.println(err);
+    return false;
+  }
+  return true;
+}
+
+inline bool init_qmc_l() {
+  Serial.println("Initializing QMC L-style (0x0D)...");
+
+  // Soft reset
+  if (!write_reg_l(L_REG_CTRL2, 0x80)) return false;
+  delay(10);
+
+  // Set SET/RESET period
+  if (!write_reg_l(L_REG_SET_RESET, 0x01)) return false;
+
+  // Control1:
+  // OSR = 512 (11 << 6 = 0xC0)
+  // RNG = 8G  (01 << 4 = 0x10)
+  // ODR = 50Hz (01 << 2 = 0x04)
+  // MODE = continuous (01 = 0x01)
+  // => 0xD5
+  if (!write_reg_l(L_REG_CTRL1, 0xD5)) return false;
+
+  Serial.println("  L: init OK");
+  return true;
+}
+
+inline bool read_qmc_l(int16_t &x, int16_t &y, int16_t &z) {
+  // Data starts at 0x00
+  Wire.beginTransmission(L_ADDR);
+  Wire.write(L_REG_X_LSB);
+  uint8_t err = Wire.endTransmission(false);
+  if (err != 0) {
+    Serial.print("  L: endTransmission err=");
+    Serial.println(err);
+    return false;
+  }
+
+  uint8_t n = Wire.requestFrom(L_ADDR, (uint8_t)6, (uint8_t)true);
+
+  if (n != 6 || Wire.available() < 6) {
+    return false;
+  }
+
+  uint8_t xl = Wire.read();
+  uint8_t xh = Wire.read();
+  uint8_t yl = Wire.read();
+  uint8_t yh = Wire.read();
+  uint8_t zl = Wire.read();
+  uint8_t zh = Wire.read();
+
+  x = (int16_t)((xh << 8) | xl);
+  y = (int16_t)((yh << 8) | yl);
+  z = (int16_t)((zh << 8) | zl);
+
+  return true;
+}
+
+// =====================================================
+// Unified init & read wrappers
+// =====================================================
+inline bool init_qmc() {
+  g_qmc_type = detect_qmc();
+  if (g_qmc_type == QMCType::NONE) {
+    return false;
+  }
+
+  bool ok = false;
+  switch (g_qmc_type) {
+    case QMCType::P_2C:
+      ok = init_qmc_p();
+      break;
+    case QMCType::L_0D:
+      ok = init_qmc_l();
+      break;
+    default:
+      ok = false;
+      break;
+  }
+
+  if (!ok) {
+    Serial.println("QMC init failed for detected type.");
+    return false;
+  }
+
+  delay(50); // let conversions start
+  return true;
+}
+
+inline bool read_qmc(int16_t &x, int16_t &y, int16_t &z) {
+  switch (g_qmc_type) {
+    case QMCType::P_2C:
+      return read_qmc_p(x, y, z);
+    case QMCType::L_0D:
+      return read_qmc_l(x, y, z);
+    default:
+      return false;
+  }
+}
+
+// =====================================================
+// Compatibility wrappers + helper
+// =====================================================
+// CHANGED: now returns bool so caller knows if a device was found & initialized
+inline bool initQMC5883P() {
+  return init_qmc();
+}
+
+inline bool readQMC5883PData(int16_t &x, int16_t &y, int16_t &z) {
+  return read_qmc(x, y, z);
+}
+
+inline float magnitude3D(float x, float y, float z) {
+  return sqrtf(x * x + y * y + z * z);
+}
