@@ -16,21 +16,16 @@
 // --------------------- USER / HW CONFIG -------------------------------------
 // ============================================================================
 
-// Set whether positive Z means BLUE (true) or RED (false)
-static const bool POSITIVE_Z_IS_BLUE = true;
-
 // NOTE: on XIAO ESP32-C3 SDA/SCL are 4/5.
 // If you actually use I2C on 4/5, move the LED to another pin.
 #define LED_PIN        4
 #define NUM_LEDS       1
 
 // Debounced, active-LOW inputs: LOW means “present”
-#define BLUE_PIN       6     // adjust to your wiring
+#define BLUE_PIN       6     // pick your real pins
 #define RED_PIN        7
 
-Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
-
-// your tile name
+// Tile identity
 static const char* TILE_ID = "CS-02";
 
 // shared service UUID (goes in SCAN_RSP, not ADV)
@@ -39,21 +34,18 @@ static const char* SHARED_SERVICE_UUID_STR = "12345678-1234-1234-1234-1234567890
 // manufacturer to stick at the front (little-endian)
 static const uint16_t MFG_COMPANY_ID = 0xFFFF;
 
-// scan window when a player is present
-static const uint16_t SCAN_TIME_MS = 400;
-
 // TX power
 static const esp_power_level_t TILE_TX_POWER = ESP_PWR_LVL_P9;
 
 // Sleep behavior
 static const uint64_t READY_WAKE_US       = 50ULL * 1000ULL;  // 50 ms
-static const uint32_t READY_SLEEP_DELAYMS = 30000UL;          // 30 s no-people before sleeping
+static const uint32_t READY_SLEEP_DELAYMS = 30000UL;          // 30 s no-people before resuming sleep
 
 // ============================================================================
 // ------------------ QMC5883P -------------------------------------------------
-const uint8_t QMC5883P_ADDR  = 0x2C;
-const float   BASELINE_ALPHA = 0.05f;
-const float   OUTPUT_ALPHA   = 0.10f;
+const uint8_t    QMC5883P_ADDR  = 0x2C;
+const float BASELINE_ALPHA = 0.05f;
+const float OUTPUT_ALPHA   = 0.10f;
 const unsigned long BASELINE_MS = 10000UL;
 
 const int MODE_REG   = 0x0A;
@@ -68,15 +60,13 @@ unsigned long tStart = 0;
 bool  outputEmaInit = false;
 float fDx = 0, fDy = 0, fDz = 0, fDt = 0;
 
-// presence thresholds
+// presence thresholds (magnetic fallback; pins are authoritative)
 const float MIN_ON_DT   = 300.0f;
 const float STRONG_DT   = 1100.0f;
 const float OFF_HYST_DT = 300.0f;
 
-static uint8_t qmc_err_streak = 0;
-
 // ============================================================================
-// ------------------- tiny SoftTicker (sleep-safe) ---------------------------
+// ------------------- tiny SoftTicker (sleep-proof) --------------------------
 class SoftTicker {
 public:
   SoftTicker() : _period(1000), _last(0), _enabled(false) {}
@@ -99,12 +89,11 @@ private:
 
 // ============================================================================
 // ------------------- LED wrapper --------------------------------------------
+Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
 class StatusLED {
 public:
-  StatusLED(uint16_t count)
-  : _count(count), _r(0), _g(0), _b(0), _haveColor(false),
-    _blink(false), _blinkOnMs(250), _blinkOffMs(750),
-    _blinkState(false), _lastToggle(0) {}
+  StatusLED(uint16_t count) : _count(count), _r(0), _g(0), _b(0), _haveColor(false), _blink(false), _blinkOnMs(250), _blinkOffMs(750), _blinkState(false), _lastToggle(0) {}
 
   void begin(uint8_t brightness = 64) {
     strip.begin();
@@ -117,19 +106,19 @@ public:
     push(r, g, b);
   }
 
-  void off()    { set(0, 0, 0); }
-  void red()    { set(255, 0, 0); }
+  void off() { set(0, 0, 0); }
+  void red() { set(255, 0, 0); }
+  void green() { set(0, 180, 0); }
+  void blue() { set(0, 0, 255); }
   void yellow() { set(255, 180, 0); }
-  void green()  { set(0, 180, 0); }
-  void blue()   { set(0, 0, 255); }
 
-  // fast blink with millis-based timing (sleep-safe)
+  // sleep-proof blinker (driven from loop())
   void blink(uint8_t r, uint8_t g, uint8_t b, uint32_t onMs, uint32_t offMs) {
     _blink = true;
     _blinkColor[0] = r; _blinkColor[1] = g; _blinkColor[2] = b;
     _blinkOnMs = onMs;
     _blinkOffMs = offMs;
-    // state toggled by service()
+    // do not block: toggle by millis in service()
   }
 
   void service() {
@@ -164,20 +153,7 @@ private:
       _haveColor = true;
       strip.setPixelColor(0, strip.Color(r, g, b));
       strip.show();
-      Serial.printf("LED -> %s (%u,%u,%u)\n", colorName(r, g, b), r, g, b);
     }
-  }
-
-  const char* colorName(uint8_t r, uint8_t g, uint8_t b) {
-    if (r == 0 && g == 0 && b == 0) return "Black";
-    if (r > 220 && g < 60  && b < 60)  return "Red";
-    if (g > 160 && r < 80  && b < 80)  return "Green";
-    if (b > 160 && r < 80  && g < 80)  return "Blue";
-    if (r > 200 && g > 120 && b < 80)  return "Yellow";
-    if (r > 200 && b > 200)            return "Magenta";
-    if (g > 150 && b > 150)            return "Cyan";
-    if (r > 180 && g > 180 && b > 180) return "White";
-    return "Custom";
   }
 };
 
@@ -185,10 +161,11 @@ StatusLED statusLed(NUM_LEDS);
 
 // ============================================================================
 // ------------------- QMC funcs ----------------------------------------------
+static uint8_t qmc_err_streak = 0;
+
 void initQMC5883P() {
   Wire.begin();
-  Wire.setTimeOut(5); // ms — prevents permanent lockup
-
+  Wire.setTimeOut(5); // ms — prevents lockup
   // continuous 200 Hz
   Wire.beginTransmission(QMC5883P_ADDR);
   Wire.write(MODE_REG);
@@ -202,36 +179,28 @@ void initQMC5883P() {
   Wire.endTransmission(true);
 
   qmc_err_streak = 0;
-  Serial.println("QMC5883P re-init");
 }
 
 bool readQMC5883PData(int16_t &x, int16_t &y, int16_t &z) {
+  // position register pointer
   Wire.beginTransmission(QMC5883P_ADDR);
   Wire.write(X_LSB_REG);
   if (Wire.endTransmission(false) != 0) {
-    if (++qmc_err_streak >= 3) {
-      Serial.println("QMC error: re-init after endTransmission");
-      initQMC5883P();
-    }
+    if (++qmc_err_streak >= 3) { initQMC5883P(); }
     return false;
   }
 
+  // Explicit types so we hit requestFrom(uint16_t, uint8_t, uint8_t)
   uint8_t req = Wire.requestFrom((uint16_t)QMC5883P_ADDR,
                                  (uint8_t)6,
                                  (uint8_t)true);
   if (req != 6) {
-    if (++qmc_err_streak >= 3) {
-      Serial.println("QMC error: re-init after short read");
-      initQMC5883P();
-    }
+    if (++qmc_err_streak >= 3) { initQMC5883P(); }
     return false;
   }
 
   if (Wire.available() < 6) {
-    if (++qmc_err_streak >= 3) {
-      Serial.println("QMC error: re-init, available < 6");
-      initQMC5883P();
-    }
+    if (++qmc_err_streak >= 3) { initQMC5883P(); }
     return false;
   }
 
@@ -250,6 +219,7 @@ bool readQMC5883PData(int16_t &x, int16_t &y, int16_t &z) {
   return true;
 }
 
+
 float magnitude3D(float x, float y, float z) {
   return sqrtf(x * x + y * y + z * z);
 }
@@ -262,17 +232,13 @@ static std::string buildManufacturerData_withTeam(char teamChar, const char* pla
   m.push_back((char)(MFG_COMPANY_ID & 0xFF));
   m.push_back((char)((MFG_COMPANY_ID >> 8) & 0xFF));
 
-  // clamp strength
   int s = (int)(strength + 0.5f);
   if (s < 0) s = 0;
   if (s > 9999) s = 9999;
 
   char buf[64];
-  snprintf(buf, sizeof(buf), "%c,%s,%s,%d",
-           teamChar,
-           TILE_ID,
-           playerId ? playerId : "PT-UNK",
-           s);
+  snprintf(buf, sizeof(buf), "%c,%s,%s,%d", teamChar, TILE_ID,
+           playerId ? playerId : "PT-UNK", s);
 
   m.append(buf);
   return m;
@@ -282,22 +248,12 @@ static std::string buildManufacturerData_withTeam(char teamChar, const char* pla
 // ------------------- Reporter (BLE) -----------------------------------------
 class BleReporter {
 public:
-  enum State {
-    IDLE,
-    SCANNING,
-    ADVERTISING
-  };
+  enum State { IDLE, SCANNING, ADVERTISING };
 
   BleReporter()
-  : _state(IDLE),
-    _pScan(nullptr),
-    _scanStart(0),
-    _bestRssi(-999),
-    _haveCurrentTag(false),
-    _lastAdvUpdate(0),
-    _seq(0),
-    _lastPlayerPresent(false),
-    _currentTeamChar('R') {}
+  : _state(IDLE), _pScan(nullptr), _scanStart(0), _bestRssi(-999),
+    _haveCurrentTag(false), _lastAdvUpdate(0), _seq(0),
+    _lastPlayerPresent(false), _currentTeamChar('R') {}
 
   void begin() {
     NimBLEDevice::init(TILE_ID);
@@ -310,12 +266,11 @@ public:
     _pScan->setDuplicateFilter(false);
   }
 
-  // teamChar so we can encode it in the MFG string
+  // teamChar comes from the debounced pins if available; otherwise fallback
   void update(bool playerPresent, float strength, char teamChar) {
     unsigned long now = millis();
     _currentTeamChar = teamChar;
 
-    // no player → tear down
     if (!playerPresent) {
       if (_state == SCANNING) {
         _pScan->stop();
@@ -329,7 +284,6 @@ public:
       return;
     }
 
-    // rising edge → scan
     if (playerPresent && !_lastPlayerPresent) {
       startScan(now);
       _lastPlayerPresent = true;
@@ -342,14 +296,14 @@ public:
         break;
 
       case SCANNING: {
-        if (now - _scanStart >= SCAN_TIME_MS) {
+        if (now - _scanStart >= 400 /*ms*/) {
           _pScan->stop();
 
           NimBLEScanResults results = _pScan->getResults();
           pickBestFromResults(results);
           _pScan->clearResults();
 
-          startAdvertising(); // uses _currentTeamChar for first packet
+          startAdvertising(); // uses _currentTeamChar for the first packet
           _state = ADVERTISING;
         }
       } break;
@@ -380,7 +334,6 @@ private:
   char _currentTeamChar; // 'R' or 'B'
 
   void startScan(unsigned long now) {
-    Serial.println("BLE: startScan()");
     _bestRssi = -999;
     _bestTagName = "";
     _haveCurrentTag = false;
@@ -391,7 +344,6 @@ private:
   }
 
   void pickBestFromResults(const NimBLEScanResults &results) {
-    Serial.println("BLE: selecting best PLB*/PLR* (anywhere in name)");
     _bestRssi = -999;
     _bestTagName = "";
     _haveCurrentTag = false;
@@ -404,8 +356,6 @@ private:
       std::string nm = dev->getName();
       if (nm.empty()) nm = "(no name)";
 
-      Serial.printf("%s: %d\n", nm.c_str(), rssi);
-
       bool nameOk = (nm.find("PLB") != std::string::npos ||
                      nm.find("PLR") != std::string::npos);
       if (!nameOk) continue;
@@ -416,18 +366,9 @@ private:
         _haveCurrentTag = true;
       }
     }
-
-    if (_haveCurrentTag) {
-      Serial.printf("Best tag: %s (%d dBm)\n", _bestTagName.c_str(), _bestRssi);
-    } else {
-      Serial.println("No PLB*/PLR* tags found");
-    }
   }
 
   void startAdvertising() {
-    Serial.printf("BLE: advertising player %s\n",
-                  _haveCurrentTag ? _bestTagName.c_str() : "PT-UNK");
-
     NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
 
     // ADV: just flags + mfg
@@ -437,7 +378,7 @@ private:
     std::string mfg = buildManufacturerData_withTeam(
         _currentTeamChar,
         _haveCurrentTag ? _bestTagName.c_str() : "PT-UNK",
-        0.0f                    // first packet, 0 strength
+        0.0f
     );
     advData.setManufacturerData(mfg);
 
@@ -459,7 +400,6 @@ private:
   }
 
   void stopAdvertising() {
-    Serial.println("BLE: stopAdvertising()");
     NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
     adv->stop();
   }
@@ -477,79 +417,36 @@ private:
         strength
     );
     advData.setManufacturerData(mfg);
-
-    // leave scan response alone
     adv->setAdvertisementData(advData);
   }
 };
 
-// global reporter
 BleReporter reporter;
 
 // ============================================================================
-// ------------------- GLOBAL PRESENCE STATE ----------------------------------
+// ------------------- GLOBAL STATE / HELPERS ---------------------------------
 Bounce blueDebouncer;
 Bounce redDebouncer;
 
-bool  g_playerPresent = false;
-float g_lastDt = 0.0f;
+bool  g_playerPresent = false;  // aggregate “someone on” view
+float g_lastDt = 0.0f;          // magnetic strength (fallback/telemetry)
 
 enum RunState { RS_BASELINING, RS_READY, RS_PERSON };
 RunState g_state = RS_BASELINING;
 
-uint32_t ready_since_ms = 0;
-bool     allow_sleep = false;   // only after 30s of READY
-
-// Helper: compute team char from magnet Z sign
-static inline char teamFromZ(float filteredDz) {
-  bool zPos = (filteredDz >= 0.0f);
-  if (POSITIVE_Z_IS_BLUE) {
-    return zPos ? 'B' : 'R';
-  } else {
-    return zPos ? 'R' : 'B';
-  }
-}
+uint32_t ready_since_ms = 0;    // when we entered READY (for 30s rule)
+bool     allow_sleep = false;   // only true if READY for >= 30s
 
 static inline char teamFromPinsOrMag(bool blueOn, bool redOn, float filteredDz) {
   if (blueOn && !redOn) return 'B';
   if (redOn && !blueOn) return 'R';
-  // both or neither → fall back to magnet sign
-  return teamFromZ(filteredDz);
+  // both or neither -> fall back to magnet sign for team hint
+  return (filteredDz >= 0.0f) ? 'B' : 'R';
 }
 
+// LED blinker controller (same timing for baseline & ready)
 static const uint32_t BLINK_ON  = 250;
 static const uint32_t BLINK_OFF = 750;
-
-// ============================================================================
-// ------------------- Sleep helpers ------------------------------------------
-void enterReady() {
-  g_state = RS_READY;
-  ready_since_ms = millis();
-  allow_sleep = false;
-  Serial.println("STATE: READY");
-  // READY: green fast blink
-  statusLed.blink(0, 180, 0, BLINK_ON, BLINK_OFF);
-}
-
-void enterPerson() {
-  g_state = RS_PERSON;
-  allow_sleep = false; // awake while person on
-  Serial.println("STATE: PERSON");
-}
-
-void manageSleep() {
-  if (g_state == RS_READY) {
-    uint32_t now = millis();
-    if (!allow_sleep && (uint32_t)(now - ready_since_ms) >= READY_SLEEP_DELAYMS) {
-      allow_sleep = true;
-      Serial.println("READY for 30s -> enabling sleep");
-    }
-    if (allow_sleep) {
-      esp_sleep_enable_timer_wakeup(READY_WAKE_US);
-      esp_light_sleep_start();
-    }
-  }
-}
 
 // ============================================================================
 // ------------------- Arduino setup / loop -----------------------------------
@@ -570,19 +467,49 @@ void setup() {
 
   initQMC5883P();
   tStart = millis();
-  Serial.println("Building baseline...");
+  g_state = RS_BASELINING;
 
   reporter.begin();
+
+  // Sleep source (timer) is configured ad-hoc when used; nothing to do here.
+}
+
+void enterReady() {
+  g_state = RS_READY;
+  ready_since_ms = millis();
+  allow_sleep = false; // 30s rule
+  // Ready LED: green fast blink
+  statusLed.blink(0, 180, 0, BLINK_ON, BLINK_OFF);
+}
+
+void enterPerson() {
+  g_state = RS_PERSON;
+  allow_sleep = false; // awake while person on
+}
+
+void manageSleep() {
+  if (g_state == RS_READY) {
+    // Decide if 30s of continuous READY has elapsed
+    uint32_t now = millis();
+    if (!allow_sleep && (uint32_t)(now - ready_since_ms) >= READY_SLEEP_DELAYMS) {
+      allow_sleep = true;
+    }
+    if (allow_sleep) {
+      // Sleep 50ms between polls
+      esp_sleep_enable_timer_wakeup(READY_WAKE_US);
+      esp_light_sleep_start(); // returns after wake
+    }
+  }
 }
 
 void loop() {
-  // --- Debounced pins
+  // -------- Debounced pins
   blueDebouncer.update();
   redDebouncer.update();
   bool blueOn = (blueDebouncer.read() == LOW);
   bool redOn  = (redDebouncer.read()  == LOW);
 
-  // --- QMC read (non-blocking)
+  // -------- Sensor read (non-blocking; if it fails, we still progress)
   int16_t rx, ry, rz;
   bool got = readQMC5883PData(rx, ry, rz);
   float x=0, y=0, z=0;
@@ -590,14 +517,10 @@ void loop() {
 
   unsigned long now = millis();
 
-  // --- Baseline phase
-  if (!baselineDone || g_state == RS_BASELINING) {
-    g_state = RS_BASELINING;
-    Serial.println(F(">baseline_building:1"));
-
-    // Baseline LED: fast blink (yellow) while calibrating
-    statusLed.blink(255, 180, 0, BLINK_ON, BLINK_OFF);
-    statusLed.service();
+  // -------- Baseline phase (runs even if some reads fail)
+  if (g_state == RS_BASELINING) {
+    // LED: fast blink (distinct while calibrating)
+    statusLed.blink(255, 180, 0, BLINK_ON, BLINK_OFF); // yellow fast blink
 
     if (got) {
       if (!baselineInit) {
@@ -609,23 +532,17 @@ void loop() {
         baseZ = BASELINE_ALPHA * z + (1 - BASELINE_ALPHA) * baseZ;
       }
     }
-
     if (now - tStart >= BASELINE_MS) {
       baselineDone = true;
-      Serial.println(F("=== Baseline established ==="));
-      Serial.print(F("base_x: ")); Serial.println(baseX, 2);
-      Serial.print(F("base_y: ")); Serial.println(baseY, 2);
-      Serial.print(F("base_z: ")); Serial.println(baseZ, 2);
-      Serial.println(F("==========================="));
       outputEmaInit = false;
       enterReady();
     }
-
-    delay(10);
+    statusLed.service(); // drive blink
+    delay(1);
     return;
   }
 
-  // --- Run phase: EMA + magnitude
+  // -------- Run phase: EMA + magnitude (tolerate missed reads)
   float dx=0, dy=0, dz=0, dt=0;
   if (got) {
     dx = x - baseX;
@@ -643,12 +560,13 @@ void loop() {
       fDt = OUTPUT_ALPHA * dt + (1 - OUTPUT_ALPHA) * fDt;
     }
     g_lastDt = fDt;
-    Serial.printf(">fDt: %0.1f\n", fDt);
   }
 
-  // --- Presence from pins + magnetic fallback
+  // -------- Determine presence
+  // Pins are authoritative: any active pin = person present
   bool pinPresent = (blueOn || redOn);
 
+  // Magnetic fallback (only if no pins active), with hysteresis
   static bool magPresent = false;
   if (!pinPresent && outputEmaInit) {
     if (!magPresent) {
@@ -657,51 +575,43 @@ void loop() {
       if (fDt <= OFF_HYST_DT) magPresent = false;
     }
   } else if (pinPresent) {
-    magPresent = false;
+    magPresent = false; // irrelevant while pins asserted
   }
 
   bool someonePresent = pinPresent || magPresent;
-  g_playerPresent = someonePresent;
 
-  // --- State transitions
-  if (g_state == RS_READY && someonePresent) {
-    enterPerson();
-  } else if (g_state == RS_PERSON && !someonePresent) {
-    enterReady();
+  // -------- State transitions
+  if (g_state == RS_READY) {
+    if (someonePresent) {
+      enterPerson();
+    }
+  } else if (g_state == RS_PERSON) {
+    if (!someonePresent) {
+      enterReady(); // resets ready_since timer
+    }
   }
 
-  // --- LED behavior
+  // -------- LED according to spec
   if (g_state == RS_READY) {
-    // READY: green fast blink (already set in enterReady, but keep it explicit)
+    // green fast blink
     statusLed.blink(0, 180, 0, BLINK_ON, BLINK_OFF);
   } else if (g_state == RS_PERSON) {
+    // Solid based on team (pins take priority; else magnet sign)
     char teamChar = teamFromPinsOrMag(blueOn, redOn, fDz);
-    if (teamChar == 'B') {
-      statusLed.blue();
-    } else {
-      statusLed.red();
-    }
+    if (teamChar == 'B') statusLed.blue();
+    else                 statusLed.red();
   }
-  statusLed.service();
+  statusLed.service(); // tick blinker if active
 
-  // --- Team char & debug P: lines
-  char teamChar = 'R';
-  if (g_playerPresent) {
-    teamChar = teamFromPinsOrMag(blueOn, redOn, fDz);
-    if (teamChar == 'R') {
-      Serial.println(">P: 1");
-    } else if (teamChar == 'B') {
-      Serial.println(">P: 2");
-    }
-  } else {
-    Serial.println(">P: 0");
-  }
+  // -------- Team for advertising
+  char advTeam = teamFromPinsOrMag(blueOn, redOn, fDz);
 
-  // --- BLE FSM
-  reporter.update(g_playerPresent, g_lastDt, teamChar);
+  // -------- BLE reporter
+  reporter.update(someonePresent, g_lastDt, advTeam);
 
-  // --- Sleep in READY after 30s
+  // -------- Power: sleep only in READY
   manageSleep();
 
-  delay(10);
+  // Small pacing; tolerant with light-sleep cadence
+  delay(1);
 }

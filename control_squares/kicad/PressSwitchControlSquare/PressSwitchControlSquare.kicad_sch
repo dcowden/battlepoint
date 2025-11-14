@@ -3800,6 +3800,80 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:Conn_01x04_Pin")
+		(at 57.15 96.52 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f50b292d-065b-406a-aab1-3873e3580d66")
+		(property "Reference" "J6"
+			(at 57.785 88.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "Conn_01x04_Pin"
+			(at 57.785 91.44 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 57.15 96.52 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 57.15 96.52 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x04, script generated"
+			(at 57.15 96.52 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "4"
+			(uuid "2a796e10-e62b-4056-8fda-3af50e9d04f1")
+		)
+		(pin "2"
+			(uuid "303fd0f8-f906-47f5-9fcd-b8a7a977262a")
+		)
+		(pin "3"
+			(uuid "04019322-4447-4571-bbc6-091b0dbb4f23")
+		)
+		(pin "1"
+			(uuid "3c9fea50-1829-4a24-a714-22546f3ece4b")
+		)
+		(instances
+			(project ""
+				(path "/a65a7e5b-df7b-4680-bd24-007c253c9cc6"
+					(reference "J6")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "AP2112K-3.3TRG1:AP2112K-3.3TRG1")
 		(at 217.17 91.44 0)
 		(unit 1)

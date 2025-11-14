@@ -78,17 +78,17 @@ REM this is to cut holes and edges
 REM =========================
 REM FRONT SIDE
 REM ==========================
-%PROG% pcb export svg --output %OUT_FILE%\back.svg --negative --black-and-white --theme "KiCad Classic" --layers B.Cu,Edge.Cuts --exclude-drawing-sheet %SOURCE_FILE%
+%PROG% pcb export svg --output %OUT_FILE%\back.svg --negative --mirror --black-and-white --theme "KiCad Classic" --layers B.Cu,Edge.Cuts --exclude-drawing-sheet %SOURCE_FILE%
 magick convert -density 1200 %OUT_FILE%\back.svg  %OUT_FILE%\back.png
-%PROG% pcb export svg --output %OUT_FILE%\mask-back.svg --black-and-white --theme "KiCad Classic" --layers B.Mask,Edge.Cuts --exclude-drawing-sheet %SOURCE_FILE%
+%PROG% pcb export svg --output %OUT_FILE%\mask-back.svg --black-and-white --mirror --theme "KiCad Classic" --layers B.Mask,Edge.Cuts --exclude-drawing-sheet %SOURCE_FILE%
 magick convert -density 1200 %OUT_FILE%\mask-back.svg  %OUT_FILE%\mask-back.png
 %PROG% pcb export dxf --output %OUT_FILE%\back-silkscreen.dxf --layers B.Silkscreen,Edge.Cuts  --output-units mm %SOURCE_FILE%
 
 REM isolation routes for front
 REM not mirrored because the board will flip over during processing
-%PROG% pcb export svg --output %OUT_FILE%\front.svg --negative --mirror --black-and-white --theme "KiCad Classic" --layers F.Cu,Edge.Cuts --exclude-drawing-sheet %SOURCE_FILE%
+%PROG% pcb export svg --output %OUT_FILE%\front.svg --negative --black-and-white --theme "KiCad Classic" --layers F.Cu,Edge.Cuts --exclude-drawing-sheet %SOURCE_FILE%
 magick convert -density 1200 %OUT_FILE%\front.svg  %OUT_FILE%\front.png
-%PROG% pcb export svg --output %OUT_FILE%\mask-front.svg --black-and-white --mirror --theme "KiCad Classic" --layers F.Mask,Edge.Cuts --exclude-drawing-sheet %SOURCE_FILE%
+%PROG% pcb export svg --output %OUT_FILE%\mask-front.svg --black-and-white --theme "KiCad Classic" --layers F.Mask,Edge.Cuts --exclude-drawing-sheet %SOURCE_FILE%
 magick convert -density 1200 %OUT_FILE%\mask-front.svg  %OUT_FILE%\mask-front.png
 %PROG% pcb export dxf --output %OUT_FILE%\front-silkscreen.dxf --layers F.Silkscreen,Edge.Cuts  --output-units mm %SOURCE_FILE%
 
