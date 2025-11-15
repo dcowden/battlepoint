@@ -274,11 +274,20 @@ class EnhancedBLEScanner:
             loop = asyncio.get_running_loop()
             sock = aiobs.create_bt_socket(self._linux_adapter_index)
 
-            # Use the same private helper that aioblescan examples use
-            fac = getattr(loop, "_create_connection_transport")(
-                sock, aiobs.BLEScanRequester, None, None
-            )
-            transport, btctrl = await fac
+            transport = None
+            btctrl = None
+
+            # Try the old private helper first (works on stock asyncio loops)
+            create_conn = getattr(loop, "_create_connection_transport", None)
+            if create_conn is not None:
+                fac = create_conn(sock, aiobs.BLEScanRequester, None, None)
+                transport, btctrl = await fac
+            else:
+                # Fallback for uvloop / NiceGUI / custom loops that don't expose
+                # _create_connection_transport
+                transport, btctrl = await loop.create_connection(
+                    aiobs.BLEScanRequester, sock=sock
+                )
 
             self._linux_transport = transport
             self._linux_btctrl = btctrl
@@ -290,6 +299,7 @@ class EnhancedBLEScanner:
             await btctrl.send_scan_request(0)
             self._scanning = True
             print(f"[BLE] (linux/aioblescan) scanning started on hci{self._linux_adapter_index}")
+
         except Exception as e:
             print(f"[BLE] (linux/aioblescan) error starting scan: {e!r}")
             self._scanning = False
@@ -297,6 +307,7 @@ class EnhancedBLEScanner:
                 self._linux_transport.close()
             self._linux_transport = None
             self._linux_btctrl = None
+
 
     async def stop_scanning(self):
         if self._is_windows:
