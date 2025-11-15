@@ -1,3 +1,4 @@
+import traceback
 from typing import Optional, List, Dict
 import asyncio
 import re
@@ -52,6 +53,9 @@ class EnhancedBLEScanner:
         self._linux_adapter_index = linux_adapter_index
         self._linux_transport = None
         self._linux_btctrl = None
+        self._linux_thread: Optional[threading.Thread] = None
+        self._linux_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._linux_want_scan: bool = False
 
         # DEBUG: track last callback time per address for gap measurement
         self._last_cb_time_by_addr: Dict[str, int] = {}
@@ -215,6 +219,64 @@ class EnhancedBLEScanner:
             now_ms=now_ms,
         )
 
+    def _start_linux_thread(self):
+        """Start the dedicated Linux aioblescan thread + event loop."""
+        if self._linux_thread is not None:
+            return
+
+        def _runner():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            self._linux_loop = loop
+            loop.run_until_complete(self._linux_scanner_main())
+
+        self._linux_thread = threading.Thread(target=_runner, daemon=True)
+        self._linux_thread.start()
+        print(f"[BLE] Linux scanner thread started on hci{self._linux_adapter_index}")
+
+    async def _linux_scanner_main(self):
+        """Runs in the Linux scanner thread's event loop."""
+        try:
+            sock = aiobs.create_bt_socket(self._linux_adapter_index)
+
+            loop = asyncio.get_event_loop()
+            # Use the same private helper aioblescan examples use; this exists
+            # on the standard SelectorEventLoop we created in this thread.
+            fac = loop._create_connection_transport(  # type: ignore[attr-defined]
+                sock, aiobs.BLEScanRequester, None, None
+            )
+            transport, btctrl = await fac
+
+            self._linux_transport = transport
+            self._linux_btctrl = btctrl
+            btctrl.process = self._aiobs_process
+
+            while True:
+                try:
+                    if self._linux_want_scan and not self._scanning:
+                        await btctrl.send_scan_request(0)
+                        self._scanning = True
+                        print(f"[BLE] (linux/aioblescan) scanning started on hci{self._linux_adapter_index}")
+                    elif not self._linux_want_scan and self._scanning:
+                        try:
+                            await btctrl.stop_scan_request()
+                        except Exception as e:
+                            print(f"[BLE] (linux/aioblescan) stop_scan_request error: {e!r}")
+                        self._scanning = False
+                        print(f"[BLE] (linux/aioblescan) scanning stopped on hci{self._linux_adapter_index}")
+                except Exception as e:
+                    print(f"[BLE] (linux/aioblescan) main loop error: {e!r}")
+
+                await asyncio.sleep(0.2)
+
+        finally:
+            if self._linux_transport is not None:
+                self._linux_transport.close()
+            self._linux_transport = None
+            self._linux_btctrl = None
+            self._scanning = False
+            print(f"[BLE] (linux/aioblescan) scanner thread exiting on hci{self._linux_adapter_index}")
+
     def _record_observation(self, address: str, tile_name: str, rssi: int, mfg_ascii: str, now_ms: int):
         """
         Shared between Linux (aioblescan) and Windows (Bleak) paths.
@@ -266,70 +328,18 @@ class EnhancedBLEScanner:
             self._want_scan = True
             return
 
-        if self._scanning:
-            return
-
-        # Linux + aioblescan
-        try:
-            loop = asyncio.get_running_loop()
-            sock = aiobs.create_bt_socket(self._linux_adapter_index)
-
-            transport = None
-            btctrl = None
-
-            # Try the old private helper first (works on stock asyncio loops)
-            create_conn = getattr(loop, "_create_connection_transport", None)
-            if create_conn is not None:
-                fac = create_conn(sock, aiobs.BLEScanRequester, None, None)
-                transport, btctrl = await fac
-            else:
-                # Fallback for uvloop / NiceGUI / custom loops that don't expose
-                # _create_connection_transport
-                transport, btctrl = await loop.create_connection(
-                    aiobs.BLEScanRequester, sock=sock
-                )
-
-            self._linux_transport = transport
-            self._linux_btctrl = btctrl
-
-            # Attach callback
-            btctrl.process = self._aiobs_process
-
-            # 0 = passive scan; 1 = active scan
-            await btctrl.send_scan_request(0)
-            self._scanning = True
-            print(f"[BLE] (linux/aioblescan) scanning started on hci{self._linux_adapter_index}")
-
-        except Exception as e:
-            print(f"[BLE] (linux/aioblescan) error starting scan: {e!r}")
-            self._scanning = False
-            if self._linux_transport:
-                self._linux_transport.close()
-            self._linux_transport = None
-            self._linux_btctrl = None
-
+        # Linux: run aioblescan in its own thread/loop
+        self._linux_want_scan = True
+        if self._linux_thread is None:
+            self._start_linux_thread()
 
     async def stop_scanning(self):
         if self._is_windows:
             self._want_scan = False
             return
 
-        if not self._scanning:
-            return
-
-        try:
-            if self._linux_btctrl is not None:
-                try:
-                    await self._linux_btctrl.stop_scan_request()
-                except Exception as e:
-                    print(f"[BLE] (linux/aioblescan) stop_scan_request error: {e!r}")
-        finally:
-            if self._linux_transport is not None:
-                self._linux_transport.close()
-            self._linux_transport = None
-            self._linux_btctrl = None
-            self._scanning = False
-            print(f"[BLE] (linux/aioblescan) scanning stopped on hci{self._linux_adapter_index}")
+        # Linux: just flip the flag; the Linux scanner thread will stop the scan
+        self._linux_want_scan = False
 
     # ======================================================================
     # READ METHODS / GAME INTEGRATION
