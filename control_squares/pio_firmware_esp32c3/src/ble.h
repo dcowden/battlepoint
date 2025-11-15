@@ -19,7 +19,7 @@ static const char* SHARED_SERVICE_UUID_STR = "12345678-1234-1234-1234-1234567890
 static const uint16_t MFG_COMPANY_ID = 0xFFFF;
 
 // scan window when a player is present
-static const uint16_t SCAN_TIME_MS = 400;
+static const uint16_t SCAN_TIME_MS = 100;
 
 // TX power
 static const esp_power_level_t TILE_TX_POWER = ESP_PWR_LVL_P9;

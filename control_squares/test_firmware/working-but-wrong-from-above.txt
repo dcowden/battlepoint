@@ -29,7 +29,7 @@
 // ============================================================================
 
 // Set whether positive Z means BLUE (true) or RED (false)
-static const bool POSITIVE_Z_IS_BLUE = true;
+static const bool POSITIVE_Z_IS_BLUE = false;
 static const int SDA_PIN = 8;
 static const int SCL_PIN = 9;
 
@@ -111,16 +111,6 @@ static const float BLUE_REF_Z = (POSITIVE_Z_IS_BLUE ? 1.0f : -1.0f);
 static const float RED_REF_X  = 0.0f;
 static const float RED_REF_Y  = 0.0f;
 static const float RED_REF_Z  = -BLUE_REF_Z;
-
-static inline char teamFromZ(float filteredDz) {
-  bool zPos = (filteredDz >= 0.0f);
-  if (POSITIVE_Z_IS_BLUE) {
-    return zPos ? 'B' : 'R';
-  } else {
-    return zPos ? 'R' : 'B';
-  }
-}
-
 
 // ============================================================================
 // ------------------- Arduino setup / loop -----------------------------------
@@ -287,15 +277,12 @@ void loop() {
         } else {
           // Direction ambiguous; don't change team.
         }
-        g_currentMagTeam = teamFromZ(fDz);
-        g_magTeamValid=true;  
       } else {
         // Outside our direction-trust band:
         // - too weak => really no reliable direction
         // - too strong => likely "jammed on chip", keep last classification
         // Do NOT clear g_magTeamValid here; just don't update it.
       }
-
     } else {
       // No magnet present => team invalid
       g_magTeamValid   = false;
