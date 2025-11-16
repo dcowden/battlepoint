@@ -255,6 +255,10 @@ class EnhancedBLEScanner:
     def _aiobs_process(self, data: bytes) -> None:
         """
         aioblescan callback (Linux).
+
+        This version:
+        - Uses local name prefix (CS-/PT-) to decide if a device is "ours".
+        - Only decodes manufacturer payload for our devices.
         """
         try:
             ev = aiobs.HCI_Event()
@@ -273,19 +277,24 @@ class EnhancedBLEScanner:
         rssi_items = ev.retrieve("rssi")
         rssi = rssi_items[0].val if rssi_items else 0
 
-        # Try to get local name from parsed AD first
+        # Get local name from parsed AD first
         name_items = ev.retrieve("Complete Local Name") or ev.retrieve("Short Local Name")
         tile_name = name_items[0].val if name_items else ""
 
-        # Fallback: parse local name directly from the raw HCI payload
+        # If there is no local name at all, this is very unlikely to be one of our tiles/tags.
+        # Early-reject to save work.
         if not tile_name:
-            hci_name = self._extract_local_name_from_hci(data)
-            if hci_name:
-                tile_name = hci_name
+            return
 
-        # Manufacturer data
-        mfg_items = ev.retrieve("Manufacturer Specific Data")
+        # Name-based filter: only keep CS-* and PT-* devices.
+        upper_name = tile_name.upper()
+        if not (upper_name.startswith("CS-") or upper_name.startswith("PT-")):
+            # Not our device, bail out before touching manufacturer payload.
+            return
+
+        # Manufacturer data (only for our devices)
         mfg_ascii = ""
+        mfg_items = ev.retrieve("Manufacturer Specific Data")
         if mfg_items:
             mfg_ascii = self._decode_aiobs_mfg(mfg_items[0])
 
@@ -297,6 +306,7 @@ class EnhancedBLEScanner:
             mfg_ascii=mfg_ascii,
             now_ms=now_ms,
         )
+
 
     def _start_linux_thread(self):
         """Start the dedicated Linux aioblescan thread + event loop."""
