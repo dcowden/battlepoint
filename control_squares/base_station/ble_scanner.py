@@ -179,6 +179,28 @@ class EnhancedBLEScanner:
         except Exception:
             return raw.hex()
 
+    def _is_our_device(self, name: str, mfg_ascii: str) -> bool:
+        """
+        Decide if this advertisement is from one of our devices.
+
+        Primary filter: local name prefix (CS-/PT-).
+        Secondary fallback: tile id in manufacturer payload, if name is missing.
+        """
+        if name:
+            upper_name = name.upper()
+            if upper_name.startswith("CS-") or upper_name.startswith("PT-"):
+                return True
+
+        # Fallback: look at manufacturer payload if we have it
+        if mfg_ascii:
+            parts = mfg_ascii.split(",")
+            if len(parts) >= 2:
+                tile_id = parts[1].strip().upper()
+                if tile_id.startswith("CS-") or tile_id.startswith("PT-"):
+                    return True
+
+        return False
+
 
     def _extract_local_name_from_hci(self, packet: bytes) -> str:
         """
@@ -254,11 +276,14 @@ class EnhancedBLEScanner:
 
     def _aiobs_process(self, data: bytes) -> None:
         """
-        aioblescan callback (Linux).
+        aioblescan callback (Linux) with early filtering.
 
-        This version:
-        - Uses local name prefix (CS-/PT-) to decide if a device is "ours".
-        - Only decodes manufacturer payload for our devices.
+        Steps:
+        - Decode HCI event.
+        - Decode manufacturer payload (cheap).
+        - Get local name (parsed AD + HCI fallback).
+        - If neither name nor manufacturer look like ours, bail out.
+        - Otherwise, get peer/RSSI and record the observation.
         """
         try:
             ev = aiobs.HCI_Event()
@@ -266,6 +291,28 @@ class EnhancedBLEScanner:
         except Exception as e:
             print(f"[BLE] aioblescan decode error: {e!r}")
             return
+
+        # Manufacturer data (cheap) – we may use it for filtering and payload.
+        mfg_ascii = ""
+        mfg_items = ev.retrieve("Manufacturer Specific Data")
+        if mfg_items:
+            mfg_ascii = self._decode_aiobs_mfg(mfg_items[0])
+
+        # Local name via parsed AD
+        name_items = ev.retrieve("Complete Local Name") or ev.retrieve("Short Local Name")
+        tile_name = name_items[0].val if name_items else ""
+
+        # Fallback: parse local name directly from raw HCI if needed
+        if not tile_name:
+            hci_name = self._extract_local_name_from_hci(data)
+            if hci_name:
+                tile_name = hci_name
+
+        # Early filter: if this doesn't look like one of our devices, bail.
+        if not self._is_our_device(tile_name, mfg_ascii):
+            return
+
+        # At this point, we know it's "ours". Now pay the cost for peer/RSSI and book-keeping.
 
         # MAC address
         peer = ev.retrieve("peer")
@@ -277,27 +324,6 @@ class EnhancedBLEScanner:
         rssi_items = ev.retrieve("rssi")
         rssi = rssi_items[0].val if rssi_items else 0
 
-        # Get local name from parsed AD first
-        name_items = ev.retrieve("Complete Local Name") or ev.retrieve("Short Local Name")
-        tile_name = name_items[0].val if name_items else ""
-
-        # If there is no local name at all, this is very unlikely to be one of our tiles/tags.
-        # Early-reject to save work.
-        if not tile_name:
-            return
-
-        # Name-based filter: only keep CS-* and PT-* devices.
-        upper_name = tile_name.upper()
-        if not (upper_name.startswith("CS-") or upper_name.startswith("PT-")):
-            # Not our device, bail out before touching manufacturer payload.
-            return
-
-        # Manufacturer data (only for our devices)
-        mfg_ascii = ""
-        mfg_items = ev.retrieve("Manufacturer Specific Data")
-        if mfg_items:
-            mfg_ascii = self._decode_aiobs_mfg(mfg_items[0])
-
         now_ms = self.clock.milliseconds()
         self._record_observation(
             address=address,
@@ -306,6 +332,7 @@ class EnhancedBLEScanner:
             mfg_ascii=mfg_ascii,
             now_ms=now_ms,
         )
+
 
 
     def _start_linux_thread(self):
