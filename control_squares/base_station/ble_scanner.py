@@ -179,6 +179,79 @@ class EnhancedBLEScanner:
         except Exception:
             return raw.hex()
 
+
+    def _extract_local_name_from_hci(self, packet: bytes) -> str:
+        """
+        Try to extract Shortened/Complete Local Name (AD type 0x08 / 0x09)
+        directly from the HCI LE Advertising Report packet.
+
+        This is adapted from typical HCI AD parsing logic (see ble_monitor, etc.).
+        It handles both legacy and extended advertising.
+        """
+        try:
+            if len(packet) < 12:
+                return ""
+
+            # HCI event length as in standard LE meta event
+            packet_size = packet[2] + 3
+            if packet_size > len(packet):
+                # malformed / truncated, bail
+                return ""
+
+            is_ext_packet = (packet[3] == 0x0D)  # 0x0D = LE Extended Advertising Report
+            payload_start = 29 if is_ext_packet else 14
+            if payload_start >= len(packet):
+                return ""
+
+            # length of the advertising data payload
+            payload_size = packet[payload_start - 1]
+            if payload_size <= 0:
+                return ""
+
+            # Where the AD structures actually begin
+            idx = payload_start
+            remaining = payload_size
+
+            best_name = None
+
+            # Walk the AD structures
+            while remaining > 1 and idx < len(packet):
+                if idx >= len(packet):
+                    break
+
+                field_len = packet[idx]
+                if field_len == 0:
+                    break
+
+                record_size = field_len + 1  # length byte + data
+                if record_size > remaining or (idx + record_size) > len(packet):
+                    break
+
+                record = packet[idx : idx + record_size]
+                ad_type = record[1]
+                value = record[2 : 2 + field_len - 1]
+
+                # 0x08 = Shortened Local Name, 0x09 = Complete Local Name
+                if ad_type in (0x08, 0x09):
+                    try:
+                        name = value.decode("utf-8", errors="replace")
+                    except Exception:
+                        name = ""
+
+                    if name:
+                        # Prefer the longest name we see
+                        if best_name is None or len(name) > len(best_name):
+                            best_name = name
+
+                idx += record_size
+                remaining -= record_size
+
+            return best_name or ""
+        except Exception as e:
+            print(f"[BLE] aioblescan local-name parse error: {e!r}")
+            return ""
+
+
     def _aiobs_process(self, data: bytes) -> None:
         """
         aioblescan callback (Linux).
@@ -200,9 +273,15 @@ class EnhancedBLEScanner:
         rssi_items = ev.retrieve("rssi")
         rssi = rssi_items[0].val if rssi_items else 0
 
-        # Local name is usually empty for your tiles; ignore for logic
+        # Try to get local name from parsed AD first
         name_items = ev.retrieve("Complete Local Name") or ev.retrieve("Short Local Name")
         tile_name = name_items[0].val if name_items else ""
+
+        # Fallback: parse local name directly from the raw HCI payload
+        if not tile_name:
+            hci_name = self._extract_local_name_from_hci(data)
+            if hci_name:
+                tile_name = hci_name
 
         # Manufacturer data
         mfg_items = ev.retrieve("Manufacturer Specific Data")

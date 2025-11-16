@@ -28,18 +28,18 @@
 // --------------------- USER / HW CONFIG -------------------------------------
 // ============================================================================
 
-// Set whether positive Z means BLUE (true) or RED (false)
+// We keep this flag and the color constants around for future use,
+// but we no longer use field direction for team detection.
 static const bool POSITIVE_Z_IS_BLUE = true;
 static const int SDA_PIN = 8;
 static const int SCL_PIN = 9;
 
-static const char ADV_PRESENCE_VALUE_RED  = 'R';
-static const char ADV_PRESENCE_VALUE_BLU  = 'B';
-static const char ADV_PRESENCE_VALUE_BOTH = 'T';
-
-// this should never get sent now because to save power we do not transmit
-// when nobody is on
-static const char ADV_PRESENCE_VALUE_NONE = 'N';
+static const char ADV_PRESENCE_VALUE_RED   = 'R';
+static const char ADV_PRESENCE_VALUE_BLU   = 'B';
+static const char ADV_PRESENCE_VALUE_BOTH  = 'T';
+static const char ADV_PRESENCE_VALUE_NONE  = 'N';
+// NEW: magnet-only presence, team indeterminate
+static const char ADV_PRESENCE_VALUE_MAG   = 'M';
 
 // NOTE: on XIAO ESP32-C3 SDA/SCL are 4/5.
 // If you actually use I2C on 4/5, move the LED to another pin.
@@ -59,8 +59,9 @@ Bounce redSwitchDebouncer;
 
 // ============================================================================
 // ------------------ QMC5883 baseline / EMA params ---------------------------
-const float BASELINE_ALPHA = 0.05f;
-const float OUTPUT_ALPHA   = 0.50f;
+
+const float BASELINE_ALPHA   = 0.05f;
+const float OUTPUT_ALPHA     = 0.50f;
 const unsigned long BASELINE_MS = 10000UL;
 
 float baseX = 0, baseY = 0, baseZ = 0;
@@ -71,56 +72,18 @@ unsigned long tStart = 0;
 bool  outputEmaInit = false;
 float fDx = 0, fDy = 0, fDz = 0, fDt = 0;
 
-// presence thresholds
+// presence thresholds (field magnitude vs baseline)
 const float MIN_ON_DT   = 380.0f;
-// hysteresis; turn off at a lower level than turn-on
 const float OFF_HYST_DT = 360.0f;
-
-// 3D direction-based team detection thresholds
-// Only trust the direction when the perturbation magnitude is in a sane band.
-// You said mid-range is ~100–200 and "jammed" is ~2000, so default band
-// clamps out the crazy-close region.
-const float DIR_MIN_MAG      = 150.0f;   // minimum |fD| to trust direction
-const float DIR_MAX_MAG      = 800.0f;   // ignore "too close" (> this)
-// minimum difference between dot products to avoid ambiguous direction
-const float DIR_DOT_EPS      = 0.05f;    // tweak if needed
 
 BleReporter reporter;
 
-bool  g_playerPresent = false;  // magnetic presence only
-float g_lastDt = 0.0f;
-
-// keep a stable magnet team to avoid flicker
-char  g_currentMagTeam = 0;   // 'R' or 'B'
-bool  g_magTeamValid   = false;
+// magnetic presence only (no team inference from field)
+bool  g_playerPresent = false;
+float g_lastDt        = 0.0f;
 
 // flag telling us if the QMC is present & initialized
 bool g_qmc_present = false;
-
-// ============================================================================
-// -------- Reference vectors for real direction-based classification ---------
-//
-// These should be measured in YOUR actual geometry by holding a blue magnet
-// in the "ideal" position, reading the normalized (fDx,fDy,fDz), and copying
-// that here, same for red.
-// For now, default them along ±Z so the code runs unchanged until you calibrate.
-static const float BLUE_REF_X = 0.0f;
-static const float BLUE_REF_Y = 0.0f;
-static const float BLUE_REF_Z = (POSITIVE_Z_IS_BLUE ? 1.0f : -1.0f);
-
-static const float RED_REF_X  = 0.0f;
-static const float RED_REF_Y  = 0.0f;
-static const float RED_REF_Z  = -BLUE_REF_Z;
-
-static inline char teamFromZ(float filteredDz) {
-  bool zPos = (filteredDz >= 0.0f);
-  if (POSITIVE_Z_IS_BLUE) {
-    return zPos ? 'B' : 'R';
-  } else {
-    return zPos ? 'R' : 'B';
-  }
-}
-
 
 // ============================================================================
 // ------------------- Arduino setup / loop -----------------------------------
@@ -150,7 +113,7 @@ void setup() {
   g_qmc_present = initQMC5883P();   // auto-detect/init_qmc() from qmc5883.h
   if (!g_qmc_present) {
     Serial.println("QMC not detected; running in switch-only mode.");
-    baselineDone = true;
+    baselineDone = true;  // skip baseline if no sensor
   }
 
   tStart = millis();
@@ -167,15 +130,12 @@ void loop() {
   bool blueSwitchOn = (blueSwitchDebouncer.read() == LOW);
   bool redSwitchOn  = (redSwitchDebouncer.read() == LOW);
 
-  // ----------------- Magnetic sensor path (optional) -----------------
-  // Default: no magnetic team info
-  char teamCharMag = 0;  // 0 means "no valid magnet team"
-
+  // ----------------- Magnetic sensor path (presence only) -----------
   if (g_qmc_present) {
     int16_t rx, ry, rz;
     if (!readQMC5883PData(rx, ry, rz)) {
-      // If QMC was present at boot but a read fails, we keep old behavior:
-      // bail out of this iteration to avoid using bogus data.
+      // If QMC was present at boot but a read fails, bail out of this iteration
+      // to avoid using bogus data.
       statusLed.update();
       delay(10);
       return;
@@ -251,97 +211,36 @@ void loop() {
       }
     }
 
-    // ----------------- 3D DIRECTION-BASED TEAM CLASSIFICATION -----------------
-    if (g_playerPresent) {
-      float mag = sqrtf(fDx * fDx + fDy * fDy + fDz * fDz);
-
-      // Only classify when we're in the "good" magnitude band.
-      if (mag >= DIR_MIN_MAG && mag <= DIR_MAX_MAG) {
-        float ux = fDx / mag;
-        float uy = fDy / mag;
-        float uz = fDz / mag;
-
-        float dotBlue = ux * BLUE_REF_X + uy * BLUE_REF_Y + uz * BLUE_REF_Z;
-        float dotRed  = ux * RED_REF_X  + uy * RED_REF_Y  + uz * RED_REF_Z;
-
-        Serial.printf(">dir_ux: %0.3f\n", ux);
-        Serial.printf(">dir_uy: %0.3f\n", ux);
-        Serial.printf(">dir_uz: %0.3f\n", uz);
-        Serial.printf(">dotBlue: %0.3f\n", dotBlue);
-        Serial.printf(">dotRed: %0.3f\n",  dotRed);
-
-        if (fabsf(dotBlue - dotRed) > DIR_DOT_EPS) {
-          char newTeam = (dotBlue > dotRed) ? 'B' : 'R';
-
-          // Basic hysteresis on team: don't flap back and forth unless clear.
-          if (!g_magTeamValid || newTeam == g_currentMagTeam) {
-            g_currentMagTeam = newTeam;
-            g_magTeamValid   = true;
-          } else {
-            // Only allow a flip if it's VERY clearly the other team.
-            if (fabsf(dotBlue - dotRed) > (DIR_DOT_EPS * 3.0f)) {
-              g_currentMagTeam = newTeam;
-              g_magTeamValid   = true;
-            }
-          }
-        } else {
-          // Direction ambiguous; don't change team.
-        }
-        g_currentMagTeam = teamFromZ(fDz);
-        g_magTeamValid=true;  
-      } else {
-        // Outside our direction-trust band:
-        // - too weak => really no reliable direction
-        // - too strong => likely "jammed on chip", keep last classification
-        // Do NOT clear g_magTeamValid here; just don't update it.
-      }
-
-    } else {
-      // No magnet present => team invalid
-      g_magTeamValid   = false;
-      g_currentMagTeam = 0;
-    }
-
-    if (g_playerPresent && g_magTeamValid) {
-      teamCharMag = g_currentMagTeam;
-    } else {
-      teamCharMag = 0;  // treat as "no magnet team"
-    }
   } else {
-    // No QMC: ensure magnet presence does not contribute
-    g_playerPresent  = false;
-    g_magTeamValid   = false;
-    g_currentMagTeam = 0;
+    // No QMC: ensure magnetic presence does not contribute
+    g_playerPresent = false;
   }
 
   // ----------------- Combine magnetic + switch presence -----------------
+  bool magPresent  = g_playerPresent;   // man-on from magnet only
   bool bluePresent = false;
   bool redPresent  = false;
 
-  // From magnet
-  if (g_playerPresent && g_magTeamValid) {
-    if (teamCharMag == 'R') {
-      redPresent = true;
-    } else if (teamCharMag == 'B') {
-      bluePresent = true;
-    } else {
-      // if direction is weird, don't set either
-    }
-  }
-
-  // From switches
+  // From switches (definitive team)
   if (blueSwitchOn) bluePresent = true;
   if (redSwitchOn)  redPresent  = true;
 
-  bool anyPlayerPresent = (bluePresent || redPresent);
+  bool anyPlayerPresent = (magPresent || bluePresent || redPresent);
 
   char teamCharAdv = ADV_PRESENCE_VALUE_NONE;
+
   if (bluePresent && redPresent) {
-    teamCharAdv = ADV_PRESENCE_VALUE_BOTH;  
+    // both switches: keep previous behavior
+    teamCharAdv = ADV_PRESENCE_VALUE_BOTH;
   } else if (bluePresent) {
     teamCharAdv = ADV_PRESENCE_VALUE_BLU;
   } else if (redPresent) {
     teamCharAdv = ADV_PRESENCE_VALUE_RED;
+  } else if (magPresent) {
+    // magnet-only presence: team unknown
+    teamCharAdv = ADV_PRESENCE_VALUE_MAG;
+  } else {
+    teamCharAdv = ADV_PRESENCE_VALUE_NONE;
   }
 
   // ----------------- LED state -----------------
@@ -349,33 +248,35 @@ void loop() {
     // Blinking green when ready to capture but nobody on
     statusLed.setFastBlink(COLOR_GREEN);
   } else {
-    // Solid red when red only, solid blue when blue only,
-    // solid purple when both present.
+    // If switches say something, trust them for color.
     if (bluePresent && redPresent) {
       statusLed.setSolid(COLOR_PURPLE);  // both
-    } else if (redPresent) {
-      statusLed.setSolid(COLOR_RED);
     } else if (bluePresent) {
       statusLed.setSolid(COLOR_BLUE);
+    } else if (redPresent) {
+      statusLed.setSolid(COLOR_RED);
+    } else if (magPresent) {
+      // magnet-only presence: solid green
+      statusLed.setSolid(COLOR_GREEN);
     } else {
-      // Fallback
+      // Fallback (shouldn't really hit)
       statusLed.setSolid(COLOR_GRAY);
     }
   }
 
-  // Debug for team presence
-  if (anyPlayerPresent) {
-    if (redPresent && !bluePresent) {
-      Serial.println(">P: 1");  // red only
-    } else if (bluePresent && !redPresent) {
-      Serial.println(">P: 2");  // blue only
-    } else if (bluePresent && redPresent) {
-      Serial.println(">P: 3");  // both
-    } else {
-      Serial.println(">P: 4");  // should not happen
-    }
+  // Debug for presence breakdown
+  if (!anyPlayerPresent) {
+    Serial.println(">P: 0");  // nobody
+  } else if (bluePresent && !redPresent && !magPresent) {
+    Serial.println(">P: 1");  // blue only (switch)
+  } else if (redPresent && !bluePresent && !magPresent) {
+    Serial.println(">P: 2");  // red only (switch)
+  } else if (bluePresent && redPresent) {
+    Serial.println(">P: 3");  // both switches
+  } else if (magPresent && !bluePresent && !redPresent) {
+    Serial.println(">P: 4");  // magnet only
   } else {
-    Serial.println(">P: 0");
+    Serial.println(">P: 5");  // mixed case (switch + magnet)
   }
 
   // BLE FSM (includes combined teamCharAdv)
