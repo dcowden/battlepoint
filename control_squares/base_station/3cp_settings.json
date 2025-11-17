@@ -1,0 +1,20 @@
+{
+  "capture_seconds": 5,
+  "capture_button_threshold_seconds": 2,
+  "time_limit_seconds": 600,
+  "start_delay_seconds": 5,
+  "add_time_per_first_capture_seconds": 111,
+  "control_square_mapping": {
+    "cp_1_squares": [
+      1
+    ],
+    "cp_2_squares": [
+      2
+    ],
+    "cp_3_squares": [
+      3
+    ]
+  },
+  "volume": 10,
+  "brightness": 50
+}

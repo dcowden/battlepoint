@@ -9,6 +9,8 @@ import time
 from battlepoint_core import (
     Clock,
     BluetoothTag,
+    Team,
+    TagType
 )
 
 MAX_PLAYERS_PER_TEAM = 3
@@ -26,7 +28,17 @@ except ImportError:
 
 class EnhancedBLEScanner:
     _CS_PREFIX = "CS-"
+    _PLAYER_PREFIX="PT-"
     FRESH_WINDOW_MS = 750  # slightly generous; adjust if you want tighter
+    _ALLOWED_PREFIXES = (_CS_PREFIX, _PLAYER_PREFIX)
+
+    @classmethod
+    def _is_ours(cls, name: str | None) -> bool:
+        """Return True if this looks like one of our devices based on the name."""
+        if not name:
+            return False
+        return any(name.startswith(prefix) for prefix in cls._ALLOWED_PREFIXES)
+
 
     def __init__(self, clock: Clock, linux_adapter_index: int = 1):
         """
@@ -124,6 +136,9 @@ class EnhancedBLEScanner:
         address = device.address
         rssi = advertisement_data.rssi
         current_time = self.clock.milliseconds()
+
+        if not EnhancedBLEScanner._is_ours(name):
+            return
 
         mfg_ascii = ""
         if advertisement_data.manufacturer_data:
@@ -571,6 +586,71 @@ class EnhancedBLEScanner:
         red = min(red, MAX_PLAYERS_PER_TEAM)
         blu = min(blu, MAX_PLAYERS_PER_TEAM)
         return {"red": red, "blu": blu}
+
+
+    def get_player_counts_for_squares(self, square_ids: List[int]) -> Dict[str, int]:
+        """
+        Get player counts only for specified control square IDs.
+
+        square_ids: e.g. [1, 2] meaning CS-01, CS-02.
+        """
+
+        if not square_ids:
+            return {"red": 0, "blu": 0}
+
+        wanted = set(int(s) for s in square_ids)
+        red = 0
+        blu = 0
+        now = self.clock.milliseconds()
+        fresh_ms = self.fresh_window_ms
+
+        with self._lock:
+            for _, info in self.devices.items():
+                # Only control squares
+                if not self._is_control_square(info):
+                    continue
+
+                last_seen = info.get("last_seen", 0.0) or 0.0
+                age = now - last_seen
+                if age > fresh_ms:
+                    continue
+
+                # Determine square index from name or manufacturer payload
+                square_idx = None
+                name = (info.get("name") or "").strip().upper()
+                if name.startswith(self._CS_PREFIX):
+                    # CS-01, CS-02, ...
+                    try:
+                        square_idx = int(name.split("-")[1])
+                    except Exception:
+                        square_idx = None
+
+                if square_idx is None:
+                    mf = info.get("manufacturer_data") or ""
+                    parts = mf.split(",")
+                    if len(parts) >= 2:
+                        tile = parts[1].strip().upper()
+                        if tile.startswith(self._CS_PREFIX):
+                            try:
+                                square_idx = int(tile.split("-")[1])
+                            except Exception:
+                                square_idx = None
+
+                if square_idx is None or square_idx not in wanted:
+                    continue
+
+                # Count team from manufacturer data
+                mf = info.get("manufacturer_data") or ""
+                team_letter = self.get_player_color(mf)
+                if team_letter == "B":
+                    blu += 1
+                elif team_letter == "R":
+                    red += 1
+
+        red = min(red, MAX_PLAYERS_PER_TEAM)
+        blu = min(blu, MAX_PLAYERS_PER_TEAM)
+        return {"red": red, "blu": blu}
+
 
 # ======================================================================
 # Stand-alone CLI test harness
