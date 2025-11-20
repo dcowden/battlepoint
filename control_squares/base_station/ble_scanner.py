@@ -61,7 +61,7 @@ class EnhancedBLEScanner:
         self._scanner: Optional["BleakScanner"] = None
         self._want_scan: bool = False
         self._thread: Optional[threading.Thread] = None
-               self._thread_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._thread_loop: Optional[asyncio.AbstractEventLoop] = None
 
         # Linux (aioblescan) bits
         self._linux_adapter_index = linux_adapter_index
