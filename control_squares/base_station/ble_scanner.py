@@ -1,8 +1,10 @@
+import traceback
+from typing import Optional, List, Dict
 import asyncio
 import sys
 import threading
 import time
-from typing import Optional, List, Dict
+import struct
 
 from battlepoint_core import (
     Clock,
@@ -24,9 +26,22 @@ except ImportError:
     BleakScanner = None
 
 
+# ============================================================================
+# CONFIG / CONSTANTS
+# ============================================================================
+
+# We consider something "ours" if its manufacturer ASCII contains a tile id
+# like CS-01, CS-02, etc. Either:
+#   "CS-02,..."      (tile id first)
+#   "B,CS-02,..."    (team, tile id, ...)
+_TILE_PREFIX = "CS-"
+_TEAM_CHARS = ("B", "R")
+
+
 class EnhancedBLEScanner:
     _CS_PREFIX = "CS-"
-    FRESH_WINDOW_MS = 750  # ms window to consider a tile "fresh"
+    _PLAYER_PREFIX = "PT-"
+    FRESH_WINDOW_MS = 750  # slightly generous; adjust if you want tighter
 
     def __init__(self, clock: Clock, linux_adapter_index: int = 1):
         """
@@ -49,7 +64,7 @@ class EnhancedBLEScanner:
         self._thread: Optional[threading.Thread] = None
         self._thread_loop: Optional[asyncio.AbstractEventLoop] = None
 
-        # Linux (aioblescan) bits
+        # Linux (aioblescan socket) bits
         self._linux_adapter_index = linux_adapter_index
         self._linux_transport = None
         self._linux_btctrl = None
@@ -59,40 +74,10 @@ class EnhancedBLEScanner:
 
         # DEBUG: track last callback time per address for gap measurement
         self._last_cb_time_by_addr: Dict[str, int] = {}
+        self._cb_count_by_addr: Dict[str, int] = {}
 
         if self._is_windows:
             self._start_windows_thread()
-
-    # ======================================================================
-    # UTILS: manufacturer parsing
-    # ======================================================================
-
-    @staticmethod
-    def _decode_mfg_bytes(raw: bytes) -> str:
-        """Decode manufacturer bytes as ASCII (fallback to hex)."""
-        if not raw:
-            return ""
-        try:
-            return raw.decode("ascii", errors="ignore")
-        except Exception:
-            return raw.hex()
-
-    @classmethod
-    def _tile_id_from_mfg(cls, mfg_ascii: str) -> Optional[str]:
-        """
-        Extract tile id from manufacturer string.
-
-        We look for any comma-separated token that starts with "CS-",
-        e.g. "B,CS-02,PT-UNK,1234" -> "CS-02".
-        """
-        if not mfg_ascii:
-            return None
-        parts = mfg_ascii.split(",")
-        for p in parts:
-            token = p.strip().upper()
-            if token.startswith(cls._CS_PREFIX):
-                return token  # we store tile_id uppercase for consistency
-        return None
 
     # ======================================================================
     # WINDOWS PATH (Bleak)
@@ -147,136 +132,41 @@ class EnhancedBLEScanner:
 
     def _bleak_callback(self, device, advertisement_data):
         """
-        Windows path: only cares about manufacturer data.
-        If manufacturer segment contains a CS-xx token, it's ours.
+        Windows path: we still trust Bleak to give us per-advert data.
         """
+        name = device.name or ""
         address = device.address
         rssi = advertisement_data.rssi
-        mfg_ascii = ""
+        current_time = self.clock.milliseconds()
 
+        mfg_ascii = ""
         if advertisement_data.manufacturer_data:
-            # Grab first entry
             for _, data_bytes in advertisement_data.manufacturer_data.items():
-                mfg_ascii = self._decode_mfg_bytes(data_bytes)
+                try:
+                    mfg_ascii = data_bytes.decode("ascii", errors="ignore")
+                except Exception:
+                    mfg_ascii = data_bytes.hex()
                 break
 
-        tile_id = self._tile_id_from_mfg(mfg_ascii)
-        if not tile_id:
-            # Not a control square
+        tile_id, logical_name = self._extract_tile_from_mfg(mfg_ascii)
+        if tile_id is None:
+            # Not one of ours
             return
-
-        now_ms = self.clock.milliseconds()
-
-        # Raw debug
-        print(f"[BLE RAW] peer={address} rssi={rssi:4d} mf='{mfg_ascii}' tile_id={tile_id}")
 
         self._record_observation(
             address=address,
-            tile_name=tile_id,  # we use tile_id as the "name"
+            logical_name=logical_name,
             rssi=rssi,
             mfg_ascii=mfg_ascii,
-            now_ms=now_ms,
+            now_ms=current_time,
         )
 
     # ======================================================================
-    # LINUX PATH (aioblescan)
+    # LINUX PATH — manual HCI parsing
     # ======================================================================
 
-    def _decode_aiobs_mfg(self, mfg_obj) -> str:
-        """
-        Extract ASCII manufacturer data from aioblescan Manufacturer Specific Data.
-        """
-        if mfg_obj is None:
-            return ""
-
-        payload = getattr(mfg_obj, "payload", None)
-
-        raw = None
-        if isinstance(payload, (bytes, bytearray)):
-            raw = bytes(payload)
-        elif isinstance(payload, list):
-            # Typical aioblescan structure: [company_id, Itself(raw_bytes)]
-            for part in payload:
-                if hasattr(part, "payload") and isinstance(part.payload, (bytes, bytearray)):
-                    raw = bytes(part.payload)
-                    break
-                if hasattr(part, "val") and isinstance(part.val, (bytes, bytearray)):
-                    raw = bytes(part.val)
-                    break
-
-        if raw is None:
-            return ""
-
-        return self._decode_mfg_bytes(raw)
-
-    def _aiobs_process(self, data: bytes) -> None:
-        """
-        aioblescan callback (Linux), **manufacturer-only** approach.
-
-        - Decode HCI event.
-        - Iterate each sub-event in ev.events (or ev itself if no sub-events).
-        - For each sub-event:
-            * Decode manufacturer payload (from that subevent).
-            * If it doesn't contain CS-xx, ignore it.
-            * Get peer address + RSSI (from that subevent).
-            * Record observation.
-        """
-        try:
-            ev = aiobs.HCI_Event()
-            ev.decode(data)
-        except Exception as e:
-            print(f"[BLE] aioblescan decode error: {e!r}")
-            return
-
-        subevents = getattr(ev, "events", None)
-        if not subevents:
-            subevents = [ev]
-
-        for pkt in subevents:
-            try:
-                # Manufacturer data per subevent
-                mfg_ascii = ""
-                mfg_items = pkt.retrieve("Manufacturer Specific Data")
-                if mfg_items:
-                    mfg_ascii = self._decode_aiobs_mfg(mfg_items[0])
-
-                # If no manufacturer data, ignore this subevent
-                if not mfg_ascii:
-                    continue
-
-                # Extract tile id purely from manufacturer segment
-                tile_id = self._tile_id_from_mfg(mfg_ascii)
-                if not tile_id:
-                    # Not one of our control squares
-                    continue
-
-                # MAC address per subevent
-                peer = pkt.retrieve("peer")
-                if not peer:
-                    continue
-                address = peer[0].val.lower()
-
-                # RSSI per subevent
-                rssi_items = pkt.retrieve("rssi")
-                rssi = rssi_items[0].val if rssi_items else 0
-
-                # Raw debug for every **tile** advert
-                print(f"[BLE RAW] peer={address} rssi={rssi:4d} mf='{mfg_ascii}' tile_id={tile_id}")
-
-                now_ms = self.clock.milliseconds()
-                self._record_observation(
-                    address=address,
-                    tile_name=tile_id,  # just use tile_id as the name
-                    rssi=rssi,
-                    mfg_ascii=mfg_ascii,
-                    now_ms=now_ms,
-                )
-
-            except Exception as e:
-                print(f"[BLE] aioblescan subevent error: {e!r}")
-
     def _start_linux_thread(self):
-        """Start the dedicated Linux aioblescan thread + event loop."""
+        """Start the dedicated Linux scanner thread + event loop."""
         if self._linux_thread is not None:
             return
 
@@ -294,7 +184,6 @@ class EnhancedBLEScanner:
         """Runs in the Linux scanner thread's event loop."""
         try:
             sock = aiobs.create_bt_socket(self._linux_adapter_index)
-
             loop = asyncio.get_event_loop()
             fac = loop._create_connection_transport(  # type: ignore[attr-defined]
                 sock, aiobs.BLEScanRequester, None, None
@@ -303,23 +192,25 @@ class EnhancedBLEScanner:
 
             self._linux_transport = transport
             self._linux_btctrl = btctrl
-            btctrl.process = self._aiobs_process
+
+            # IMPORTANT: we ignore aioblescan's decoder and parse HCI by hand
+            btctrl.process = self._aiobs_process_raw
 
             while True:
                 try:
                     if self._linux_want_scan and not self._scanning:
                         await btctrl.send_scan_request(0)
                         self._scanning = True
-                        print(f"[BLE] (linux/aioblescan) scanning started on hci{self._linux_adapter_index}")
+                        print(f"[BLE] (linux) scanning started on hci{self._linux_adapter_index}")
                     elif not self._linux_want_scan and self._scanning:
                         try:
                             await btctrl.stop_scan_request()
                         except Exception as e:
-                            print(f"[BLE] (linux/aioblescan) stop_scan_request error: {e!r}")
+                            print(f"[BLE] (linux) stop_scan_request error: {e!r}")
                         self._scanning = False
-                        print(f"[BLE] (linux/aioblescan) scanning stopped on hci{self._linux_adapter_index}")
+                        print(f"[BLE] (linux) scanning stopped on hci{self._linux_adapter_index}")
                 except Exception as e:
-                    print(f"[BLE] (linux/aioblescan) main loop error: {e!r}")
+                    print(f"[BLE] (linux) main loop error: {e!r}")
 
                 await asyncio.sleep(0.2)
 
@@ -329,61 +220,319 @@ class EnhancedBLEScanner:
             self._linux_transport = None
             self._linux_btctrl = None
             self._scanning = False
-            print(f"[BLE] (linux/aioblescan) scanner thread exiting on hci{self._linux_adapter_index}")
+            print(f"[BLE] (linux) scanner thread exiting on hci{self._linux_adapter_index}")
+
+    # ---------- Raw HCI parser ----------
+
+    def _aiobs_process_raw(self, data: bytes) -> None:
+        """
+        Called by aioblescan BLEScanRequester with raw HCI event bytes.
+
+        We ignore aioblescan's high-level decode and instead parse LE
+        Advertising Report (0x02) and LE Extended Advertising Report (0x0D)
+        manually to avoid the "mixed mfg data across devices" bug.
+        """
+        try:
+            if not data or len(data) < 3:
+                return
+
+            # HCI LE Meta Event format used by aioblescan:
+            #   byte 0: event code (0x3E)
+            #   byte 1: parameter length
+            #   byte 2: subevent code (0x02 adv report, 0x0D ext adv report, ...)
+            event_code = data[0]
+            if event_code != 0x3E:
+                return
+
+            param_len = data[1]
+            # Make sure we don't walk past the buffer if kernel lies
+            if 2 + param_len > len(data):
+                param_len = len(data) - 2
+
+            subevent = data[2]
+            now_ms = self.clock.milliseconds()
+
+            if subevent == 0x02:
+                self._parse_legacy_adv_reports(data, 3, now_ms)
+            elif subevent == 0x0D:
+                self._parse_ext_adv_reports(data, 3, now_ms)
+            else:
+                # Ignore other LE Meta subevents
+                return
+
+        except Exception as e:
+            print(f"[BLE RAW] parse error: {e!r}")
+            # Debug: uncomment to see raw
+            # print("RAW:", data.hex())
+
+    def _parse_legacy_adv_reports(self, buf: bytes, offset: int, now_ms: int) -> None:
+        """
+        Parse LE Advertising Report (subevent 0x02).
+
+        Layout (per spec):
+            num_reports: 1 byte
+            For each report:
+              event_type: 1 byte
+              address_type: 1 byte
+              address: 6 bytes (LSB first)
+              data_len: 1 byte
+              data: data_len bytes
+              rssi: 1 byte (signed)
+        """
+        if offset >= len(buf):
+            return
+
+        num_reports = buf[offset]
+        offset += 1
+
+        for _ in range(num_reports):
+            if offset + 9 > len(buf):
+                break
+
+            evt_type = buf[offset]
+            addr_type = buf[offset + 1]
+            addr_bytes = buf[offset + 2 : offset + 8]
+            offset += 8
+
+            data_len = buf[offset]
+            offset += 1
+
+            if offset + data_len + 1 > len(buf):
+                break
+
+            adv_data = buf[offset : offset + data_len]
+            offset += data_len
+
+            rssi_raw = buf[offset]
+            offset += 1
+            rssi = struct.unpack("b", bytes([rssi_raw]))[0]
+
+            address = ":".join(f"{b:02x}" for b in addr_bytes[::-1])
+
+            mfg_ascii = self._extract_mfg_from_adv_data(adv_data)
+
+            print(f"[BLE RAW-L] peer={address} rssi={rssi:4d} mfg='{mfg_ascii}'")
+
+            tile_id, logical_name = self._extract_tile_from_mfg(mfg_ascii)
+            if tile_id is None:
+                continue  # not one of ours
+
+            self._record_observation(
+                address=address,
+                logical_name=logical_name,
+                rssi=rssi,
+                mfg_ascii=mfg_ascii,
+                now_ms=now_ms,
+            )
+
+    def _parse_ext_adv_reports(self, buf: bytes, offset: int, now_ms: int) -> None:
+        """
+        Parse LE Extended Advertising Report (subevent 0x0D).
+
+        Layout (per spec):
+            num_reports: 1 byte
+            For each report:
+              event_type: 2 bytes (LE Extended Adv Event Type)
+              address_type: 1 byte
+              address: 6 bytes (LSB first)
+              primary_phy: 1
+              secondary_phy: 1
+              adv_sid: 1
+              tx_power: 1
+              rssi: 1 (signed, 127 means 'not available')
+              periodic_adv_interval: 2
+              direct_addr_type: 1
+              direct_addr: 6
+              data_len: 1
+              data: data_len bytes
+        """
+        if offset >= len(buf):
+            return
+
+        num_reports = buf[offset]
+        offset += 1
+
+        for _ in range(num_reports):
+            # Fixed header size before data_len: 2 + 1 + 6 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + 6 + 1 = 24
+            if offset + 24 > len(buf):
+                break
+
+            evt_type = buf[offset] | (buf[offset + 1] << 8)
+            offset += 2
+
+            addr_type = buf[offset]
+            offset += 1
+
+            addr_bytes = buf[offset : offset + 6]
+            offset += 6
+
+            primary_phy = buf[offset]
+            secondary_phy = buf[offset + 1]
+            offset += 2
+
+            adv_sid = buf[offset]
+            offset += 1
+
+            tx_power = buf[offset]
+            offset += 1
+
+            rssi_raw = buf[offset]
+            offset += 1
+            # 127 == "RSSI not available"
+            if rssi_raw == 127:
+                rssi = 0
+            else:
+                rssi = struct.unpack("b", bytes([rssi_raw]))[0]
+
+            periodic_interval = buf[offset] | (buf[offset + 1] << 8)
+            offset += 2
+
+            direct_addr_type = buf[offset]
+            offset += 1
+
+            direct_addr_bytes = buf[offset : offset + 6]
+            offset += 6
+
+            if offset >= len(buf):
+                break
+
+            data_len = buf[offset]
+            offset += 1
+
+            if offset + data_len > len(buf):
+                break
+
+            adv_data = buf[offset : offset + data_len]
+            offset += data_len
+
+            address = ":".join(f"{b:02x}" for b in addr_bytes[::-1])
+
+            mfg_ascii = self._extract_mfg_from_adv_data(adv_data)
+
+            print(f"[BLE RAW-E] peer={address} rssi={rssi:4d} mfg='{mfg_ascii}'")
+
+            tile_id, logical_name = self._extract_tile_from_mfg(mfg_ascii)
+            if tile_id is None:
+                continue  # not one of ours
+
+            self._record_observation(
+                address=address,
+                logical_name=logical_name,
+                rssi=rssi,
+                mfg_ascii=mfg_ascii,
+                now_ms=now_ms,
+            )
+
+    # ---------- AD & manufacturer parsing ----------
+
+    def _extract_mfg_from_adv_data(self, adv_data: bytes) -> str:
+        """
+        Parse the AD structures (Length, Type, Value...) and return the first
+        Manufacturer Specific Data (type 0xFF) as ASCII, or "" if none.
+        """
+        i = 0
+        n = len(adv_data)
+        while i < n:
+            length = adv_data[i]
+            if length == 0:
+                break
+            if i + length >= n:
+                break
+
+            ad_type = adv_data[i + 1]
+            value = adv_data[i + 2 : i + 1 + length]
+
+            if ad_type == 0xFF:  # Manufacturer Specific Data
+                # First 2 bytes are company ID (little-endian)
+                if len(value) >= 2:
+                    payload = value[2:]
+                else:
+                    payload = b""
+                try:
+                    return payload.decode("ascii", errors="ignore")
+                except Exception:
+                    return payload.hex()
+
+            i += length + 1
+
+        return ""
+
+    def _extract_tile_from_mfg(self, mfg_ascii: str) -> (Optional[str], Optional[str]):
+        """
+        From manufacturer ASCII, decide if this is one of our tiles and
+        return (tile_id, logical_name).
+
+        We support two formats:
+          1) "CS-02,..."      -> tile_id="CS-02"
+          2) "B,CS-02,..."    -> team, tile_id, ...
+        """
+        if not mfg_ascii:
+            return None, None
+
+        s = mfg_ascii.strip()
+        tile_id = None
+
+        # Format 1: "CS-02,...."
+        if s.startswith(_TILE_PREFIX):
+            tile_id = s.split(",", 1)[0].strip()
+
+        # Format 2: "B,CS-02,PT-...,..." etc.
+        if tile_id is None:
+            parts = s.split(",")
+            if len(parts) >= 2:
+                team = parts[0].strip().upper()
+                maybe_tile = parts[1].strip().upper()
+                if maybe_tile.startswith(_TILE_PREFIX):
+                    tile_id = maybe_tile
+
+        if tile_id is None:
+            return None, None
+
+        logical_name = tile_id  # what we show as "name"
+        return tile_id, logical_name
 
     # ======================================================================
-    # RECORD OBSERVATIONS
+    # SHARED RECORD / SUMMARY
     # ======================================================================
 
-    def _record_observation(self, address: str, tile_name: str, rssi: int, mfg_ascii: str, now_ms: int):
+    def _record_observation(
+        self,
+        address: str,
+        logical_name: str,
+        rssi: int,
+        mfg_ascii: str,
+        now_ms: int,
+    ):
         """
-        Shared between Linux (aioblescan) and Windows (Bleak) paths.
-        This is where we update self.devices and debug-log gaps.
-
-        - tile_name is already the tile_id (e.g., "CS-02").
-        - We track cb_count and last_gap_ms per MAC.
+        Update self.devices for a single adv from a specific MAC.
         """
-
-        # 1) Per-address callback gaps
         prev = self._last_cb_time_by_addr.get(address)
-        gap = None
+        cb_count = self._cb_count_by_addr.get(address, 0) + 1
+        self._cb_count_by_addr[address] = cb_count
+
         if prev is not None:
             gap = now_ms - prev
             print(
-                f"[BLE] cb addr={address} name={tile_name} "
+                f"[BLE] cb addr={address} name={logical_name} "
                 f"gap={gap:4d}ms rssi={rssi:4d} mf='{mfg_ascii}'"
             )
         else:
             print(
-                f"[BLE] first cb addr={address} name={tile_name} "
+                f"[BLE] first cb addr={address} name={logical_name} "
                 f"rssi={rssi:4d} mf='{mfg_ascii}'"
             )
 
         self._last_cb_time_by_addr[address] = now_ms
 
-        # 2) Store/update device record
         with self._lock:
-            info = self.devices.get(address)
-            if info is None:
-                info = {
-                    "name": tile_name,
-                    "rssi": rssi,
-                    "address": address,
-                    "manufacturer_data": mfg_ascii,
-                    "last_seen": now_ms,
-                    "cb_count": 0,
-                    "last_gap_ms": None,
-                }
-                self.devices[address] = info
-
-            # update dynamic fields
-            info["name"] = tile_name
-            info["rssi"] = rssi
-            info["manufacturer_data"] = mfg_ascii
-            info["last_seen"] = now_ms
-            info["cb_count"] = info.get("cb_count", 0) + 1
-            if gap is not None:
-                info["last_gap_ms"] = gap
+            self.devices[address] = {
+                "name": logical_name,
+                "rssi": rssi,
+                "address": address,
+                "manufacturer_data": mfg_ascii,
+                "last_seen": now_ms,
+                "cb_count": cb_count,
+            }
 
     # ======================================================================
     # PUBLIC API: start/stop
@@ -391,11 +540,9 @@ class EnhancedBLEScanner:
 
     async def start_scanning(self):
         if self._is_windows:
-            # Windows → tell the Bleak thread to start
             self._want_scan = True
             return
 
-        # Linux: run aioblescan in its own thread/loop
         self._linux_want_scan = True
         if self._linux_thread is None:
             self._start_linux_thread()
@@ -405,7 +552,6 @@ class EnhancedBLEScanner:
             self._want_scan = False
             return
 
-        # Linux: just flip the flag; the Linux scanner thread will stop the scan
         self._linux_want_scan = False
 
     # ======================================================================
@@ -417,15 +563,20 @@ class EnhancedBLEScanner:
             current_time = self.clock.milliseconds()
             device_list = []
             for address, info in self.devices.items():
+                age = int(current_time - info["last_seen"])
                 device_list.append(
                     {
                         "name": info["name"],
                         "rssi": info["rssi"],
                         "address": address,
-                        "last_seen_ms": int(current_time - info["last_seen"]),
+                        "last_seen_ms": age,
                         "manufacturer_data": info["manufacturer_data"],
                         "cb_count": info.get("cb_count", 0),
-                        "last_gap_ms": info.get("last_gap_ms"),
+                        "last_gap_ms": (
+                            (current_time - self._last_cb_time_by_addr[address])
+                            if address in self._last_cb_time_by_addr
+                            else None
+                        ),
                     }
                 )
 
@@ -443,7 +594,7 @@ class EnhancedBLEScanner:
         # Kept for compatibility; currently unused.
         return []
 
-    # ---------- Helper parsing ----------
+    # ---------- Helper parsing for team ----------
 
     def get_player_color(self, manufacturer_data: str) -> Optional[str]:
         """
@@ -471,11 +622,23 @@ class EnhancedBLEScanner:
     def _is_control_square(self, info: dict) -> bool:
         """
         Decide if this device should count as a tile.
-
-        Now purely name-based: name is tile_id derived from manufacturer.
         """
-        name = (info.get("name") or "").strip().upper()
-        return name.startswith(self._CS_PREFIX)
+        name = (info.get("name") or "").strip()
+        if name.startswith(self._CS_PREFIX):
+            return True
+
+        mf = info.get("manufacturer_data") or ""
+        if not mf:
+            return False
+
+        parts = mf.split(",")
+        if len(parts) >= 2:
+            tile_id = parts[1].strip().upper()
+            if tile_id.startswith(self._CS_PREFIX):
+                info["name"] = tile_id
+                return True
+
+        return False
 
     # ---------- Player count logic ----------
 
@@ -488,7 +651,6 @@ class EnhancedBLEScanner:
         with self._lock:
             for _, info in self.devices.items():
                 if not self._is_control_square(info):
-                    # Only control squares contribute to counts
                     continue
 
                 last_seen = info.get("last_seen", 0.0) or 0.0
@@ -513,7 +675,6 @@ class EnhancedBLEScanner:
 
         square_ids: e.g. [1, 2] meaning CS-01, CS-02.
         """
-
         if not square_ids:
             return {"red": 0, "blu": 0}
 
@@ -525,7 +686,6 @@ class EnhancedBLEScanner:
 
         with self._lock:
             for _, info in self.devices.items():
-                # Only control squares
                 if not self._is_control_square(info):
                     continue
 
@@ -534,7 +694,6 @@ class EnhancedBLEScanner:
                 if age > fresh_ms:
                     continue
 
-                # Determine square index from name (CS-xx)
                 square_idx = None
                 name = (info.get("name") or "").strip().upper()
                 if name.startswith(self._CS_PREFIX):
@@ -543,10 +702,20 @@ class EnhancedBLEScanner:
                     except Exception:
                         square_idx = None
 
+                if square_idx is None:
+                    mf = info.get("manufacturer_data") or ""
+                    parts = mf.split(",")
+                    if len(parts) >= 2:
+                        tile = parts[1].strip().upper()
+                        if tile.startswith(self._CS_PREFIX):
+                            try:
+                                square_idx = int(tile.split("-")[1])
+                            except Exception:
+                                square_idx = None
+
                 if square_idx is None or square_idx not in wanted:
                     continue
 
-                # Count team from manufacturer data
                 mf = info.get("manufacturer_data") or ""
                 team_letter = self.get_player_color(mf)
                 if team_letter == "B":
@@ -573,7 +742,7 @@ async def _cli_main(adapter_index: int = 1):
     """
     Runs a simple loop printing scanner status every second.
     On Windows: uses Bleak.
-    On Linux:   uses aioblescan on hci<adapter_index>.
+    On Linux:   uses raw HCI parsing on hci<adapter_index>.
     """
     clock = _MonotonicClock()
     scanner = EnhancedBLEScanner(clock, linux_adapter_index=adapter_index)
@@ -593,19 +762,17 @@ async def _cli_main(adapter_index: int = 1):
                   f"device_count={summary['device_count']}")
             print(f"[BLE TEST] players: RED={counts['red']}  BLU={counts['blu']}")
 
-            # Show only CS-* tiles for clarity
             for dev in summary["devices"]:
                 name = dev["name"]
                 if name.startswith("CS-"):
-                    cb_count = dev.get("cb_count", 0)
-                    last_gap = dev.get("last_gap_ms", None)
-                    lg = f"{last_gap:4d}ms" if last_gap is not None else "----"
+                    last_gap = dev["last_gap_ms"]
+                    last_gap_str = f"{last_gap:4d}ms" if last_gap is not None else "----"
                     print(
                         f"  {name} {dev['address']}  "
                         f"age={dev['last_seen_ms']:4d}ms  "
                         f"rssi={dev['rssi']:4d}  "
                         f"mfg='{dev['manufacturer_data']}'  "
-                        f"cb_count={cb_count:5d}  last_gap={lg}"
+                        f"cb_count={dev['cb_count']:5d}  last_gap={last_gap_str}"
                     )
 
     except KeyboardInterrupt:
@@ -614,8 +781,6 @@ async def _cli_main(adapter_index: int = 1):
 
 
 if __name__ == "__main__":
-    # Allow: python ble_scanner.py
-    # Or:    python ble_scanner.py 0   to use hci0 instead of hci1.
     idx = 1
     if len(sys.argv) >= 2:
         try:
@@ -626,6 +791,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(_cli_main(adapter_index=idx))
     except RuntimeError:
-        # Allows running from interactive event loops
         loop = asyncio.get_event_loop()
         loop.run_until_complete(_cli_main(adapter_index=idx))
