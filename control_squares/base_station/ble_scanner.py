@@ -16,7 +16,7 @@ from battlepoint_core import (
 MAX_PLAYERS_PER_TEAM = 3
 
 # Toggle this to enable/disable "is this ours?" filtering
-ENABLE_OURS_FILTER = True
+ENABLE_OURS_FILTER = False
 
 # Only import aioblescan on non-Windows
 if sys.platform != "win32":
@@ -276,11 +276,11 @@ class EnhancedBLEScanner:
                 rssi = rssi_items[0].val if rssi_items else 0
 
                 # Raw debug for every subevent
-                print(f"[BLE RAW] peer={address} name='{tile_name}' rssi={rssi:4d} mf='{mfg_ascii}'")
+                # print(f"[BLE RAW] peer={address} name='{tile_name}' rssi={rssi:4d} mf='{mfg_ascii}'")
 
                 # Optional early filter using the rules above
                 if ENABLE_OURS_FILTER and not self._is_our_device(tile_name, mfg_ascii):
-                    print(f"[BLE RAW]   -> filtered out (not ours)")
+                    #print(f"[BLE RAW]   -> filtered out (not ours)")
                     continue
 
                 now_ms = self.clock.milliseconds()
