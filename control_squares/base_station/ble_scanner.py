@@ -222,84 +222,12 @@ class EnhancedBLEScanner:
 
         return False
 
-    def _extract_local_name_from_hci(self, packet: bytes) -> str:
-        """
-        Try to extract Shortened/Complete Local Name (AD type 0x08 / 0x09)
-        directly from the HCI LE Advertising Report packet.
-
-        This is adapted from typical HCI AD parsing logic (see ble_monitor, etc.).
-        It handles both legacy and extended advertising.
-        """
-        try:
-            if len(packet) < 12:
-                return ""
-
-            # HCI event length as in standard LE meta event
-            packet_size = packet[2] + 3
-            if packet_size > len(packet):
-                # malformed / truncated, bail
-                return ""
-
-            is_ext_packet = (packet[3] == 0x0D)  # 0x0D = LE Extended Advertising Report
-            payload_start = 29 if is_ext_packet else 14
-            if payload_start >= len(packet):
-                return ""
-
-            # length of the advertising data payload
-            payload_size = packet[payload_start - 1]
-            if payload_size <= 0:
-                return ""
-
-            # Where the AD structures actually begin
-            idx = payload_start
-            remaining = payload_size
-
-            best_name = None
-
-            # Walk the AD structures
-            while remaining > 1 and idx < len(packet):
-                if idx >= len(packet):
-                    break
-
-                field_len = packet[idx]
-                if field_len == 0:
-                    break
-
-                record_size = field_len + 1  # length byte + data
-                if record_size > remaining or (idx + record_size) > len(packet):
-                    break
-
-                record = packet[idx: idx + record_size]
-                ad_type = record[1]
-                value = record[2: 2 + field_len - 1]
-
-                # 0x08 = Shortened Local Name, 0x09 = Complete Local Name
-                if ad_type in (0x08, 0x09):
-                    try:
-                        name = value.decode("utf-8", errors="replace")
-                    except Exception:
-                        name = ""
-
-                    if name:
-                        # Prefer the longest name we see
-                        if best_name is None or len(name) > len(best_name):
-                            best_name = name
-
-                idx += record_size
-                remaining -= record_size
-
-            return best_name or ""
-        except Exception as e:
-            print(f"[BLE] aioblescan local-name parse error: {e!r}")
-            return ""
-
     def _aiobs_process(self, data: bytes) -> None:
         """
         aioblescan callback (Linux) with correct per-advert processing.
 
-        FIXED: Process each advertising report independently by decoding
-        the full HCI event once, then handling each subevent separately.
-        Each subevent contains its own complete advertising data.
+        FIXED: Each subevent is completely independent. We no longer use
+        the broken HCI fallback that was mixing names between devices.
         """
         try:
             ev = aiobs.HCI_Event()
@@ -328,31 +256,27 @@ class EnhancedBLEScanner:
                 rssi = rssi_items[0].val if rssi_items else 0
 
                 # Step 3: Get manufacturer data for THIS subevent ONLY
-                # This is the key fix - retrieve must be called on the subevent pkt
                 mfg_ascii = ""
                 mfg_items = pkt.retrieve("Manufacturer Specific Data")
                 if mfg_items:
                     mfg_ascii = self._decode_aiobs_mfg(mfg_items[0])
 
                 # Step 4: Get local name for THIS subevent ONLY
+                # This is retrieved from the parsed AD structures in THIS subevent
                 tile_name = ""
                 name_items = pkt.retrieve("Complete Local Name") or pkt.retrieve("Short Local Name")
                 if name_items:
                     tile_name = name_items[0].val
 
-                # Step 5: Fallback - parse local name directly from raw HCI if needed
-                # Note: This might not work correctly for multi-device reports
-                # but is kept as a last resort
-                if not tile_name:
-                    hci_name = self._extract_local_name_from_hci(data)
-                    if hci_name:
-                        tile_name = hci_name
+                # CRITICAL FIX: Do NOT use _extract_local_name_from_hci as fallback
+                # because it parses the entire HCI packet which may contain multiple
+                # devices, causing names to be assigned to the wrong MAC addresses.
 
-                # Step 6: Filter based on what we actually found for THIS device
+                # Step 5: Filter based on what we actually found for THIS device
                 if ENABLE_OURS_FILTER and not self._is_our_device(tile_name, mfg_ascii):
                     continue
 
-                # Step 7: Record this specific observation
+                # Step 6: Record this specific observation
                 self._record_observation(
                     address=address,
                     tile_name=tile_name,
