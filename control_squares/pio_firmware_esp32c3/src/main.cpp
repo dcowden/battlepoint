@@ -34,6 +34,8 @@ static const bool POSITIVE_Z_IS_BLUE = true;
 static const int SDA_PIN = 8;
 static const int SCL_PIN = 9;
 
+static const char* TILE_ID = "CS-06";
+
 static const char ADV_PRESENCE_VALUE_RED   = 'R';
 static const char ADV_PRESENCE_VALUE_BLU   = 'B';
 static const char ADV_PRESENCE_VALUE_BOTH  = 'T';
@@ -51,7 +53,7 @@ static const int BLUE_SWITCH_PIN = 1;  // closed => blue present
 static const int RED_SWITCH_PIN  = 2;  // closed => red present
 
 // Capture timing for mini control point (10 seconds)
-static const uint32_t CAPTURE_TIME_MS = 5000UL;
+static const uint32_t CAPTURE_TIME_MS = 10000UL;
 
 // Light sleep interval
 static const uint64_t SLEEP_US = 50ULL * 1000ULL;  // 50 ms
@@ -75,7 +77,8 @@ float fDx = 0, fDy = 0, fDz = 0, fDt = 0;
 const float MIN_ON_DT   = 380.0f;
 const float OFF_HYST_DT = 360.0f;
 
-BleReporter reporter;
+BleReporter reporter(TILE_ID);
+
 
 // magnetic presence only (no team inference from field)
 bool  g_playerPresent = false;

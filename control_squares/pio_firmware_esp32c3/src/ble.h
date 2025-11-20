@@ -13,8 +13,6 @@ extern "C" {
 // --------------------- BLE CONFIG (was in main) -----------------------------
 // ============================================================================
 
-// your tile name
-static const char* TILE_ID = "CS-02";
 
 // shared service UUID (goes in SCAN_RSP, not ADV)
 static const char* SHARED_SERVICE_UUID_STR = "12345678-1234-1234-1234-1234567890ab";
@@ -30,7 +28,10 @@ static const esp_power_level_t TILE_TX_POWER = ESP_PWR_LVL_P9;
 
 // ============================================================================
 // --------------- MFG builder: "TEAM,TILE,PLAYER,STRENGTH" -------------------
-static std::string buildManufacturerData_withTeam(char teamChar, const char* playerId, float strength) {
+static std::string buildManufacturerData_withTeam(const char* tileId,
+                                                  char teamChar,
+                                                  const char* playerId,
+                                                  float strength) {
     std::string m;
     // 2-byte company ID
     m.push_back((char)(MFG_COMPANY_ID & 0xFF));
@@ -42,9 +43,9 @@ static std::string buildManufacturerData_withTeam(char teamChar, const char* pla
     if (s > 9999) s = 9999;
 
     char buf[64];
-    // TEAM,TILE,PLAYER,STRENGTH  (TEAM is 'R' or 'B' or special code like 'X' for both)
+    // TILE,TEAM,PLAYER,STRENGTH  (TEAM is 'R' or 'B' or special code like 'X' for both)
     snprintf(buf, sizeof(buf), "%s,%c,%s,%d",
-             TILE_ID,
+             (tileId ? tileId : ""),
              teamChar,
              playerId,
              s);
@@ -52,6 +53,7 @@ static std::string buildManufacturerData_withTeam(char teamChar, const char* pla
     m.append(buf);
     return m;
 }
+
 
 // ============================================================================
 // ------------------- Reporter (BLE) -----------------------------------------
@@ -63,8 +65,9 @@ public:
     ADVERTISING
   };
 
-  BleReporter()
-  : _state(IDLE),
+  BleReporter(const char* tileId)
+  : _tileId(tileId ? tileId : ""),
+    _state(IDLE),
     _pScan(nullptr),
     _scanStart(0),
     _bestRssi(-999),
@@ -74,6 +77,8 @@ public:
     _lastPlayerPresent(false),
     _currentTeamChar('R'),
     _bleStarted(false) {}
+
+
 
   // Now just initializes internal state; BLE hardware is *not* started here.
   void begin() {
@@ -157,7 +162,7 @@ private:
   State _state;
   NimBLEScan* _pScan;
   unsigned long _scanStart;
-
+  std::string _tileId;
   int    _bestRssi;
   String _bestTagName;
   bool   _haveCurrentTag;
@@ -174,7 +179,7 @@ private:
     if (_bleStarted) return;
 
     Serial.println("BLE: startBle()");
-    NimBLEDevice::init(TILE_ID);
+    NimBLEDevice::init(_tileId.c_str());
     NimBLEDevice::setPower(TILE_TX_POWER);
 
     _pScan = NimBLEDevice::getScan();
@@ -286,16 +291,17 @@ private:
     advData.setFlags(0x04);  // non-connectable, LE only
 
     std::string mfg = buildManufacturerData_withTeam(
+        _tileId.c_str(),
         _currentTeamChar,
         _haveCurrentTag ? _bestTagName.c_str() : "PT-UNK",
-        0.0f                    // first packet, 0 strength
+        0.0f
     );
     advData.setManufacturerData(mfg);
 
     // SCAN_RSP: UUID + name
     NimBLEAdvertisementData respData;
     respData.setCompleteServices(NimBLEUUID(SHARED_SERVICE_UUID_STR));
-    respData.setName(TILE_ID);
+    respData.setName(_tileId.c_str());
 
     uint16_t intervalMs = 40;
     uint16_t units = (uint16_t)((float)intervalMs / 0.625f + 0.5f);
@@ -328,6 +334,7 @@ private:
     advData.setFlags(0x04);
 
     std::string mfg = buildManufacturerData_withTeam(
+        _tileId.c_str(),
         _currentTeamChar,
         _haveCurrentTag ? _bestTagName.c_str() : "PT-UNK",
         strength
