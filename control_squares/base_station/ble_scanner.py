@@ -10,7 +10,7 @@ from battlepoint_core import (
     Clock,
     BluetoothTag,
     Team,
-    TagType
+    TagType,
 )
 
 MAX_PLAYERS_PER_TEAM = 3
@@ -28,9 +28,23 @@ except ImportError:
 
 class EnhancedBLEScanner:
     _CS_PREFIX = "CS-"
-    _PLAYER_PREFIX="PT-"
+    _PLAYER_PREFIX = "PT-"
     FRESH_WINDOW_MS = 750  # slightly generous; adjust if you want tighter
     _ALLOWED_PREFIXES = (_CS_PREFIX, _PLAYER_PREFIX)
+
+    # MAC OUIs that belong to your own hardware. Start with the one observed
+    # for CS-02: 70:04:1d:39:6b:46 → OUI "70:04:1d".
+    # Add more prefixes here if you have additional vendors/boards.
+    _ALLOWED_OUI_PREFIXES = (
+        "70:04:1d",
+    )
+
+    @classmethod
+    def _address_looks_like_ours(cls, address: str | None) -> bool:
+        if not address:
+            return False
+        addr = address.lower()
+        return any(addr.startswith(oui) for oui in cls._ALLOWED_OUI_PREFIXES)
 
     @classmethod
     def _is_ours(cls, name: str | None) -> bool:
@@ -38,7 +52,6 @@ class EnhancedBLEScanner:
         if not name:
             return False
         return any(name.startswith(prefix) for prefix in cls._ALLOWED_PREFIXES)
-
 
     def __init__(self, clock: Clock, linux_adapter_index: int = 1):
         """
@@ -194,28 +207,35 @@ class EnhancedBLEScanner:
         except Exception:
             return raw.hex()
 
-    def _is_our_device(self, name: str, mfg_ascii: str) -> bool:
+    def _is_our_device(self, address: str, name: str, mfg_ascii: str) -> bool:
         """
         Decide if this advertisement is from one of our devices.
 
-        Primary filter: local name prefix (CS-/PT-).
-        Secondary fallback: tile id in manufacturer payload, if name is missing.
+        Rules:
+        - The MAC OUI must match one of our known vendors.
+        - Then we require either:
+          * local name starting with CS-/PT-, or
+          * tile-id in manufacturer data starting with CS-/PT-.
         """
-        if name:
-            upper_name = name.upper()
-            if upper_name.startswith("CS-") or upper_name.startswith("PT-"):
-                return True
+        if not EnhancedBLEScanner._address_looks_like_ours(address):
+            return False
 
-        # Fallback: look at manufacturer payload if we have it
+        name = (name or "").strip()
+        upper_name = name.upper()
+
+        # Primary: local name
+        if upper_name.startswith(self._CS_PREFIX) or upper_name.startswith(self._PLAYER_PREFIX):
+            return True
+
+        # Fallback: tile-id in manufacturer payload
         if mfg_ascii:
             parts = mfg_ascii.split(",")
             if len(parts) >= 2:
                 tile_id = parts[1].strip().upper()
-                if tile_id.startswith("CS-") or tile_id.startswith("PT-"):
+                if tile_id.startswith(self._CS_PREFIX) or tile_id.startswith(self._PLAYER_PREFIX):
                     return True
 
         return False
-
 
     def _extract_local_name_from_hci(self, packet: bytes) -> str:
         """
@@ -264,9 +284,9 @@ class EnhancedBLEScanner:
                 if record_size > remaining or (idx + record_size) > len(packet):
                     break
 
-                record = packet[idx : idx + record_size]
+                record = packet[idx: idx + record_size]
                 ad_type = record[1]
-                value = record[2 : 2 + field_len - 1]
+                value = record[2: 2 + field_len - 1]
 
                 # 0x08 = Shortened Local Name, 0x09 = Complete Local Name
                 if ad_type in (0x08, 0x09):
@@ -288,7 +308,6 @@ class EnhancedBLEScanner:
             print(f"[BLE] aioblescan local-name parse error: {e!r}")
             return ""
 
-
     def _aiobs_process(self, data: bytes) -> None:
         """
         aioblescan callback (Linux) with early filtering.
@@ -297,8 +316,9 @@ class EnhancedBLEScanner:
         - Decode HCI event.
         - Decode manufacturer payload (cheap).
         - Get local name (parsed AD + HCI fallback).
-        - If neither name nor manufacturer look like ours, bail out.
-        - Otherwise, get peer/RSSI and record the observation.
+        - Get peer address + RSSI.
+        - If MAC/name/manufacturer don't look like ours, bail out.
+        - Otherwise, record the observation.
         """
         try:
             ev = aiobs.HCI_Event()
@@ -307,7 +327,7 @@ class EnhancedBLEScanner:
             print(f"[BLE] aioblescan decode error: {e!r}")
             return
 
-        # Manufacturer data (cheap) – we may use it for filtering and payload.
+        # Manufacturer data (cheap) – we may use it for payload + secondary filter.
         mfg_ascii = ""
         mfg_items = ev.retrieve("Manufacturer Specific Data")
         if mfg_items:
@@ -323,13 +343,7 @@ class EnhancedBLEScanner:
             if hci_name:
                 tile_name = hci_name
 
-        # Early filter: if this doesn't look like one of our devices, bail.
-        if not self._is_our_device(tile_name, mfg_ascii):
-            return
-
-        # At this point, we know it's "ours". Now pay the cost for peer/RSSI and book-keeping.
-
-        # MAC address
+        # MAC address (we need this before deciding if it's ours)
         peer = ev.retrieve("peer")
         if not peer:
             return
@@ -339,6 +353,10 @@ class EnhancedBLEScanner:
         rssi_items = ev.retrieve("rssi")
         rssi = rssi_items[0].val if rssi_items else 0
 
+        # Early filter: if this doesn't look like one of our devices, bail.
+        if not self._is_our_device(address, tile_name, mfg_ascii):
+            return
+
         now_ms = self.clock.milliseconds()
         self._record_observation(
             address=address,
@@ -347,8 +365,6 @@ class EnhancedBLEScanner:
             mfg_ascii=mfg_ascii,
             now_ms=now_ms,
         )
-
-
 
     def _start_linux_thread(self):
         """Start the dedicated Linux aioblescan thread + event loop."""
@@ -586,7 +602,6 @@ class EnhancedBLEScanner:
         red = min(red, MAX_PLAYERS_PER_TEAM)
         blu = min(blu, MAX_PLAYERS_PER_TEAM)
         return {"red": red, "blu": blu}
-
 
     def get_player_counts_for_squares(self, square_ids: List[int]) -> Dict[str, int]:
         """
