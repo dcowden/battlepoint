@@ -3,14 +3,7 @@
 #include <math.h>
 #include <string>
 
-
-#define COLOR_RED     255,0,0
-#define COLOR_BLUE    0,0,255
-#define COLOR_YELLOW  255,255,0
-#define COLOR_PURPLE  128,0,128
-#define COLOR_GREEN   0,180,0
-#define COLOR_GRAY    100,100,100
-
+#include "esp_sleep.h"   // for light sleep
 
 // ------------------ NeoPixel -------------
 #include <Adafruit_NeoPixel.h>
@@ -18,8 +11,15 @@
 // ------------------ QMC auto-detect ------
 #include "qmc5883.h"
 
+// ------------------ Teams / MiniCP / Colors / LED -------------
+#include "Teams.h"
+#include "minicp.h"
+#include "ColorMapper.h"
+#include "Rgb.h"
+#include "FgBgLed.h"
+
+// ------------------ BLE reporter ---------
 #include "ble.h"
-#include "led.h"   // our LED wrapper
 
 // ------------------ Debounce -------------
 #include <Bounce2.h>
@@ -50,12 +50,11 @@ static const char ADV_PRESENCE_VALUE_MAG   = 'M';
 static const int BLUE_SWITCH_PIN = 1;  // closed => blue present
 static const int RED_SWITCH_PIN  = 2;  // closed => red present
 
-// LED wrapper instance
-StatusLED statusLed(LED_PIN, NUM_LEDS);
+// Capture timing for mini control point (10 seconds)
+static const uint32_t CAPTURE_TIME_MS = 5000UL;
 
-// debouncers for the switches
-Bounce blueSwitchDebouncer;
-Bounce redSwitchDebouncer;
+// Light sleep interval
+static const uint64_t SLEEP_US = 50ULL * 1000ULL;  // 50 ms
 
 // ============================================================================
 // ------------------ QMC5883 baseline / EMA params ---------------------------
@@ -86,14 +85,28 @@ float g_lastDt        = 0.0f;
 bool g_qmc_present = false;
 
 // ============================================================================
+// ------------------ Game / LED Objects --------------------------------------
+
+// Mini control point: owner/capturing/progress logic
+MiniControlPoint g_controlPoint(CAPTURE_TIME_MS);
+
+// Single LED indicator with foreground/background + blink duty
+FgBgLed g_statusLed(LED_PIN, NUM_LEDS);
+
+// debouncers for the switches
+Bounce blueSwitchDebouncer;
+Bounce redSwitchDebouncer;
+
+// ============================================================================
 // ------------------- Arduino setup / loop -----------------------------------
 void setup() {
   Serial.begin(115200);
   delay(200);
+
   Serial.println("Startup...");
 
-  statusLed.begin(64);
-  statusLed.off();
+  g_statusLed.begin(64);
+  g_statusLed.off();
 
   // I2C init
   Wire.begin(SDA_PIN, SCL_PIN);
@@ -111,6 +124,7 @@ void setup() {
 
   // capture whether the QMC is actually present
   g_qmc_present = initQMC5883P();   // auto-detect/init_qmc() from qmc5883.h
+
   if (!g_qmc_present) {
     Serial.println("QMC not detected; running in switch-only mode.");
     baselineDone = true;  // skip baseline if no sensor
@@ -118,10 +132,13 @@ void setup() {
 
   tStart = millis();
 
+  g_controlPoint.reset();
   reporter.begin();
 }
 
 void loop() {
+  uint32_t now = millis();
+
   // ----------------- Update debounced switch state -----------------
   blueSwitchDebouncer.update();
   redSwitchDebouncer.update();
@@ -136,7 +153,7 @@ void loop() {
     if (!readQMC5883PData(rx, ry, rz)) {
       // If QMC was present at boot but a read fails, bail out of this iteration
       // to avoid using bogus data.
-      statusLed.update();
+      g_statusLed.update(now);
       delay(10);
       return;
     }
@@ -144,8 +161,6 @@ void loop() {
     float x = rx;
     float y = ry;
     float z = rz;
-
-    unsigned long now = millis();
 
     // ----------------- Baseline phase -----------------
     if (!baselineDone) {
@@ -160,8 +175,12 @@ void loop() {
 
       Serial.println(F(">baseline_building:1"));
 
-      statusLed.setFastBlink(COLOR_YELLOW);
-      statusLed.update();
+      // Baseline indicator: blinking yellow over black
+      g_statusLed.setForeground(Rgb(255, 255, 0));   // yellow
+      g_statusLed.setBackground(Rgb(0, 0, 0));       // black
+      g_statusLed.setBlinkIntervalMs(500);           // 0.5s
+      g_statusLed.setBlinkRatePercent(50);           // 50% duty
+      g_statusLed.update(now);
 
       if (now - tStart >= BASELINE_MS) {
         baselineDone = true;
@@ -243,28 +262,35 @@ void loop() {
     teamCharAdv = ADV_PRESENCE_VALUE_NONE;
   }
 
-  // ----------------- LED state -----------------
-  if (!anyPlayerPresent) {
-    // Blinking green when ready to capture but nobody on
-    statusLed.setFastBlink(COLOR_GREEN);
-  } else {
-    // If switches say something, trust them for color.
-    if (bluePresent && redPresent) {
-      statusLed.setSolid(COLOR_PURPLE);  // both
-    } else if (bluePresent) {
-      statusLed.setSolid(COLOR_BLUE);
-    } else if (redPresent) {
-      statusLed.setSolid(COLOR_RED);
-    } else if (magPresent) {
-      // magnet-only presence: solid green
-      statusLed.setSolid(COLOR_GREEN);
-    } else {
-      // Fallback (shouldn't really hit)
-      statusLed.setSolid(COLOR_GRAY);
-    }
-  }
+  // ----------------- Mini control point update -----------------
 
-  // Debug for presence breakdown
+  // Interpret presence as:
+  //   redPresent  -> Team::RED
+  //   bluePresent -> Team::BLU
+  //   magPresent  -> Team::NEUTRAL
+  g_controlPoint.update(now, redPresent, bluePresent, magPresent);
+
+  Team owner     = g_controlPoint.owner();
+  Team capturing = g_controlPoint.capturing();
+  uint8_t progress = g_controlPoint.progressPercent();  // 0..100
+
+  // ----------------- LED state via ColorMapper + FgBgLed ---------
+
+  // Background = owner, foreground = capturing / opposite as per ColorMapper
+  Rgb bg = ColorMapper::backgroundFor(owner);
+  Rgb fg = ColorMapper::foregroundFor(owner, capturing);
+
+
+g_controlPoint.applyLedPattern(g_statusLed,
+  now,
+  ColorMapper::fromTeamColor(TeamColor::COLOR_RED),
+  ColorMapper::fromTeamColor(TeamColor::COLOR_BLUE),
+  ColorMapper::fromTeamColor(TeamColor::COLOR_GREEN),
+  ColorMapper::fromTeamColor(TeamColor::COLOR_BLACK)
+);
+g_statusLed.update(now);
+
+  // ----------------- Debug for presence breakdown -----------------
   if (!anyPlayerPresent) {
     Serial.println(">P: 0");  // nobody
   } else if (bluePresent && !redPresent && !magPresent) {
@@ -279,12 +305,21 @@ void loop() {
     Serial.println(">P: 5");  // mixed case (switch + magnet)
   }
 
-  // BLE FSM (includes combined teamCharAdv)
-  // If QMC is absent, fDt stays at its default (0.0f), which is fine.
+  // ----------------- BLE FSM (includes combined teamCharAdv) ------
   reporter.update(anyPlayerPresent, fDt, teamCharAdv);
 
-  // Update LED blink timing
-  statusLed.update();
+  // ----------------- Power management -----------------
+  if (!anyPlayerPresent) {
+    //Serial.println("Sleep");
+    //Serial.flush();
 
-  delay(10); // ~100 Hz
+    // Use the pattern that worked in your original sketch: enable timer every time
+    const uint64_t sleep_us = 50ULL * 1000ULL;  // 50 ms in microseconds
+    esp_sleep_enable_timer_wakeup(sleep_us);
+    esp_light_sleep_start();
+    // Then loop() runs again
+  } else {
+    // Player present: keep responsiveness high
+    delay(10); // ~100 Hz
+  }
 }

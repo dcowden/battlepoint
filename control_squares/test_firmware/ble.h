@@ -5,10 +5,6 @@
 #include <NimBLEDevice.h>
 #include <string>
 
-extern "C" {
-  #include "esp_bt.h"   // for btStop() as a hard kill if needed
-}
-
 // ============================================================================
 // --------------------- BLE CONFIG (was in main) -----------------------------
 // ============================================================================
@@ -43,9 +39,9 @@ static std::string buildManufacturerData_withTeam(char teamChar, const char* pla
 
     char buf[64];
     // TEAM,TILE,PLAYER,STRENGTH  (TEAM is 'R' or 'B' or special code like 'X' for both)
-    snprintf(buf, sizeof(buf), "%s,%c,%s,%d",
-             TILE_ID,
+    snprintf(buf, sizeof(buf), "%c,%s,%s,%d",
              teamChar,
+             TILE_ID,
              playerId,
              s);
 
@@ -72,18 +68,17 @@ public:
     _lastAdvUpdate(0),
     _seq(0),
     _lastPlayerPresent(false),
-    _currentTeamChar('R'),
-    _bleStarted(false) {}
+    _currentTeamChar('R') {}
 
-  // Now just initializes internal state; BLE hardware is *not* started here.
   void begin() {
-    _state = IDLE;
-    _pScan = nullptr;
-    _bleStarted = false;
-    _lastPlayerPresent = false;
-    _haveCurrentTag = false;
-    _bestRssi = -999;
-    _bestTagName = "";
+    NimBLEDevice::init(TILE_ID);
+    NimBLEDevice::setPower(TILE_TX_POWER);
+
+    _pScan = NimBLEDevice::getScan();
+    _pScan->setActiveScan(true);
+    _pScan->setInterval(100);
+    _pScan->setWindow(100);
+    _pScan->setDuplicateFilter(false);
   }
 
   // Now takes teamChar so we can encode it in the MFG string
@@ -91,29 +86,22 @@ public:
     unsigned long now = millis();
     _currentTeamChar = teamChar;
 
-    // no player → tear down BLE completely
+    // no player → tear down
     if (!playerPresent) {
-      if (_bleStarted) {
-        if (_state == SCANNING && _pScan) {
-          _pScan->stop();
-          _pScan->clearResults();
-        }
-        if (_state == ADVERTISING) {
-          stopAdvertising();
-        }
-        shutdownBle();
+      if (_state == SCANNING) {
+        _pScan->stop();
+        _pScan->clearResults();
       }
-
+      if (_state == ADVERTISING) {
+        stopAdvertising();
+      }
       _state = IDLE;
       _lastPlayerPresent = false;
       return;
     }
 
-    // rising edge → ensure BLE started, then scan
+    // rising edge → scan
     if (playerPresent && !_lastPlayerPresent) {
-      if (!_bleStarted) {
-        startBle();
-      }
       startScan(now);
       _lastPlayerPresent = true;
       return;
@@ -121,22 +109,17 @@ public:
 
     switch (_state) {
       case IDLE:
-        if (!_bleStarted) {
-          startBle();
-        }
         Serial.println("Starting Scan");
         startScan(now);
         break;
 
       case SCANNING: {
         if (now - _scanStart >= SCAN_TIME_MS) {
-          if (_pScan) {
-            _pScan->stop();
+          _pScan->stop();
 
-            NimBLEScanResults results = _pScan->getResults();
-            pickBestFromResults(results);
-            _pScan->clearResults();
-          }
+          NimBLEScanResults results = _pScan->getResults();
+          pickBestFromResults(results);
+          _pScan->clearResults();
 
           startAdvertising(); // uses _currentTeamChar for the first packet
           _state = ADVERTISING;
@@ -167,61 +150,8 @@ private:
   bool _lastPlayerPresent;
 
   char _currentTeamChar; // 'R' or 'B' or special code like 'X' for both
-  bool _bleStarted;
 
-  // --------- BLE lifecycle helpers ----------
-  void startBle() {
-    if (_bleStarted) return;
-
-    Serial.println("BLE: startBle()");
-    NimBLEDevice::init(TILE_ID);
-    NimBLEDevice::setPower(TILE_TX_POWER);
-
-    _pScan = NimBLEDevice::getScan();
-    _pScan->setActiveScan(true);
-    _pScan->setInterval(100);
-    _pScan->setWindow(100);
-    _pScan->setDuplicateFilter(false);
-
-    _bleStarted = true;
-  }
-
-  void shutdownBle() {
-    if (!_bleStarted) return;
-
-    Serial.println("BLE: shutdownBle()");
-    // Stop advertising if still running
-    NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
-    if (adv && adv->isAdvertising()) {
-      adv->stop();
-    }
-
-    // Stop scan if still running
-    if (_pScan) {
-      _pScan->stop();
-      _pScan->clearResults();
-      _pScan = nullptr;
-    }
-
-    // Deinit NimBLE if available; fall back to btStop() if needed
-    // If NimBLEDevice::deinit(true) doesn't exist in your version,
-    // comment it out and rely on btStop().
-    #if defined(NIMBLE_CPP_VERSION) || defined(CONFIG_BT_NIMBLE_ENABLED)
-      NimBLEDevice::deinit(true);  // true = release memory
-    #endif
-
-    btStop();  // hard-stop BT controller (no-op if already stopped)
-
-    _bleStarted = false;
-  }
-
-  // --------- Existing logic, unchanged except for null checks ----------
   void startScan(unsigned long now) {
-    if (!_bleStarted || !_pScan) {
-      Serial.println("BLE: startScan() called but BLE not started");
-      return;
-    }
-
     Serial.println("BLE: startScan()");
     _bestRssi = -999;
     _bestTagName = "";
@@ -267,19 +197,10 @@ private:
   }
 
   void startAdvertising() {
-    if (!_bleStarted) {
-      Serial.println("BLE: startAdvertising() called but BLE not started");
-      return;
-    }
-
     Serial.printf("BLE: advertising player %s\n",
                   _haveCurrentTag ? _bestTagName.c_str() : "PT-UNK");
 
     NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
-    if (!adv) {
-      Serial.println("BLE: getAdvertising() returned null");
-      return;
-    }
 
     // ADV: just flags + mfg
     NimBLEAdvertisementData advData;
@@ -310,19 +231,14 @@ private:
   }
 
   void stopAdvertising() {
-    if (!_bleStarted) return;
     Serial.println("BLE: stopAdvertising()");
     NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
-    if (adv && adv->isAdvertising()) {
-      adv->stop();
-    }
+    adv->stop();
   }
 
   void updateAdvPacket(float strength) {
-    if (!_bleStarted) return;
-
     NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
-    if (!adv || !adv->isAdvertising()) return;
+    if (!adv->isAdvertising()) return;
 
     NimBLEAdvertisementData advData;
     advData.setFlags(0x04);

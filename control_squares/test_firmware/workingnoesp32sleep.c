@@ -2,7 +2,7 @@
 #include <Wire.h>
 #include <math.h>
 #include <string>
-#include <WiFi.h>
+
 
 #define COLOR_RED     255,0,0
 #define COLOR_BLUE    0,0,255
@@ -10,9 +10,6 @@
 #define COLOR_PURPLE  128,0,128
 #define COLOR_GREEN   0,180,0
 #define COLOR_GRAY    100,100,100
-extern "C" {
-  #include "esp_system.h"
-}
 
 // ------------------ NeoPixel -------------
 #include <Adafruit_NeoPixel.h>
@@ -92,12 +89,12 @@ bool g_qmc_present = false;
 void setup() {
   Serial.begin(115200);
 
-  setCpuFrequencyMhz(80);
+  //setCpuFrequencyMhz(80);
 
   delay(200);
   Serial.println("Startup...");
-  WiFi.mode(WIFI_OFF);
-  WiFi.disconnect(true, true);
+  //WiFi.mode(WIFI_OFF);
+  //WiFi.disconnect(true, true);
   statusLed.begin(64);
   statusLed.off();
 
@@ -117,6 +114,7 @@ void setup() {
 
   // capture whether the QMC is actually present
   g_qmc_present = initQMC5883P();   // auto-detect/init_qmc() from qmc5883.h
+
   if (!g_qmc_present) {
     Serial.println("QMC not detected; running in switch-only mode.");
     baselineDone = true;  // skip baseline if no sensor
@@ -171,11 +169,11 @@ void loop() {
 
       if (now - tStart >= BASELINE_MS) {
         baselineDone = true;
-        //Serial.println(F("=== Baseline established ==="));
-        //Serial.print(F("base_x: ")); Serial.println(baseX, 2);
-        //Serial.print(F("base_y: ")); Serial.println(baseY, 2);
-        //Serial.print(F("base_z: ")); Serial.println(baseZ, 2);
-        //Serial.println(F("==========================="));
+        Serial.println(F("=== Baseline established ==="));
+        Serial.print(F("base_x: ")); Serial.println(baseX, 2);
+        Serial.print(F("base_y: ")); Serial.println(baseY, 2);
+        Serial.print(F("base_z: ")); Serial.println(baseZ, 2);
+        Serial.println(F("==========================="));
       }
 
       delay(10);
@@ -200,10 +198,10 @@ void loop() {
       fDz = OUTPUT_ALPHA * dz + (1 - OUTPUT_ALPHA) * fDz;
       fDt = OUTPUT_ALPHA * dt + (1 - OUTPUT_ALPHA) * fDt;
     }
-    //Serial.printf(">fDt: %0.1f\n", fDt);
-    //Serial.printf(">fDx: %0.1f\n", fDx);
-    //Serial.printf(">fDy: %0.1f\n", fDy);
-    //Serial.printf(">fDz: %0.1f\n", fDz);
+    Serial.printf(">fDt: %0.1f\n", fDt);
+    Serial.printf(">fDx: %0.1f\n", fDx);
+    Serial.printf(">fDy: %0.1f\n", fDy);
+    Serial.printf(">fDz: %0.1f\n", fDz);
     g_lastDt = fDt;
 
     // presence FSM (magnet-based only)
@@ -272,17 +270,17 @@ void loop() {
 
   // Debug for presence breakdown
   if (!anyPlayerPresent) {
-    //Serial.println(">P: 0");  // nobody
+    Serial.println(">P: 0");  // nobody
   } else if (bluePresent && !redPresent && !magPresent) {
-    //Serial.println(">P: 1");  // blue only (switch)
+    Serial.println(">P: 1");  // blue only (switch)
   } else if (redPresent && !bluePresent && !magPresent) {
-    //Serial.println(">P: 2");  // red only (switch)
+    Serial.println(">P: 2");  // red only (switch)
   } else if (bluePresent && redPresent) {
-    //Serial.println(">P: 3");  // both switches
+    Serial.println(">P: 3");  // both switches
   } else if (magPresent && !bluePresent && !redPresent) {
-    //Serial.println(">P: 4");  // magnet only
+    Serial.println(">P: 4");  // magnet only
   } else {
-    //Serial.println(">P: 5");  // mixed case (switch + magnet)
+    Serial.println(">P: 5");  // mixed case (switch + magnet)
   }
 
   // BLE FSM (includes combined teamCharAdv)
@@ -292,5 +290,5 @@ void loop() {
   // Update LED blink timing
   statusLed.update();
 
-  delay(540); // ~100 Hz
+  delay(10); // ~100 Hz
 }

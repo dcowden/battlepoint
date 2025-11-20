@@ -213,14 +213,6 @@ class EnhancedBLEScanner:
     # ======================================================================
 
     def _extract_tile_from_mfg(self, mfg_ascii: str) -> (Optional[str], Optional[str]):
-        """
-        From manufacturer ASCII, decide if this is one of our tiles and
-        return (tile_id, logical_name).
-
-        Expected formats:
-          1) "CS-02,..."      -> tile_id="CS-02"
-          2) "B,CS-02,..."    -> team, tile_id, ...
-        """
         if not mfg_ascii:
             return None, None
 
@@ -231,7 +223,7 @@ class EnhancedBLEScanner:
         if tile_id is None:
             parts = s.split(",")
             if len(parts) >= 2:
-                maybe_tile = parts[1].strip().upper()
+                maybe_tile = parts[0].strip().upper()
                 if maybe_tile.startswith(_TILE_PREFIX):
                     tile_id = maybe_tile
 
