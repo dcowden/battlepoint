@@ -15,6 +15,9 @@ from battlepoint_core import (
 
 MAX_PLAYERS_PER_TEAM = 3
 
+# Toggle this to enable/disable "is this ours?" filtering
+ENABLE_OURS_FILTER = True
+
 # Only import aioblescan on non-Windows
 if sys.platform != "win32":
     import aioblescan as aiobs
@@ -47,7 +50,7 @@ class EnhancedBLEScanner:
         return any(addr.startswith(oui) for oui in cls._ALLOWED_OUI_PREFIXES)
 
     @classmethod
-    def _is_ours(cls, name: str | None) -> bool:
+    def _name_looks_like_ours(cls, name: str | None) -> bool:
         """Return True if this looks like one of our devices based on the name."""
         if not name:
             return False
@@ -89,7 +92,7 @@ class EnhancedBLEScanner:
             self._start_windows_thread()
 
     # ======================================================================
-    # WINDOWS PATH (Bleak, same idea as your old implementation)
+    # WINDOWS PATH (Bleak)
     # ======================================================================
 
     def _start_windows_thread(self):
@@ -150,7 +153,7 @@ class EnhancedBLEScanner:
         rssi = advertisement_data.rssi
         current_time = self.clock.milliseconds()
 
-        if not EnhancedBLEScanner._is_ours(name):
+        if ENABLE_OURS_FILTER and not EnhancedBLEScanner._name_looks_like_ours(name):
             return
 
         mfg_ascii = ""
@@ -317,8 +320,8 @@ class EnhancedBLEScanner:
         - Decode manufacturer payload (cheap).
         - Get local name (parsed AD + HCI fallback).
         - Get peer address + RSSI.
-        - If MAC/name/manufacturer don't look like ours, bail out.
-        - Otherwise, record the observation.
+        - Optionally: filter using _is_our_device (toggled by ENABLE_OURS_FILTER).
+        - Record the observation.
         """
         try:
             ev = aiobs.HCI_Event()
@@ -353,8 +356,8 @@ class EnhancedBLEScanner:
         rssi_items = ev.retrieve("rssi")
         rssi = rssi_items[0].val if rssi_items else 0
 
-        # Early filter: if this doesn't look like one of our devices, bail.
-        if not self._is_our_device(address, tile_name, mfg_ascii):
+        # Optional early filter
+        if ENABLE_OURS_FILTER and not self._is_our_device(address, tile_name, mfg_ascii):
             return
 
         now_ms = self.clock.milliseconds()
@@ -439,6 +442,7 @@ class EnhancedBLEScanner:
 
         # DEBUG: per-address callback gaps
         prev = self._last_cb_time_by_addr.get(address)
+        gap = None
         if prev is not None:
             gap = now_ms - prev
             # Only log aggressively for tiles (CS-*) to keep noise down
@@ -457,13 +461,27 @@ class EnhancedBLEScanner:
         self._last_cb_time_by_addr[address] = now_ms
 
         with self._lock:
-            self.devices[address] = {
-                "name": logical_name or tile_name,
-                "rssi": rssi,
-                "address": address,
-                "manufacturer_data": mfg_ascii,
-                "last_seen": now_ms,
-            }
+            info = self.devices.get(address)
+            if info is None:
+                info = {
+                    "name": logical_name or tile_name,
+                    "rssi": rssi,
+                    "address": address,
+                    "manufacturer_data": mfg_ascii,
+                    "last_seen": now_ms,
+                    "cb_count": 0,
+                    "last_gap_ms": None,
+                }
+                self.devices[address] = info
+
+            # update dynamic fields
+            info["name"] = logical_name or tile_name
+            info["rssi"] = rssi
+            info["manufacturer_data"] = mfg_ascii
+            info["last_seen"] = now_ms
+            info["cb_count"] = info.get("cb_count", 0) + 1
+            if gap is not None:
+                info["last_gap_ms"] = gap
 
     # ======================================================================
     # PUBLIC API: start/stop
@@ -504,6 +522,8 @@ class EnhancedBLEScanner:
                         "address": address,
                         "last_seen_ms": int(current_time - info["last_seen"]),
                         "manufacturer_data": info["manufacturer_data"],
+                        "cb_count": info.get("cb_count", 0),
+                        "last_gap_ms": info.get("last_gap_ms"),
                     }
                 )
 
@@ -588,8 +608,6 @@ class EnhancedBLEScanner:
                 last_seen = info.get("last_seen", 0.0) or 0.0
                 age = now - last_seen
                 if age > fresh_ms:
-                    # Ignore stale tiles (debug log if you want)
-                    # print(f"[BLE] stale tile {info['name']}: age={age}ms > {fresh_ms}ms")
                     continue
 
                 mf = info.get("manufacturer_data") or ""
@@ -705,11 +723,15 @@ async def _cli_main(adapter_index: int = 1):
             for dev in summary["devices"]:
                 name = dev["name"]
                 if name.startswith("CS-"):
+                    cb_count = dev.get("cb_count", 0)
+                    last_gap = dev.get("last_gap_ms", None)
+                    lg = f"{last_gap:4d}ms" if last_gap is not None else "----"
                     print(
                         f"  {name} {dev['address']}  "
                         f"age={dev['last_seen_ms']:4d}ms  "
                         f"rssi={dev['rssi']:4d}  "
-                        f"mfg='{dev['manufacturer_data']}'"
+                        f"mfg='{dev['manufacturer_data']}'  "
+                        f"cb_count={cb_count:5d}  last_gap={lg}"
                     )
 
     except KeyboardInterrupt:
