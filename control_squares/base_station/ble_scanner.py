@@ -220,8 +220,8 @@ class EnhancedBLEScanner:
           * local name starting with CS-/PT-, or
           * tile-id in manufacturer data starting with CS-/PT-.
         """
-        if not EnhancedBLEScanner._address_looks_like_ours(address):
-            return False
+        #if not EnhancedBLEScanner._address_looks_like_ours(address):
+        #    return False
 
         name = (name or "").strip()
         upper_name = name.upper()
