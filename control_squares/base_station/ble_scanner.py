@@ -74,6 +74,9 @@ class EnhancedBLEScanner:
         # DEBUG: track last callback time per address for gap measurement
         self._last_cb_time_by_addr: Dict[str, int] = {}
 
+        # Map from logical tile id (e.g. "CS-02") to canonical MAC address
+        self._canonical_addr_by_tile: Dict[str, str] = {}
+
         if self._is_windows:
             self._start_windows_thread()
 
@@ -179,7 +182,7 @@ class EnhancedBLEScanner:
         if isinstance(payload, (bytes, bytearray)):
             raw = bytes(payload)
         elif isinstance(payload, list):
-            # Typical aioblescan structure: [company_id, Itself(raw_bytes)]
+        # Typical aioblescan structure: [company_id, Itself(raw_bytes)]
             for part in payload:
                 if hasattr(part, "payload") and isinstance(part.payload, (bytes, bytearray)):
                     raw = bytes(part.payload)
@@ -303,7 +306,7 @@ class EnhancedBLEScanner:
             * Decode manufacturer payload
             * Decode local name
             * Get peer address + RSSI
-            * Optionally filter with _is_our_device
+            * Optional filter with _is_our_device
             * Record observation
         """
         try:
@@ -345,8 +348,12 @@ class EnhancedBLEScanner:
                 rssi_items = pkt.retrieve("rssi")
                 rssi = rssi_items[0].val if rssi_items else 0
 
+                # Raw debug for every subevent
+                print(f"[BLE RAW] peer={address} name='{tile_name}' rssi={rssi:4d} mf='{mfg_ascii}'")
+
                 # Optional early filter
                 if ENABLE_OURS_FILTER and not self._is_our_device(tile_name, mfg_ascii):
+                    print(f"[BLE RAW]   -> filtered out (not ours)")
                     continue
 
                 now_ms = self.clock.milliseconds()
@@ -423,6 +430,7 @@ class EnhancedBLEScanner:
         """
         Shared between Linux (aioblescan) and Windows (Bleak) paths.
         This is where we update self.devices and debug-log gaps.
+        Also enforces a canonical MAC per logical tile id (CS-XX/PT-XX).
         """
         # Derive a "logical name" from manufacturer data if needed
         # Format: B,CS-02,PT-UNK,4341 → team, tile_id, ...
@@ -432,19 +440,36 @@ class EnhancedBLEScanner:
             if len(parts) >= 2:
                 logical_name = parts[1].strip()  # CS-02
 
+        # If this looks like one of our tiles/players, enforce canonical MAC
+        if logical_name:
+            upper_logical = logical_name.upper()
+            if upper_logical.startswith(self._CS_PREFIX) or upper_logical.startswith(self._PLAYER_PREFIX):
+                canonical = self._canonical_addr_by_tile.get(upper_logical)
+                if canonical is None:
+                    # First time we see this tile id: lock in this MAC
+                    self._canonical_addr_by_tile[upper_logical] = address
+                    print(f"[BLE CANON] assigning tile {upper_logical} -> {address}")
+                elif canonical != address:
+                    # Mixed event / bogus alias: drop this observation
+                    print(
+                        f"[BLE DROP] tile {upper_logical} canonical={canonical} "
+                        f"but got addr={address}, rssi={rssi:4d}, mf='{mfg_ascii}'"
+                    )
+                    return
+
         # DEBUG: per-address callback gaps
         prev = self._last_cb_time_by_addr.get(address)
         gap = None
         if prev is not None:
             gap = now_ms - prev
             # Only log aggressively for tiles (CS-*) to keep noise down
-            if logical_name.startswith(self._CS_PREFIX):
+            if logical_name and logical_name.startswith(self._CS_PREFIX):
                 print(
                     f"[BLE] cb addr={address} name={logical_name or tile_name} "
                     f"gap={gap:4d}ms rssi={rssi:4d} mf='{mfg_ascii}'"
                 )
         else:
-            if logical_name.startswith(self._CS_PREFIX):
+            if logical_name and logical_name.startswith(self._CS_PREFIX):
                 print(
                     f"[BLE] first cb addr={address} name={logical_name or tile_name} "
                     f"rssi={rssi:4d} mf='{mfg_ascii}'"
