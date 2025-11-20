@@ -16,7 +16,7 @@ from battlepoint_core import (
 MAX_PLAYERS_PER_TEAM = 3
 
 # Toggle this to enable/disable "is this ours?" filtering
-ENABLE_OURS_FILTER = False
+ENABLE_OURS_FILTER = True
 
 # Only import aioblescan on non-Windows
 if sys.platform != "win32":
@@ -34,20 +34,6 @@ class EnhancedBLEScanner:
     _PLAYER_PREFIX = "PT-"
     FRESH_WINDOW_MS = 750  # slightly generous; adjust if you want tighter
     _ALLOWED_PREFIXES = (_CS_PREFIX, _PLAYER_PREFIX)
-
-    # MAC OUIs that belong to your own hardware. Start with the one observed
-    # for CS-02: 70:04:1d:39:6b:46 → OUI "70:04:1d".
-    # Add more prefixes here if you have additional vendors/boards.
-    _ALLOWED_OUI_PREFIXES = (
-        "70:04:1d",
-    )
-
-    @classmethod
-    def _address_looks_like_ours(cls, address: str | None) -> bool:
-        if not address:
-            return False
-        addr = address.lower()
-        return any(addr.startswith(oui) for oui in cls._ALLOWED_OUI_PREFIXES)
 
     @classmethod
     def _name_looks_like_ours(cls, name: str | None) -> bool:
@@ -210,19 +196,15 @@ class EnhancedBLEScanner:
         except Exception:
             return raw.hex()
 
-    def _is_our_device(self, address: str, name: str, mfg_ascii: str) -> bool:
+    def _is_our_device(self, name: str, mfg_ascii: str) -> bool:
         """
         Decide if this advertisement is from one of our devices.
 
-        Rules:
-        - The MAC OUI must match one of our known vendors.
-        - Then we require either:
-          * local name starting with CS-/PT-, or
-          * tile-id in manufacturer data starting with CS-/PT-.
+        Rules (when ENABLE_OURS_FILTER is True):
+        - If the local name starts with CS-/PT-, accept.
+        - Else, if the tile-id in manufacturer data starts with CS-/PT-, accept.
+        - Otherwise reject.
         """
-        #if not EnhancedBLEScanner._address_looks_like_ours(address):
-        #    return False
-
         name = (name or "").strip()
         upper_name = name.upper()
 
@@ -313,15 +295,16 @@ class EnhancedBLEScanner:
 
     def _aiobs_process(self, data: bytes) -> None:
         """
-        aioblescan callback (Linux) with early filtering.
+        aioblescan callback (Linux) with correct per-advert processing.
 
-        Steps:
         - Decode HCI event.
-        - Decode manufacturer payload (cheap).
-        - Get local name (parsed AD + HCI fallback).
-        - Get peer address + RSSI.
-        - Optionally: filter using _is_our_device (toggled by ENABLE_OURS_FILTER).
-        - Record the observation.
+        - Iterate each sub-event in ev.events (or ev itself if no sub-events).
+        - For each sub-event:
+            * Decode manufacturer payload
+            * Decode local name
+            * Get peer address + RSSI
+            * Optionally filter with _is_our_device
+            * Record observation
         """
         try:
             ev = aiobs.HCI_Event()
@@ -330,44 +313,53 @@ class EnhancedBLEScanner:
             print(f"[BLE] aioblescan decode error: {e!r}")
             return
 
-        # Manufacturer data (cheap) – we may use it for payload + secondary filter.
-        mfg_ascii = ""
-        mfg_items = ev.retrieve("Manufacturer Specific Data")
-        if mfg_items:
-            mfg_ascii = self._decode_aiobs_mfg(mfg_items[0])
+        subevents = getattr(ev, "events", None)
+        if not subevents:
+            subevents = [ev]
 
-        # Local name via parsed AD
-        name_items = ev.retrieve("Complete Local Name") or ev.retrieve("Short Local Name")
-        tile_name = name_items[0].val if name_items else ""
+        for pkt in subevents:
+            try:
+                # Manufacturer data per subevent
+                mfg_ascii = ""
+                mfg_items = pkt.retrieve("Manufacturer Specific Data")
+                if mfg_items:
+                    mfg_ascii = self._decode_aiobs_mfg(mfg_items[0])
 
-        # Fallback: parse local name directly from raw HCI if needed
-        if not tile_name:
-            hci_name = self._extract_local_name_from_hci(data)
-            if hci_name:
-                tile_name = hci_name
+                # Local name via parsed AD per subevent
+                name_items = pkt.retrieve("Complete Local Name") or pkt.retrieve("Short Local Name")
+                tile_name = name_items[0].val if name_items else ""
 
-        # MAC address (we need this before deciding if it's ours)
-        peer = ev.retrieve("peer")
-        if not peer:
-            return
-        address = peer[0].val.lower()
+                # Fallback: parse local name directly from raw HCI if needed
+                if not tile_name:
+                    hci_name = self._extract_local_name_from_hci(data)
+                    if hci_name:
+                        tile_name = hci_name
 
-        # RSSI
-        rssi_items = ev.retrieve("rssi")
-        rssi = rssi_items[0].val if rssi_items else 0
+                # MAC address per subevent
+                peer = pkt.retrieve("peer")
+                if not peer:
+                    continue
+                address = peer[0].val.lower()
 
-        # Optional early filter
-        if ENABLE_OURS_FILTER and not self._is_our_device(address, tile_name, mfg_ascii):
-            return
+                # RSSI per subevent
+                rssi_items = pkt.retrieve("rssi")
+                rssi = rssi_items[0].val if rssi_items else 0
 
-        now_ms = self.clock.milliseconds()
-        self._record_observation(
-            address=address,
-            tile_name=tile_name,
-            rssi=rssi,
-            mfg_ascii=mfg_ascii,
-            now_ms=now_ms,
-        )
+                # Optional early filter
+                if ENABLE_OURS_FILTER and not self._is_our_device(tile_name, mfg_ascii):
+                    continue
+
+                now_ms = self.clock.milliseconds()
+                self._record_observation(
+                    address=address,
+                    tile_name=tile_name,
+                    rssi=rssi,
+                    mfg_ascii=mfg_ascii,
+                    now_ms=now_ms,
+                )
+
+            except Exception as e:
+                print(f"[BLE] aioblescan subevent error: {e!r}")
 
     def _start_linux_thread(self):
         """Start the dedicated Linux aioblescan thread + event loop."""
