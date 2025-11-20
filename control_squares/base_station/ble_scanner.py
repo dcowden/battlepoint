@@ -61,7 +61,7 @@ class EnhancedBLEScanner:
         self._scanner: Optional["BleakScanner"] = None
         self._want_scan: bool = False
         self._thread: Optional[threading.Thread] = None
-        self._thread_loop: Optional[asyncio.AbstractEventLoop] = None
+               self._thread_loop: Optional[asyncio.AbstractEventLoop] = None
 
         # Linux (aioblescan) bits
         self._linux_adapter_index = linux_adapter_index
@@ -73,6 +73,9 @@ class EnhancedBLEScanner:
 
         # DEBUG: track last callback time per address for gap measurement
         self._last_cb_time_by_addr: Dict[str, int] = {}
+
+        # Map from logical tile id (e.g. "CS-02") to canonical MAC address
+        self._canonical_addr_by_tile: Dict[str, str] = {}
 
         if self._is_windows:
             self._start_windows_thread()
@@ -154,7 +157,7 @@ class EnhancedBLEScanner:
 
         self._record_observation(
             address=address,
-            tile_name=name,  # might be empty on Windows too, but ok
+            tile_name=name,        # might be empty on Windows too, but ok
             rssi=rssi,
             mfg_ascii=mfg_ascii,
             now_ms=current_time,
@@ -174,7 +177,6 @@ class EnhancedBLEScanner:
 
         payload = getattr(mfg_obj, "payload", None)
 
-        # raw bytes case
         raw = None
         if isinstance(payload, (bytes, bytearray)):
             raw = bytes(payload)
@@ -200,19 +202,24 @@ class EnhancedBLEScanner:
         """
         Decide if this advertisement is from one of our devices.
 
-        Rules (when ENABLE_OURS_FILTER is True):
-        - If the local name starts with CS-/PT-, accept.
-        - Else, if the tile-id in manufacturer data starts with CS-/PT-, accept.
-        - Otherwise reject.
+        RULES:
+        - If there is a non-empty local name and it does NOT start with CS-/PT-, we
+          treat it as NOT ours, even if the manufacturer payload claims CS-xx.
+        - Only when name is empty (or already CS-/PT-) do we allow manufacturer to
+          "promote" it to one of our tiles/players.
         """
         name = (name or "").strip()
         upper_name = name.upper()
 
-        # Primary: local name
+        # If it's clearly one of our names, done.
         if upper_name.startswith(self._CS_PREFIX) or upper_name.startswith(self._PLAYER_PREFIX):
             return True
 
-        # Fallback: tile-id in manufacturer payload
+        # If there *is* a name and it's not ours, do NOT trust manufacturer.
+        if name:
+            return False
+
+        # Name is empty: we may rely on manufacturer tile_id
         if mfg_ascii:
             parts = mfg_ascii.split(",")
             if len(parts) >= 2:
@@ -226,8 +233,14 @@ class EnhancedBLEScanner:
         """
         aioblescan callback (Linux) with correct per-advert processing.
 
-        FIXED: Each subevent is completely independent. We no longer use
-        the broken HCI fallback that was mixing names between devices.
+        - Decode HCI event.
+        - Iterate each sub-event in ev.events (or ev itself if no sub-events).
+        - For each sub-event:
+            * Decode manufacturer payload (from that subevent)
+            * Decode local name (from that subevent via aioblescan)
+            * Get peer address + RSSI (from that subevent)
+            * Optional filter with _is_our_device
+            * Record observation
         """
         try:
             ev = aiobs.HCI_Event()
@@ -236,47 +249,41 @@ class EnhancedBLEScanner:
             print(f"[BLE] aioblescan decode error: {e!r}")
             return
 
-        # Get list of advertising reports (subevents)
         subevents = getattr(ev, "events", None)
         if not subevents:
             subevents = [ev]
 
-        now_ms = self.clock.milliseconds()
-
         for pkt in subevents:
             try:
-                # Step 1: Get MAC address for THIS subevent
-                peer = pkt.retrieve("peer")
-                if not peer:
-                    continue
-                address = peer[0].val.lower()
-
-                # Step 2: Get RSSI for THIS subevent
-                rssi_items = pkt.retrieve("rssi")
-                rssi = rssi_items[0].val if rssi_items else 0
-
-                # Step 3: Get manufacturer data for THIS subevent ONLY
+                # Manufacturer data per subevent
                 mfg_ascii = ""
                 mfg_items = pkt.retrieve("Manufacturer Specific Data")
                 if mfg_items:
                     mfg_ascii = self._decode_aiobs_mfg(mfg_items[0])
 
-                # Step 4: Get local name for THIS subevent ONLY
-                # This is retrieved from the parsed AD structures in THIS subevent
-                tile_name = ""
+                # Local name via parsed AD per subevent
                 name_items = pkt.retrieve("Complete Local Name") or pkt.retrieve("Short Local Name")
-                if name_items:
-                    tile_name = name_items[0].val
+                tile_name = name_items[0].val if name_items else ""
 
-                # CRITICAL FIX: Do NOT use _extract_local_name_from_hci as fallback
-                # because it parses the entire HCI packet which may contain multiple
-                # devices, causing names to be assigned to the wrong MAC addresses.
+                # MAC address per subevent
+                peer = pkt.retrieve("peer")
+                if not peer:
+                    continue
+                address = peer[0].val.lower()
 
-                # Step 5: Filter based on what we actually found for THIS device
+                # RSSI per subevent
+                rssi_items = pkt.retrieve("rssi")
+                rssi = rssi_items[0].val if rssi_items else 0
+
+                # Raw debug for every subevent
+                print(f"[BLE RAW] peer={address} name='{tile_name}' rssi={rssi:4d} mf='{mfg_ascii}'")
+
+                # Optional early filter using the rules above
                 if ENABLE_OURS_FILTER and not self._is_our_device(tile_name, mfg_ascii):
+                    print(f"[BLE RAW]   -> filtered out (not ours)")
                     continue
 
-                # Step 6: Record this specific observation
+                now_ms = self.clock.milliseconds()
                 self._record_observation(
                     address=address,
                     tile_name=tile_name,
@@ -287,7 +294,6 @@ class EnhancedBLEScanner:
 
             except Exception as e:
                 print(f"[BLE] aioblescan subevent error: {e!r}")
-                traceback.print_exc()
 
     def _start_linux_thread(self):
         """Start the dedicated Linux aioblescan thread + event loop."""
@@ -351,28 +357,75 @@ class EnhancedBLEScanner:
         """
         Shared between Linux (aioblescan) and Windows (Bleak) paths.
         This is where we update self.devices and debug-log gaps.
+
+        Key rules:
+        - Derive tile_id from manufacturer ONLY if there is no foreign (non-CS/PT) local name.
+        - tile_id = CS-xx/PT-xx from mfg when allowed.
+        - Always prefer tile_id as logical name once we know it.
+        - Canonical MAC per tile_id remains, but only for true tile_ids.
         """
-        # Derive a "logical name" from manufacturer data if needed
-        # Format: B,CS-02,PT-UNK,4341 → team, tile_id, ...
-        logical_name = tile_name
-        if not logical_name and mfg_ascii:
+
+        # 1) Derive tile_id from manufacturer string, but ONLY when allowed
+        tile_id = None
+        tile_id_upper = None
+
+        safe_to_trust_mfg = False
+        clean_name = (tile_name or "").strip()
+        upper_name = clean_name.upper()
+
+        # If name is empty, or already ours, then it is safe to interpret mfg as tile_id
+        if not clean_name or upper_name.startswith(self._CS_PREFIX) or upper_name.startswith(self._PLAYER_PREFIX):
+            safe_to_trust_mfg = True
+
+        if safe_to_trust_mfg and mfg_ascii:
             parts = mfg_ascii.split(",")
             if len(parts) >= 2:
-                logical_name = parts[1].strip()  # CS-02
+                candidate = parts[1].strip()
+                cand_upper = candidate.upper()
+                if cand_upper.startswith(self._CS_PREFIX) or cand_upper.startswith(self._PLAYER_PREFIX):
+                    tile_id = candidate
+                    tile_id_upper = cand_upper
 
-        # DEBUG: per-address callback gaps
+        # 2) Logical name: prefer tile_id over tile_name
+        if tile_id:
+            logical_name = tile_id
+        else:
+            logical_name = tile_name
+
+        # 3) Canonical MAC per tile_id (only if we actually have a tile_id)
+        if tile_id_upper is not None:
+            canonical = self._canonical_addr_by_tile.get(tile_id_upper)
+            if canonical is None:
+                self._canonical_addr_by_tile[tile_id_upper] = address
+                print(f"[BLE CANON] assign tile_id={tile_id_upper} -> mac={address}")
+            elif canonical != address:
+                # Some other MAC is claiming the same tile_id; drop it.
+                print(
+                    f"[BLE DROP_ALIAS] tile_id={tile_id_upper} canonical={canonical} "
+                    f"but addr={address} rssi={rssi:4d} mf='{mfg_ascii}'"
+                )
+                return
+
+        # DEBUG for observations that look like tiles/players
+        if tile_id_upper is not None:
+            print(
+                f"[BLE OBS] addr={address} tile_id={tile_id_upper} "
+                f"logical_name='{logical_name}' rssi={rssi:4d} mf='{mfg_ascii}'"
+            )
+
+        # 4) Per-address callback gaps
         prev = self._last_cb_time_by_addr.get(address)
         gap = None
         if prev is not None:
             gap = now_ms - prev
             # Only log aggressively for tiles (CS-*) to keep noise down
-            if logical_name.startswith(self._CS_PREFIX):
+            if tile_id_upper and tile_id_upper.startswith(self._CS_PREFIX):
                 print(
                     f"[BLE] cb addr={address} name={logical_name or tile_name} "
                     f"gap={gap:4d}ms rssi={rssi:4d} mf='{mfg_ascii}'"
                 )
         else:
-            if logical_name.startswith(self._CS_PREFIX):
+            if tile_id_upper and tile_id_upper.startswith(self._CS_PREFIX):
                 print(
                     f"[BLE] first cb addr={address} name={logical_name or tile_name} "
                     f"rssi={rssi:4d} mf='{mfg_ascii}'"
@@ -380,6 +433,7 @@ class EnhancedBLEScanner:
 
         self._last_cb_time_by_addr[address] = now_ms
 
+        # 5) Store/update device record
         with self._lock:
             info = self.devices.get(address)
             if info is None:
@@ -490,12 +544,20 @@ class EnhancedBLEScanner:
         """
         Decide if this device should count as a tile.
 
-        On Bleak we *might* have a local name CS-02.
-        On aioblescan we often have no name and only manufacturer data.
+        RULES:
+        - If 'name' exists and is CS-*, we accept.
+        - If 'name' exists and is not CS-*, we DO NOT re-interpret it via manufacturer.
+        - Only when name is empty or already CS-* do we allow mfg to promote it.
         """
         name = (info.get("name") or "").strip()
-        if name.startswith(self._CS_PREFIX):
+        upper_name = name.upper()
+
+        if upper_name.startswith(self._CS_PREFIX):
             return True
+
+        # If there *is* a foreign name, we don't trust manufacturer.
+        if name and not upper_name.startswith(self._CS_PREFIX):
+            return False
 
         mf = info.get("manufacturer_data") or ""
         if not mf:
@@ -505,7 +567,6 @@ class EnhancedBLEScanner:
         if len(parts) >= 2:
             tile_id = parts[1].strip().upper()
             if tile_id.startswith(self._CS_PREFIX):
-                # also sync the "name" field for UI/debug
                 info["name"] = tile_id
                 return True
 
@@ -611,7 +672,6 @@ class EnhancedBLEScanner:
 
 class _MonotonicClock(Clock):
     """Simple clock for CLI testing."""
-
     def milliseconds(self) -> int:
         return int(time.monotonic() * 1000)
 
