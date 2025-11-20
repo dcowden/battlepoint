@@ -16,7 +16,7 @@ from battlepoint_core import (
 MAX_PLAYERS_PER_TEAM = 3
 
 # Toggle this to enable/disable "is this ours?" filtering
-ENABLE_OURS_FILTER = True
+ENABLE_OURS_FILTER = False
 
 # Only import aioblescan on non-Windows
 if sys.platform != "win32":
