@@ -74,9 +74,6 @@ class EnhancedBLEScanner:
         # DEBUG: track last callback time per address for gap measurement
         self._last_cb_time_by_addr: Dict[str, int] = {}
 
-        # Map from logical tile id (e.g. "CS-02") to canonical MAC address
-        self._canonical_addr_by_tile: Dict[str, str] = {}
-
         if self._is_windows:
             self._start_windows_thread()
 
@@ -157,7 +154,7 @@ class EnhancedBLEScanner:
 
         self._record_observation(
             address=address,
-            tile_name=name,        # might be empty on Windows too, but ok
+            tile_name=name,  # might be empty on Windows too, but ok
             rssi=rssi,
             mfg_ascii=mfg_ascii,
             now_ms=current_time,
@@ -182,7 +179,7 @@ class EnhancedBLEScanner:
         if isinstance(payload, (bytes, bytearray)):
             raw = bytes(payload)
         elif isinstance(payload, list):
-        # Typical aioblescan structure: [company_id, Itself(raw_bytes)]
+            # Typical aioblescan structure: [company_id, Itself(raw_bytes)]
             for part in payload:
                 if hasattr(part, "payload") and isinstance(part.payload, (bytes, bytearray)):
                     raw = bytes(part.payload)
@@ -300,14 +297,9 @@ class EnhancedBLEScanner:
         """
         aioblescan callback (Linux) with correct per-advert processing.
 
-        - Decode HCI event.
-        - Iterate each sub-event in ev.events (or ev itself if no sub-events).
-        - For each sub-event:
-            * Decode manufacturer payload
-            * Decode local name
-            * Get peer address + RSSI
-            * Optional filter with _is_our_device
-            * Record observation
+        FIXED: Process each advertising report independently by decoding
+        the full HCI event once, then handling each subevent separately.
+        Each subevent contains its own complete advertising data.
         """
         try:
             ev = aiobs.HCI_Event()
@@ -316,47 +308,51 @@ class EnhancedBLEScanner:
             print(f"[BLE] aioblescan decode error: {e!r}")
             return
 
+        # Get list of advertising reports (subevents)
         subevents = getattr(ev, "events", None)
         if not subevents:
             subevents = [ev]
 
+        now_ms = self.clock.milliseconds()
+
         for pkt in subevents:
             try:
-                # Manufacturer data per subevent
-                mfg_ascii = ""
-                mfg_items = pkt.retrieve("Manufacturer Specific Data")
-                if mfg_items:
-                    mfg_ascii = self._decode_aiobs_mfg(mfg_items[0])
-
-                # Local name via parsed AD per subevent
-                name_items = pkt.retrieve("Complete Local Name") or pkt.retrieve("Short Local Name")
-                tile_name = name_items[0].val if name_items else ""
-
-                # Fallback: parse local name directly from raw HCI if needed
-                if not tile_name:
-                    hci_name = self._extract_local_name_from_hci(data)
-                    if hci_name:
-                        tile_name = hci_name
-
-                # MAC address per subevent
+                # Step 1: Get MAC address for THIS subevent
                 peer = pkt.retrieve("peer")
                 if not peer:
                     continue
                 address = peer[0].val.lower()
 
-                # RSSI per subevent
+                # Step 2: Get RSSI for THIS subevent
                 rssi_items = pkt.retrieve("rssi")
                 rssi = rssi_items[0].val if rssi_items else 0
 
-                # Raw debug for every subevent
-                print(f"[BLE RAW] peer={address} name='{tile_name}' rssi={rssi:4d} mf='{mfg_ascii}'")
+                # Step 3: Get manufacturer data for THIS subevent ONLY
+                # This is the key fix - retrieve must be called on the subevent pkt
+                mfg_ascii = ""
+                mfg_items = pkt.retrieve("Manufacturer Specific Data")
+                if mfg_items:
+                    mfg_ascii = self._decode_aiobs_mfg(mfg_items[0])
 
-                # Optional early filter
+                # Step 4: Get local name for THIS subevent ONLY
+                tile_name = ""
+                name_items = pkt.retrieve("Complete Local Name") or pkt.retrieve("Short Local Name")
+                if name_items:
+                    tile_name = name_items[0].val
+
+                # Step 5: Fallback - parse local name directly from raw HCI if needed
+                # Note: This might not work correctly for multi-device reports
+                # but is kept as a last resort
+                if not tile_name:
+                    hci_name = self._extract_local_name_from_hci(data)
+                    if hci_name:
+                        tile_name = hci_name
+
+                # Step 6: Filter based on what we actually found for THIS device
                 if ENABLE_OURS_FILTER and not self._is_our_device(tile_name, mfg_ascii):
-                    print(f"[BLE RAW]   -> filtered out (not ours)")
                     continue
 
-                now_ms = self.clock.milliseconds()
+                # Step 7: Record this specific observation
                 self._record_observation(
                     address=address,
                     tile_name=tile_name,
@@ -367,6 +363,7 @@ class EnhancedBLEScanner:
 
             except Exception as e:
                 print(f"[BLE] aioblescan subevent error: {e!r}")
+                traceback.print_exc()
 
     def _start_linux_thread(self):
         """Start the dedicated Linux aioblescan thread + event loop."""
@@ -430,7 +427,6 @@ class EnhancedBLEScanner:
         """
         Shared between Linux (aioblescan) and Windows (Bleak) paths.
         This is where we update self.devices and debug-log gaps.
-        Also enforces a canonical MAC per logical tile id (CS-XX/PT-XX).
         """
         # Derive a "logical name" from manufacturer data if needed
         # Format: B,CS-02,PT-UNK,4341 → team, tile_id, ...
@@ -440,36 +436,19 @@ class EnhancedBLEScanner:
             if len(parts) >= 2:
                 logical_name = parts[1].strip()  # CS-02
 
-        # If this looks like one of our tiles/players, enforce canonical MAC
-        if logical_name:
-            upper_logical = logical_name.upper()
-            if upper_logical.startswith(self._CS_PREFIX) or upper_logical.startswith(self._PLAYER_PREFIX):
-                canonical = self._canonical_addr_by_tile.get(upper_logical)
-                if canonical is None:
-                    # First time we see this tile id: lock in this MAC
-                    self._canonical_addr_by_tile[upper_logical] = address
-                    print(f"[BLE CANON] assigning tile {upper_logical} -> {address}")
-                elif canonical != address:
-                    # Mixed event / bogus alias: drop this observation
-                    print(
-                        f"[BLE DROP] tile {upper_logical} canonical={canonical} "
-                        f"but got addr={address}, rssi={rssi:4d}, mf='{mfg_ascii}'"
-                    )
-                    return
-
         # DEBUG: per-address callback gaps
         prev = self._last_cb_time_by_addr.get(address)
         gap = None
         if prev is not None:
             gap = now_ms - prev
             # Only log aggressively for tiles (CS-*) to keep noise down
-            if logical_name and logical_name.startswith(self._CS_PREFIX):
+            if logical_name.startswith(self._CS_PREFIX):
                 print(
                     f"[BLE] cb addr={address} name={logical_name or tile_name} "
                     f"gap={gap:4d}ms rssi={rssi:4d} mf='{mfg_ascii}'"
                 )
         else:
-            if logical_name and logical_name.startswith(self._CS_PREFIX):
+            if logical_name.startswith(self._CS_PREFIX):
                 print(
                     f"[BLE] first cb addr={address} name={logical_name or tile_name} "
                     f"rssi={rssi:4d} mf='{mfg_ascii}'"
@@ -708,6 +687,7 @@ class EnhancedBLEScanner:
 
 class _MonotonicClock(Clock):
     """Simple clock for CLI testing."""
+
     def milliseconds(self) -> int:
         return int(time.monotonic() * 1000)
 
