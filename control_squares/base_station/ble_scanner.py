@@ -4,6 +4,7 @@ import asyncio
 import sys
 import threading
 import time
+import re, subprocess
 
 from battlepoint_core import (
     Clock,
@@ -26,6 +27,65 @@ try:
     from bleak import BleakScanner
 except ImportError:
     BleakScanner = None
+
+
+def pick_usb_hci_index():
+    """
+    Parse `hciconfig -a` output and return the index of the adapter
+    whose Bus is USB. Handles 'Bus: USB' on the same line as hciX:,
+    or on the following line. Falls back to 0 if none found.
+    """
+    try:
+        out = subprocess.check_output(
+            ["hciconfig", "-a"], text=True, stderr=subprocess.STDOUT
+        )
+    except Exception as e:
+        print(f"[ERROR] Failed to run hciconfig: {e}")
+        print("[INFO] Falling back to hci0")
+        return 0
+
+    lines = out.splitlines()
+    current_idx = None
+    current_bus = None
+    usb_indices = []
+
+    for i, line in enumerate(lines):
+        line = line.rstrip()
+
+        # Match hci header line: "hci0:   Type: Primary  Bus: USB"
+        m = re.match(r"^hci(\d+):", line)
+        if m:
+            # flush previous adapter
+            if current_idx is not None and current_bus == "USB":
+                usb_indices.append(current_idx)
+
+            current_idx = int(m.group(1))
+            current_bus = None
+
+            # Check for Bus: on the same line
+            if "Bus:" in line:
+                parts = line.split("Bus:", 1)
+                bus = parts[1].strip().split()[0]
+                current_bus = bus
+            continue
+
+        # If Bus: is on a following line, catch it here
+        if "Bus:" in line and current_idx is not None and current_bus is None:
+            parts = line.split("Bus:", 1)
+            bus = parts[1].strip().split()[0]
+            current_bus = bus
+
+    # Flush last adapter block
+    if current_idx is not None and current_bus == "USB":
+        usb_indices.append(current_idx)
+
+    if usb_indices:
+        chosen = usb_indices[0]
+        print(f"[INFO] Detected USB Bluetooth adapter: hci{chosen}")
+        return chosen
+
+    print("[WARN] No USB adapter detected via hciconfig, falling back to hci0")
+    return 0
 
 
 # ============================================================================
@@ -63,7 +123,7 @@ class EnhancedBLEScanner:
         self._thread_loop: Optional[asyncio.AbstractEventLoop] = None
 
         # ---------------- Linux (Bleson) bits ----------------
-        self._linux_adapter_index = linux_adapter_index
+        self._linux_adapter_index = pick_usb_hci_index()
         self._linux_adapter = None
         self._linux_observer: Optional["Observer"] = None
 
