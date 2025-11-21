@@ -10,7 +10,7 @@ pytest-asyncio>=0.21.0
 
 # Bluetooth support (optional, for real hardware)
 bleak>=0.21.0  # Cross-platform Bluetooth LE library
-
+bleson
 # Sound support (optional)
 pygame>=2.5.0  # For sound playback
 # OR
