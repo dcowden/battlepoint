@@ -1,6 +1,6 @@
 """
 BattlePoint - Multi-Mode Game Server
-Supports KOTH and 3CP game modes
+Supports KOTH, 3CP, and CLOCK-ONLY game modes
 """
 
 import asyncio
@@ -12,36 +12,42 @@ from starlette.staticfiles import StaticFiles
 
 from battlepoint_game import EnhancedGameBackend
 from threecp_game import ThreeCPBackend
+from clock_game import ClockBackend
 from settings import UnifiedSettingsManager, ThreeCPOptions
 import aiohttp
 
+# Windows event loop policy
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # Mount sounds
 app.mount('/sounds', StaticFiles(directory='sounds'), name='sounds')
 
-# Create backends for both modes
+# Create backends for all modes
 koth_backend = EnhancedGameBackend()
-# Create backends for both modes
 
 threecp_backend = ThreeCPBackend(
     sound_system=koth_backend.sound_system,
     scanner=koth_backend.scanner,
 )
 
+clock_backend = ClockBackend(
+    event_manager=koth_backend.event_manager
+)
 
-# Settings manager
 settings_manager = UnifiedSettingsManager()
 
+# ---- Load KOTH settings via backend ----
+koth_saved = None
+if hasattr(koth_backend, "load_settings"):
+    koth_saved = koth_backend.load_settings()
 
-# Load saved settings
-koth_saved = settings_manager.load_koth_settings()
 if koth_saved:
     opts, vol, _ = koth_saved
     koth_backend.configure(opts)
     koth_backend.sound_system.set_volume(vol)
 
+# ---- Load 3CP settings via global manager (unchanged) ----
 threecp_saved = settings_manager.load_3cp_settings()
 if threecp_saved:
     opts, vol, _ = threecp_saved
@@ -63,6 +69,121 @@ async def close_session():
     if _session is not None:
         await _session.close()
         _session = None
+
+
+# ========================================================================
+# WINNER OVERLAY HELPER (KOTH + 3CP)
+# ========================================================================
+
+def install_winner_overlay(mode: str) -> dict:
+    """
+    Install a full-screen winner overlay for the current client.
+
+    'mode' is something like 'koth', '3cp', etc., so each mode
+    gets its own dismissal memory.
+    """
+    storage = app.storage.user
+    DISMISSED_KEY_NAME = f'bp_winner_dismissed_key_{mode}'
+
+    winner_dismissed = {'flag': False}
+    last_winner_key = {'key': None}
+
+    def _team_bg(team: str) -> str:
+        t = (team or '').strip().upper()
+        if t == 'RED':
+            return '#FF0000'
+        if t == 'BLU':
+            return '#0000FF'
+        return 'rgba(0,0,0,0.95)'
+
+    def _winner_text(team: str) -> str:
+        t = (team or '').strip().upper()
+        if t in ('RED', 'BLU'):
+            return f'Winner: {t}'
+        return 'Winner'
+
+    with ui.dialog() as winner_dialog:
+        with ui.element('div').style(
+            'position:fixed;'
+            'left:0;'
+            'top:52px;'
+            'width:100vw;'
+            'height:calc(100vh - 52px);'
+            'max-width:none;'
+            'max-height:none;'
+            'border-radius:0;'
+            'box-shadow:none;'
+            'display:flex;'
+            'flex-direction:column;'
+            'align-items:center;'
+            'justify-content:center;'
+            'background:rgba(0,0,0,0.95);'
+            'color:white;'
+            'z-index:1;'
+        ) as winner_overlay:
+
+            winner_label = ui.label('Winner').classes(
+                'text-8xl font-extrabold tracking-wide mb-4'
+            )
+            winner_subtitle = ui.label('Control point secured').classes('text-3xl')
+
+            ui.button(
+                'DISMISS',
+                on_click=lambda: (
+                    winner_dialog.close(),
+                    winner_dismissed.__setitem__('flag', True),
+                    storage.__setitem__(DISMISSED_KEY_NAME, last_winner_key['key'])
+                ),
+            ).props('unelevated color=white text-color=black').classes(
+                'text-xl px-10 py-4 rounded-xl font-bold'
+            ).style(
+                'position:absolute;'
+                'bottom:40px;'
+                'left:50%;'
+                'transform:translateX(-50%);'
+            )
+
+    def open_winner(team_str: str):
+        team_norm = (team_str or '').strip().upper()
+        key = f"ended:{team_norm or 'NONE'}"
+        stored_key = storage.get(DISMISSED_KEY_NAME, None)
+
+        # If user already dismissed this specific winner in THIS MODE, don't re-show
+        if stored_key == key:
+            return
+
+        bg = _team_bg(team_str)
+        winner_overlay.style(
+            'position:fixed;'
+            'left:0;'
+            'top:52px;'
+            'width:100vw;'
+            'height:calc(100vh - 52px);'
+            'max-width:none;'
+            'max-height:none;'
+            'border-radius:0;'
+            'box-shadow:none;'
+            'display:flex;'
+            'flex-direction:column;'
+            'align-items:center;'
+            'justify-content:center;'
+            f'background:{bg};'
+            'color:white;'
+            'z-index:1;'
+        )
+        winner_label.set_text(_winner_text(team_str))
+        winner_subtitle.set_text('Control point secured')
+
+        last_winner_key['key'] = key
+        winner_dialog.open()
+        winner_dismissed['flag'] = False
+
+    return {
+        'open_winner': open_winner,
+        'dialog': winner_dialog,
+        'dismissed': winner_dismissed,
+        'storage_key': DISMISSED_KEY_NAME,
+    }
 
 
 # ========================================================================
@@ -186,6 +307,23 @@ def landing_page():
                         'unelevated color=teal-6'
                     ).classes('w-full')
 
+                # CLOCK-ONLY Card
+                with ui.element('div').classes('bp-mode-card').on('click', lambda: ui.navigate.to('/clock')):
+                    ui.html(
+                        '<div class="bp-mode-title" style="color: #ffd166;">⏱️ CLOCK ONLY</div>',
+                        sanitize=False,
+                    )
+                    ui.html(
+                        '<div class="bp-mode-desc">'
+                        'A simple round clock: set minutes and seconds, start the timer, '
+                        'and let BattlePoint handle announcements and sounds.'
+                        '</div>',
+                        sanitize=False,
+                    )
+                    ui.button('RUN CLOCK →', on_click=lambda: ui.navigate.to('/clock')).props(
+                        'unelevated color=amber-6'
+                    ).classes('w-full')
+
             with ui.element('div').classes('bp-info'):
                 ui.label('📋 Game Instructions').classes('text-xl font-bold mb-2')
                 ui.html(
@@ -193,7 +331,8 @@ def landing_page():
                 <ul style="color: #b0b0b0; line-height: 1.8;">
                     <li><strong>KOTH:</strong> One control point. Own it to drain your timer. Reach 0:00 to win.</li>
                     <li><strong>3CP:</strong> Three points (A-B-C). Capture in sequence to push forward and win.</li>
-                    <li><strong>Setup:</strong> Use Bluetooth devices or manual controls (Debug page) to simulate players.</li>
+                    <li><strong>Clock:</strong> Simple round timer with audio cues; no control points.</li>
+                    <li><strong>Setup:</strong> Use Bluetooth devices or manual controls (Debug page) to simulate players for KOTH/3CP.</li>
                     <li><strong>Settings:</strong> Configure capture times, game duration, and control square mappings.</li>
                 </ul>
                 ''',
@@ -367,6 +506,10 @@ async def koth_game_ui():
     </style>
     """)
 
+    # Winner overlay for this client/page
+    overlay = install_winner_overlay('koth')
+    open_winner = overlay['open_winner']
+
     with ui.element('div').classes('bp-root'):
         # TOP BAR
         with ui.element('div').classes('bp-topbar'):
@@ -477,6 +620,11 @@ async def koth_game_ui():
                 else:
                     start_btn.set_visibility(True)
                     stop_btn.set_visibility(False)
+
+                # Winner overlay
+                winner = state.get('winner')
+                if winner:
+                    open_winner(winner)
 
                 # Update clock
                 if phase == 'countdown':
@@ -647,6 +795,10 @@ async def threecp_game_ui():
     </style>
     """)
 
+    # Winner overlay for this client/page
+    overlay = install_winner_overlay('3cp')
+    open_winner = overlay['open_winner']
+
     with ui.element('div').classes('bp-root'):
         # TOP BAR
         with ui.element('div').classes('bp-topbar'):
@@ -719,14 +871,14 @@ async def threecp_game_ui():
 
             s = await get_session()
 
-            # make sure manual mode is on for 3cp
+            # enable manual mode
             try:
                 resp_mode = await s.post('http://localhost:8080/api/3cp/manual/mode/true')
                 print(f"[DEBUG] 3CP UI toggle: manual mode ON -> {resp_mode.status}")
             except Exception as ex:
                 print(f"[DEBUG] 3CP UI toggle: error enabling manual mode: {ex}")
 
-            # now toggle that CP/team state in the backend
+            # toggle this CP/team state
             try:
                 resp = await s.post(f'http://localhost:8080/api/3cp/manual/{cp_idx}/{team}/toggle')
                 txt = await resp.text()
@@ -765,6 +917,11 @@ async def threecp_game_ui():
                 else:
                     start_btn.set_visibility(True)
                     stop_btn.set_visibility(False)
+
+                # Winner overlay
+                winner = state.get('winner')
+                if winner:
+                    open_winner(winner)
 
                 # Clock
                 if phase == 'countdown':
@@ -821,7 +978,225 @@ async def threecp_game_ui():
 
 
 # ========================================================================
-# SETTINGS PAGE (supports both modes)
+# CLOCK-ONLY GAME PAGE
+# ========================================================================
+
+@ui.page('/clock')
+async def clock_game_ui():
+    """Simple clock-only game interface (no control points)"""
+    ui.colors(primary='#1976D2')
+
+    ui.add_head_html("""
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        height: 100%;
+        overflow: hidden;
+      }
+      .bp-root-clock {
+        width: 100vw;
+        height: 100vh;
+        background: radial-gradient(circle at top, #222 0%, #000 60%);
+        display: flex;
+        flex-direction: column;
+        color: #fff;
+      }
+      .bp-topbar-clock {
+        height: 52px;
+        background: #111;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 1rem;
+      }
+      .bp-main-clock {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3rem;
+        padding: 2rem;
+      }
+      .bp-clock-face {
+        font-size: clamp(18rem, 50rem, 60rem);
+        font-weight: 400;
+        color: #ffffff;
+        text-shadow: 0 0 40px rgba(0,0,0,0.9);
+      }
+      .bp-controls-clock {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        align-items: center;
+        justify-content: center;
+        min-width: 380px;
+        padding: 1.75rem 2.25rem;
+        border-radius: 16px;
+        background: rgba(15,15,15,0.95);
+        border: 1px solid #444;
+      }
+      .bp-controls-clock .q-field__control {
+        min-height: 4.2rem;
+      }
+      .bp-controls-clock .q-field__native {
+        line-height: 3rem;
+        padding-top: 0.2rem;
+        padding-bottom: 0.2rem;
+      }
+      .bp-time-input-row {
+        display: flex;
+        flex-direction: row;
+        gap: 2rem;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+      }
+      .bp-buttons-row {
+        display: flex;
+        flex-direction: row;
+        gap: 1.5rem;
+        align-items: center;
+        justify-content: center;
+      }
+      .bp-status-clock {
+        font-size: 1.6rem;
+        color: #cccccc;
+      }
+    </style>
+    """)
+
+    with ui.element('div').classes('bp-root-clock'):
+        # TOP BAR
+        with ui.element('div').classes('bp-topbar-clock'):
+            with ui.row().classes('gap-2 items-center'):
+                ui.button('← HOME', on_click=lambda: ui.navigate.to('/')).props('flat color=white')
+                ui.label('CLOCK MODE').classes('text-white text-lg font-bold')
+            ui.label('Set round time, then press START').classes('text-sm text-gray-400')
+
+        # MAIN CONTENT
+        with ui.element('div').classes('bp-main-clock'):
+            # Big clock
+            clock_label = ui.label('10:00').classes('bp-clock-face')
+
+            # Time configuration + start/stop
+            with ui.element('div').classes('bp-controls-clock'):
+                ui.label('Round Time (mm:ss)').classes('text-2xl font-semibold')
+
+                with ui.element('div').classes('bp-time-input-row'):
+                    minutes_input = ui.input(
+                        label='Minutes',
+                        value='10',
+                    ).props(
+                        'outlined input-style="font-size: 2.8rem; text-align: center; color: white;"'
+                    )
+                    seconds_input = ui.input(
+                        label='Seconds',
+                        value='0',
+                    ).props(
+                        'outlined input-style="font-size: 2.8rem; text-align: center; color: white;"'
+                    )
+
+                with ui.element('div').classes('bp-buttons-row'):
+                    start_btn = ui.button('START', icon='play_arrow').props('color=green')
+                    stop_btn = ui.button('STOP', icon='stop').props('color=orange')
+                    stop_btn.set_visibility(False)
+
+            status_label = ui.label('Waiting...').classes('bp-status-clock')
+
+    # Handlers
+    async def start_clock():
+        try:
+            mins = int(minutes_input.value.strip() or '0')
+        except Exception:
+            mins = 0
+        try:
+            secs = int(seconds_input.value.strip() or '0')
+        except Exception:
+            secs = 0
+
+        mins = max(0, min(99, mins))
+        secs = max(0, min(59, secs))
+
+        total_seconds = max(1, mins * 60 + secs)
+
+        s = await get_session()
+        await s.post(
+            'http://localhost:8080/api/clock/configure',
+            json={'time_limit_seconds': total_seconds},
+        )
+        await s.post('http://localhost:8080/api/clock/start')
+
+    async def stop_clock():
+        s = await get_session()
+        await s.post('http://localhost:8080/api/clock/stop')
+
+    start_btn.on('click', start_clock)
+    stop_btn.on('click', stop_clock)
+
+    initialized = {'done': False}
+
+    async def update_ui():
+        try:
+            while True:
+                try:
+                    s = await get_session()
+                    async with s.get('http://localhost:8080/api/clock/state') as resp:
+                        state = await resp.json()
+                except Exception:
+                    await asyncio.sleep(0.3)
+                    continue
+
+                running = bool(state.get('running', False))
+                phase = state.get('phase', 'idle')
+                remaining = int(state.get('remaining_seconds', 0))
+                total = int(state.get('time_limit_seconds', max(remaining, 1)))
+
+                # Initialize inputs from backend once
+                if not initialized['done']:
+                    base = total if phase == 'idle' else remaining
+                    m0, s0 = divmod(base, 60)
+                    minutes_input.value = str(m0)
+                    seconds_input.value = f'{s0}'
+                    minutes_input.update()
+                    seconds_input.update()
+                    initialized['done'] = True
+
+                # Button visibility
+                if running:
+                    start_btn.set_visibility(False)
+                    stop_btn.set_visibility(True)
+                else:
+                    start_btn.set_visibility(True)
+                    stop_btn.set_visibility(False)
+
+                # Clock display
+                mins = remaining // 60
+                secs = remaining % 60
+                clock_label.set_text(f'{mins}:{secs:02d}')
+
+                # Status
+                if phase == 'idle':
+                    status_label.set_text('Waiting...')
+                elif phase == 'running':
+                    status_label.set_text('Clock running')
+                elif phase == 'ended':
+                    status_label.set_text('Time up')
+                else:
+                    status_label.set_text(phase)
+
+                await asyncio.sleep(0.1)
+        finally:
+            await close_session()
+
+    task = asyncio.create_task(update_ui())
+    clock_label.on('disconnect', lambda _: task.cancel())
+
+
+# ========================================================================
+# SETTINGS PAGE
 # ========================================================================
 
 @ui.page('/settings')
@@ -965,23 +1340,19 @@ async def settings_ui(mode: str = 'koth'):
                 ).classes('w-full')
 
                 async def save_3cp():
-                    # Parse square mappings
                     def parse_squares(text: str) -> list[int]:
                         out: list[int] = []
                         for token in text.split(','):
                             token = token.strip()
                             if not token:
                                 continue
-
                             digits = ''.join(ch for ch in token if ch.isdigit())
                             if not digits:
                                 continue
-
                             try:
                                 out.append(int(digits))
                             except ValueError:
                                 continue
-
                         return out
 
                     cp1_squares = parse_squares(cp1_input.value)
@@ -1019,12 +1390,51 @@ async def settings_ui(mode: str = 'koth'):
                     'Save 3CP Settings', on_click=save_3cp
                 ).props('color=primary').classes('mt-4')
 
-        # -------------------- Load settings on page load --------------------
+        # Load settings on page load
         async def load_initial_settings():
             if current_mode == 'koth':
-                # You can add KOTH settings load logic here if needed.
-                return
+                # ---- KOTH settings load ----
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            'http://localhost:8080/api/koth/settings/load'
+                        ) as resp:
+                            data = await resp.json()
+
+                    print("[DEBUG] load_initial_settings(koth): got data =", data)
+
+                    if data.get('status') != 'not_found':
+                        # mode int -> label
+                        mode_rev = {0: 'KOTH', 1: 'AD', 2: 'CP'}
+                        koth_mode_select.value = mode_rev.get(data.get('mode', 0), 'KOTH')
+
+                        koth_time_limit.value = data.get('time_limit_seconds', 60)
+                        koth_capture_time.value = data.get('capture_seconds', 20)
+                        koth_button_threshold.value = data.get(
+                            'capture_button_threshold_seconds', 5
+                        )
+                        koth_start_delay.value = data.get('start_delay_seconds', 5)
+
+                        print(
+                            "[DEBUG] load_initial_settings(koth): "
+                            "mode=", koth_mode_select.value,
+                            "time_limit=", koth_time_limit.value,
+                            "capture=", koth_capture_time.value,
+                            "btn_thresh=", koth_button_threshold.value,
+                            "start_delay=", koth_start_delay.value,
+                        )
+
+                        koth_mode_select.update()
+                        koth_time_limit.update()
+                        koth_capture_time.update()
+                        koth_button_threshold.update()
+                        koth_start_delay.update()
+
+                except Exception as e:
+                    print(f"[DEBUG] Error loading KOTH settings: {e}")
+
             else:
+                # ---- 3CP settings load (unchanged) ----
                 try:
                     async with aiohttp.ClientSession() as session:
                         async with session.get(
@@ -1086,7 +1496,7 @@ async def settings_ui(mode: str = 'koth'):
 
 
 # ========================================================================
-# DEBUG PAGE (BLE + events, single/global)
+# DEBUG PAGE (BLE + events)
 # ========================================================================
 
 @ui.page('/debug')
@@ -1112,7 +1522,6 @@ def debug_ui(from_page: str = '', admin: str = ''):
                 'Manual Proximity Control (use Red/Blue toggles on main screen)'
             )
             manual_status = ui.label('').classes('text-sm text-gray-400')
-            # attach_sound_opt_in()  # removed; not defined in this file
 
         # BLE SCANNER CARD
         with ui.card().classes('w-full p-4'):
@@ -1350,11 +1759,11 @@ def debug_ui(from_page: str = '', admin: str = ''):
         except Exception as e:
             print(f"Debug update error: {e}")
 
-    ui.timer(0.5, update_debug_once, once=False)
+    ui.timer(0.25, update_debug_once, once=False)
 
 
 # ========================================================================
-# API ENDPOINTS - ALIASES FOR OLD DEBUG PAGE
+# API ENDPOINTS - ALIASES / MANUAL / BLE
 # ========================================================================
 
 @app.get("/api/manual/state")
@@ -1400,7 +1809,6 @@ async def bluetooth_devices():
     print("[DEBUG] /api/bluetooth/devices called (FORCED KOTH)")
 
     try:
-        # Always use the scanner owned by koth_backend
         return koth_backend.get_ble_devices_summary()
     except Exception as e:
         print(f"[DEBUG] /api/bluetooth/devices ERROR: {e}")
@@ -1410,12 +1818,6 @@ async def bluetooth_devices():
 # ========================================================================
 # API ENDPOINTS - KOTH
 # ========================================================================
-
-@app.get("/api/3cp/manual/state")
-async def threecp_manual_state():
-    print("[DEBUG] /api/3cp/manual/state called")
-    return threecp_backend.get_manual_state()
-
 
 @app.get("/api/koth/manual/state")
 async def koth_manual_state():
@@ -1459,24 +1861,39 @@ async def koth_configure(options: dict):
 
 @app.post("/api/koth/settings/save")
 async def koth_save_settings():
+    """
+    Persist current KOTH options using EnhancedGameBackend's own settings manager.
+    """
+    if not hasattr(koth_backend, "save_settings"):
+        return {"status": "error", "reason": "koth_backend has no save_settings()"}
     success = koth_backend.save_settings()
     return {"status": "saved" if success else "error"}
 
 
+
 @app.get("/api/koth/settings/load")
 async def koth_load_settings():
-    saved = settings_manager.load_koth_settings()
-    if saved:
-        options, volume, _ = saved
-        return {
-            "mode": options.mode.value,
-            "capture_seconds": options.capture_seconds,
-            "capture_button_threshold_seconds": options.capture_button_threshold_seconds,
-            "time_limit_seconds": options.time_limit_seconds,
-            "start_delay_seconds": options.start_delay_seconds,
-            "volume": volume,
-        }
-    return {"status": "not_found"}
+    """
+    Load KOTH settings via EnhancedGameBackend so we read the same file
+    that /api/koth/settings/save writes.
+    """
+    if not hasattr(koth_backend, "load_settings"):
+        return {"status": "not_found"}
+
+    saved = koth_backend.load_settings()
+    if not saved:
+        return {"status": "not_found"}
+
+    options, volume, _ = saved
+    return {
+        "mode": options.mode.value,
+        "capture_seconds": options.capture_seconds,
+        "capture_button_threshold_seconds": options.capture_button_threshold_seconds,
+        "time_limit_seconds": options.time_limit_seconds,
+        "start_delay_seconds": options.start_delay_seconds,
+        "volume": volume,
+    }
+
 
 
 @app.post("/api/koth/manual/mode/{enabled}")
@@ -1530,13 +1947,8 @@ async def threecp_configure(options: dict):
 
 @app.post("/api/3cp/settings/save")
 async def threecp_save_settings(options: dict):
-    # Build ThreeCPOptions directly from the incoming JSON
     opts = ThreeCPOptions.from_dict(options)
-
-    # Apply to running backend
     threecp_backend.configure(opts)
-
-    # Persist to disk
     success = settings_manager.save_3cp_settings(opts, volume=10)
     return {"status": "saved" if success else "error"}
 
@@ -1558,6 +1970,12 @@ async def threecp_load_settings():
     return {"status": "not_found"}
 
 
+@app.get("/api/3cp/manual/state")
+async def threecp_manual_state():
+    print("[DEBUG] /api/3cp/manual/state called")
+    return threecp_backend.get_manual_state()
+
+
 @app.post("/api/3cp/manual/mode/{enabled}")
 async def threecp_set_manual(enabled: bool):
     print(f"[DEBUG] /api/3cp/manual/mode called with enabled={enabled}")
@@ -1576,6 +1994,34 @@ async def threecp_manual_toggle(cp_index: int, team: str):
 
 
 # ========================================================================
+# API ENDPOINTS - CLOCK
+# ========================================================================
+
+@app.get("/api/clock/state")
+async def clock_get_state():
+    return clock_backend.get_state()
+
+
+@app.post("/api/clock/configure")
+async def clock_configure(options: dict):
+    total = int(options.get('time_limit_seconds', 60) or 60)
+    clock_backend.configure(total)
+    return {"status": "configured"}
+
+
+@app.post("/api/clock/start")
+async def clock_start():
+    clock_backend.start_game()
+    return {"status": "started"}
+
+
+@app.post("/api/clock/stop")
+async def clock_stop():
+    clock_backend.stop_game()
+    return {"status": "stopped"}
+
+
+# ========================================================================
 # GAME LOOPS
 # ========================================================================
 
@@ -1591,9 +2037,16 @@ async def threecp_game_loop():
         await asyncio.sleep(0.1)
 
 
+async def clock_game_loop():
+    while True:
+        clock_backend.update()
+        await asyncio.sleep(0.1)
+
+
 async def start_game_loops():
     asyncio.create_task(koth_game_loop())
     asyncio.create_task(threecp_game_loop())
+    asyncio.create_task(clock_game_loop())
 
 
 app.on_startup(start_game_loops)

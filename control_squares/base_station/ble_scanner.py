@@ -39,7 +39,7 @@ _TEAM_CHARS = ("B", "R")
 class EnhancedBLEScanner:
     _CS_PREFIX = "CS-"
     _PLAYER_PREFIX = "PT-"
-    FRESH_WINDOW_MS = 750  # slightly generous; adjust if you want tighter
+    FRESH_WINDOW_MS = 1000  # slightly generous; adjust if you want tighter
 
     def __init__(self, clock: Clock, linux_adapter_index: int = 1):
         """
@@ -392,8 +392,8 @@ class EnhancedBLEScanner:
         if not parts:
             return None
 
-        team = parts[0].strip().upper()
-        if team in ("B", "R"):
+        team = parts[1].strip().upper()
+        if team in ("B", "R","M","T"):
             return team
 
         return None
@@ -430,6 +430,7 @@ class EnhancedBLEScanner:
         with self._lock:
             for _, info in self.devices.items():
                 if not self._is_control_square(info):
+                    print(f"Warning: skipping {info['name']} ", file=sys.stderr)
                     continue
 
                 last_seen = info.get("last_seen", 0.0) or 0.0
@@ -446,7 +447,8 @@ class EnhancedBLEScanner:
 
         red = min(red, MAX_PLAYERS_PER_TEAM)
         blu = min(blu, MAX_PLAYERS_PER_TEAM)
-        return {"red": red, "blu": blu}
+        r =  {"red": red, "blu": blu}
+        return r
 
     def get_player_counts_for_squares(self, square_ids: List[int]) -> Dict[str, int]:
         """

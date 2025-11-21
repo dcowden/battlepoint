@@ -1969,7 +1969,7 @@ async def mobile_ui(admin: str = ''):
                         start_btn.set_visibility(True)
                         stop_btn.set_visibility(False)
 
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.1)
         finally:
             await close_page_session()
 

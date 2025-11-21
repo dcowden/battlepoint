@@ -6,6 +6,8 @@ Linear progression: RED captures A→B→C, BLU captures C→B→A
 from typing import Optional, List, Dict
 from enum import Enum
 import traceback
+import asyncio
+import threading
 
 from battlepoint_core import (
     Team,
@@ -355,9 +357,26 @@ class ThreeCPBackend:
         else:
             self._do_start_game_now()
 
+    #tod-- break this out
+    def _ensure_ble(self, scanning: bool):
+        async def _go():
+            if scanning:
+                await self.scanner.start_scanning()
+            else:
+                await self.scanner.stop_scanning()
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_go())
+        except RuntimeError:
+            # No running loop (e.g., called from blocking context) – spin a thread
+            threading.Thread(target=lambda: asyncio.run(_go()), daemon=True).start()
+
+
     def _do_start_game_now(self):
         """Actually start the game after countdown."""
         if self.game:
+            self._ensure_ble(True)
             self.game.start()
             self._phase = GamePhase.RUNNING
             self._running = True
@@ -370,6 +389,7 @@ class ThreeCPBackend:
         if self.game:
             self.game.end()
 
+        self._ensure_ble(False)
         self._phase = GamePhase.IDLE
         self._running = False
         self.game = None
