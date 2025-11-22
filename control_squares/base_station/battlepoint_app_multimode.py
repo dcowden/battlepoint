@@ -728,18 +728,18 @@ async def threecp_game_ui():
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 2rem;
-        padding: 2rem;
+        gap: 1rem;
+        padding: 1rem;
       }
       .bp-clock-3cp {
-        font-size: clamp(4rem, 12vw, 8rem);
+        font-size: clamp(4rem, 14vw, 16rem);
         font-weight: 400;
         color: #fff;
         text-align: center;
       }
       .bp-points-container {
         display: flex;
-        gap: 3rem;
+            gap: 10rem;
         align-items: flex-start;
         justify-content: center;
         width: 100%;
@@ -754,14 +754,14 @@ async def threecp_game_ui():
         max-width: 350px;
       }
       .bp-cp-circle {
-        width: 120px;
-        height: 120px;
+        width: 300px;
+        height: 300px;
         border-radius: 50%;
         border: 4px solid #444;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 3rem;
+        font-size: 7rem;
         font-weight: 800;
         background: #222;
         transition: all 0.3s ease;
@@ -800,22 +800,23 @@ async def threecp_game_ui():
     open_winner = overlay['open_winner']
 
     with ui.element('div').classes('bp-root'):
-        # TOP BAR
-        with ui.element('div').classes('bp-topbar'):
-            with ui.row().classes('gap-2'):
+        with ui.element('div').classes('bp-topbar flex justify-between items-center px-4'):
+            # LEFT SIDE
+            with ui.row().classes('gap-2 items-center'):
                 ui.button('← HOME', on_click=lambda: ui.navigate.to('/')).props('flat color=white')
                 ui.label('3CP MODE').classes('text-white text-lg font-bold')
 
-            with ui.row().classes('gap-2'):
+            # RIGHT SIDE
+            with ui.row().classes('gap-3 items-center'):
                 start_btn = ui.button('START').props('color=green')
                 stop_btn = ui.button('STOP').props('color=orange')
                 stop_btn.set_visibility(False)
-                ui.button(
-                    'Settings', on_click=lambda: ui.navigate.to('/settings?mode=3cp')
-                ).props('flat color=white')
-                ui.button(
-                    'Debug', on_click=lambda: ui.navigate.to('/debug')
-                ).props('flat color=white')
+
+                ui.button('Settings', on_click=lambda: ui.navigate.to('/settings?mode=3cp')
+                          ).props('flat color=white')
+
+                ui.button('Debug', on_click=lambda: ui.navigate.to('/debug')
+                          ).props('flat color=white')
 
         # MAIN CONTENT
         with ui.element('div').classes('bp-main-3cp'):
@@ -825,7 +826,7 @@ async def threecp_game_ui():
             # THREE CONTROL POINTS
             with ui.element('div').classes('bp-points-container'):
                 cp_elements: list[dict[str, Any]] = []
-                for i, label in enumerate(['A', 'B', 'C']):
+                for i, label in enumerate(['R', 'C', 'B']):
                     with ui.element('div').classes('bp-cp-column'):
                         circle = ui.element('div').classes('bp-cp-circle')
                         circle.style('color: #fff;')
@@ -1021,7 +1022,7 @@ async def clock_game_ui():
         padding: 2rem;
       }
       .bp-clock-face {
-        font-size: clamp(18rem, 50rem, 60rem);
+        font-size: clamp(18rem, 30rem, 30rem);
         font-weight: 400;
         color: #ffffff;
         text-shadow: 0 0 40px rgba(0,0,0,0.9);
@@ -1033,7 +1034,7 @@ async def clock_game_ui():
         align-items: center;
         justify-content: center;
         min-width: 380px;
-        padding: 1.75rem 2.25rem;
+        padding: 1.25rem 1.25rem;
         border-radius: 16px;
         background: rgba(15,15,15,0.95);
         border: 1px solid #444;

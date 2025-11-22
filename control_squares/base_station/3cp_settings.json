@@ -2,8 +2,8 @@
   "capture_seconds": 5,
   "capture_button_threshold_seconds": 1,
   "time_limit_seconds": 200,
-  "start_delay_seconds": 7,
-  "add_time_per_first_capture_seconds": 111,
+  "start_delay_seconds": 6,
+  "add_time_per_first_capture_seconds": 100,
   "control_square_mapping": {
     "cp_1_squares": [
       1
