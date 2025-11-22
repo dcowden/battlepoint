@@ -23,9 +23,6 @@ if sys.platform == 'win32':
 # Mount sounds
 app.mount('/sounds', StaticFiles(directory='sounds'), name='sounds')
 
-# Single backend instance
-
-app.mount('/sounds',StaticFiles(directory='sounds'), name='sounds')
 
 class BrowserSoundClient:
     def __init__(self, client_id: int, audio: ui.audio):
@@ -464,7 +461,7 @@ def attach_sound_opt_in():
 
 
 # Create backends for all modes
-koth_backend = EnhancedGameBackend()
+koth_backend = EnhancedGameBackend(sound_system = browser_sound_bus)
 
 threecp_backend = ThreeCPBackend(
     sound_system=koth_backend.sound_system,
