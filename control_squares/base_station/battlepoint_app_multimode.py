@@ -9,10 +9,11 @@ from typing import Any
 
 from nicegui import ui, app, Client
 from starlette.staticfiles import StaticFiles
-
+from multimode_app_static import *
 from battlepoint_game import EnhancedGameBackend,SOUND_MAP
 from threecp_game import ThreeCPBackend
 from clock_game import ClockBackend
+from ad_game import ADBackend
 from settings import UnifiedSettingsManager, ThreeCPOptions
 import aiohttp
 
@@ -29,8 +30,6 @@ class BrowserSoundClient:
         self.client_id = client_id
         self.audio = audio
         self.enabled = False
-
-
 
 from typing import Dict, Optional
 import random
@@ -200,138 +199,7 @@ def inject_audio_js_once():
         return
     _audio_js_injected = True
 
-    ui.add_head_html("""
-    <script>
-    (function() {
-      if (window.bpSoundBootstrapped) return;
-      window.bpSoundBootstrapped = true;
-
-      window.bpChannels = window.bpChannels || {};
-
-      window.bpPlaySound = function(opts) {
-        try {
-          const a = new Audio(opts.src);
-          a.volume = (opts.volume !== undefined) ? opts.volume : 1.0;
-          a.play().catch(e => {
-            console.warn('bpPlaySound blocked', e);
-          });
-        } catch (e) {
-          console.error('bpPlaySound error', e);
-        }
-      };
-
-      window.bpPlayChannel = function(name, opts) {
-        try {
-          window.bpChannels = window.bpChannels || {};
-          const existing = window.bpChannels[name];
-          if (existing) {
-            try {
-              existing.pause();
-              existing.currentTime = 0;
-            } catch (e) {}
-          }
-          const a = new Audio(opts.src);
-          a.volume = (opts.volume !== undefined) ? opts.volume : 1.0;
-          a.loop = !!opts.loop;
-          a.play().catch(e => {
-            console.warn('bpPlayChannel blocked for', name, e);
-          });
-          window.bpChannels[name] = a;
-        } catch (e) {
-          console.error('bpPlayChannel error', name, e);
-        }
-      };
-
-      window.bpStopChannel = function(name) {
-        try {
-          if (!window.bpChannels) return;
-          const a = window.bpChannels[name];
-          if (a) {
-            try { a.pause(); } catch (e) {}
-          }
-          delete window.bpChannels[name];
-        } catch (e) {
-          console.error('bpStopChannel error', name, e);
-        }
-      };
-
-      async function bpTryPrimeOnce() {
-        // silent 1-frame WAV
-        const src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQAAAAA=";
-        const a = new Audio(src);
-        a.volume = 0.0;
-        const p = a.play();
-        if (p && typeof p.then === 'function') {
-          await p;
-        }
-        try { a.pause(); } catch (e) {}
-      }
-
-      window.bpInitSound = function(cid) {
-        const container = document.getElementById('bp-sound-ui-' + cid);
-        if (!container) return;
-
-        const stored = (localStorage.getItem('bp_sound_enabled') === '1');
-
-        function renderChip(text, colorClass) {
-          container.innerHTML =
-            '<div class="q-chip q-chip--dense ' + colorClass + ' text-white" ' +
-            'style="padding:2px 8px;display:inline-flex;align-items:center;gap:4px;">' +
-            '<span>🔊</span><span>' + text + '</span></div>';
-        }
-
-        function renderButton() {
-          container.innerHTML =
-            '<button class="q-btn q-btn--dense bg-yellow-7 text-black" ' +
-            'style="padding:2px 8px;border-radius:6px;">Enable sound</button>';
-          const btn = container.querySelector('button');
-          if (btn) {
-            btn.addEventListener('click', async () => {
-              const ok = await attemptEnable(true);
-              if (!ok) {
-                alert('Your browser blocked sound. Check autoplay / mute settings.');
-              }
-            }, { once: true });
-          }
-        }
-
-        async function attemptEnable(fromUser) {
-          try {
-            await bpTryPrimeOnce();  // if this throws -> not allowed
-          } catch (e) {
-            console.warn('bpTryPrimeOnce failed', e);
-            return false;
-          }
-
-          // If we got here, we actually played something -> audio allowed
-          localStorage.setItem('bp_sound_enabled', '1');
-          renderChip('Sound on', 'bg-green-6');
-
-          const realCid = container.dataset.clientId || cid;
-          fetch('/api/sound/enable?cid=' + encodeURIComponent(realCid), {
-            method: 'POST',
-          }).catch(err => console.warn('sound enable notify failed', err));
-
-          return true;
-        }
-
-        (async () => {
-          if (stored) {
-            // Try silently: if blocked, fall back to button instead of lying.
-            const ok = await attemptEnable(false);
-            if (!ok) {
-              // reset flag so next time we don't auto-assume
-              localStorage.removeItem('bp_sound_enabled');
-              renderButton();
-            }
-          } else {
-            renderButton();
-          }
-        })();
-      };
-    })();
-    </script>
-    """)
+    ui.add_head_html(AUDIO_JS)
 
 SILENT_WAV = (
     "data:audio/wav;base64,"
@@ -472,6 +340,11 @@ clock_backend = ClockBackend(
     event_manager=koth_backend.event_manager
 )
 
+ad_backend = ADBackend(
+    sound_system=koth_backend.sound_system,
+    scanner=koth_backend.scanner,
+)
+
 settings_manager = UnifiedSettingsManager()
 
 # ---- Load KOTH settings via backend ----
@@ -515,13 +388,9 @@ async def close_session():
 def install_winner_overlay(mode: str) -> dict:
     """
     Install a full-screen winner overlay for the current client.
-
-    'mode' is something like 'koth', '3cp', etc., so each mode
-    gets its own dismissal memory.
+    Now *dumb*: it always shows when open_winner() is called.
+    The per-game suppression is handled in the page's update loop.
     """
-    storage = app.storage.user
-    DISMISSED_KEY_NAME = f'bp_winner_dismissed_key_{mode}'
-
     winner_dismissed = {'flag': False}
     last_winner_key = {'key': None}
 
@@ -569,7 +438,6 @@ def install_winner_overlay(mode: str) -> dict:
                 on_click=lambda: (
                     winner_dialog.close(),
                     winner_dismissed.__setitem__('flag', True),
-                    storage.__setitem__(DISMISSED_KEY_NAME, last_winner_key['key'])
                 ),
             ).props('unelevated color=white text-color=black').classes(
                 'text-xl px-10 py-4 rounded-xl font-bold'
@@ -581,13 +449,9 @@ def install_winner_overlay(mode: str) -> dict:
             )
 
     def open_winner(team_str: str):
+        """Always show when called; higher-level code decides *when* to call."""
         team_norm = (team_str or '').strip().upper()
         key = f"ended:{team_norm or 'NONE'}"
-        stored_key = storage.get(DISMISSED_KEY_NAME, None)
-
-        # If user already dismissed this specific winner in THIS MODE, don't re-show
-        if stored_key == key:
-            return
 
         bg = _team_bg(team_str)
         winner_overlay.style(
@@ -611,7 +475,6 @@ def install_winner_overlay(mode: str) -> dict:
         winner_label.set_text(_winner_text(team_str))
         winner_subtitle.set_text('Control point secured')
 
-        last_winner_key['key'] = key
         winner_dialog.open()
         winner_dismissed['flag'] = False
 
@@ -619,8 +482,8 @@ def install_winner_overlay(mode: str) -> dict:
         'open_winner': open_winner,
         'dialog': winner_dialog,
         'dismissed': winner_dismissed,
-        'storage_key': DISMISSED_KEY_NAME,
     }
+
 
 
 # ========================================================================
@@ -631,78 +494,7 @@ def install_winner_overlay(mode: str) -> dict:
 def landing_page():
     ui.colors(primary='#1976D2')
 
-    ui.add_head_html("""
-    <style>
-        .bp-landing {
-            min-height: 100vh;
-            background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-        }
-        .bp-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 3rem;
-            max-width: 900px;
-            color: white;
-        }
-        .bp-title {
-            font-size: 4rem;
-            font-weight: 800;
-            text-align: center;
-            margin-bottom: 1rem;
-            background: linear-gradient(90deg, #ff6b6b, #4ecdc4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .bp-subtitle {
-            text-align: center;
-            font-size: 1.3rem;
-            color: #b0b0b0;
-            margin-bottom: 3rem;
-        }
-        .bp-mode-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-        .bp-mode-card {
-            background: rgba(255, 255, 255, 0.03);
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 2rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .bp-mode-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(78, 205, 196, 0.5);
-            box-shadow: 0 10px 30px rgba(78, 205, 196, 0.2);
-        }
-        .bp-mode-title {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-        .bp-mode-desc {
-            color: #b0b0b0;
-            line-height: 1.6;
-            margin-bottom: 1rem;
-        }
-        .bp-info {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-top: 2rem;
-        }
-    </style>
-    """)
+    ui.add_head_html(ROOT_HEAD_HTML)
 
     with ui.element('div').classes('bp-landing'):
         with ui.element('div').classes('bp-card'):
@@ -744,6 +536,24 @@ def landing_page():
                         'unelevated color=teal-6'
                     ).classes('w-full')
 
+                # NEW: AD Card (Attack/Defend multi-point)
+                with ui.element('div').classes('bp-mode-card').on('click', lambda: ui.navigate.to('/ad')):
+                    ui.html(
+                        '<div class="bp-mode-title" style="color: #9b5de5;">🛡️ ATTACK / DEFEND</div>',
+                        sanitize=False,
+                    )
+                    ui.html(
+                        '<div class="bp-mode-desc">'
+                        '<strong>BLUE attacks, RED defends:</strong> BLUE must capture 1→2→3 in order '
+                        'before time runs out. Control points start RED and cannot be recaptured.'
+                        '</div>',
+                        sanitize=False,
+                    )
+                    ui.button('PLAY AD →', on_click=lambda: ui.navigate.to('/ad')).props(
+                        'unelevated color=deep-purple-5'
+                    ).classes('w-full')
+
+
                 # CLOCK-ONLY Card
                 with ui.element('div').classes('bp-mode-card').on('click', lambda: ui.navigate.to('/clock')):
                     ui.html(
@@ -768,6 +578,7 @@ def landing_page():
                 <ul style="color: #b0b0b0; line-height: 1.8;">
                     <li><strong>KOTH:</strong> One control point. Own it to drain your timer. Reach 0:00 to win.</li>
                     <li><strong>3CP:</strong> Three points (A-B-C). Capture in sequence to push forward and win.</li>
+                    <li><strong>AD:</strong> BLUE (attack) captures points 1→2→3 in order while RED defends. All points start RED and cannot be recaptured.</li>
                     <li><strong>Clock:</strong> Simple round timer with audio cues; no control points.</li>
                     <li><strong>Setup:</strong> Use Bluetooth devices or manual controls (Debug page) to simulate players for KOTH/3CP.</li>
                     <li><strong>Settings:</strong> Configure capture times, game duration, and control square mappings.</li>
@@ -790,158 +601,7 @@ async def koth_game_ui():
     """KOTH game interface"""
     ui.colors(primary='#1976D2')
 
-    ui.add_head_html("""
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: #000;
-        height: 100%;
-        overflow: hidden;
-      }
-      .bp-root {
-        width: 100vw;
-        height: 100vh;
-        background: #000;
-        display: flex;
-        flex-direction: column;
-      }
-      .bp-topbar {
-        height: 52px;
-        background: #111;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 1rem;
-        gap: 4rem;
-      }
-      .bp-topbar-left,
-      .bp-topbar-center,
-      .bp-topbar-right {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-      .bp-main {
-        height: calc(100vh - 52px - 170px);
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-        overflow: hidden;
-      }
-      .bp-side {
-        width: 20vw;
-        min-width: 200px;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        align-items: center;
-        justify-content: center;
-      }
-      .bp-vert-shell {
-        width: 270px;
-        height: 100vh;
-        max-height: calc(100vh - 52px - 160px);
-        background: #222;
-        border: 3px solid #444;
-        border-radius: 16px;
-        position: relative;
-        overflow: hidden;
-      }
-      .bp-vert-fill {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 0%;
-        background: #ff0000;
-        transition: height 0.15s linear;
-      }
-      .bp-center {
-        flex: 1;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 1.0rem;
-      }
-      .bp-clock {
-        flex: 1 1 auto;
-        font-size: clamp(10rem, 40rem, 80rem);
-        line-height: 1;
-        font-weight: 400;
-        color: #fff;
-        text-align: center;
-        max-height: 64%;
-      }
-      .bp-status-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1.5rem;
-        align-items: baseline;
-        justify-content: center;
-        color: #ddd;
-        font-size: 1.2rem;
-      }
-      .bp-capture-shell {
-        width: min(60vw, 900px);
-        flex-shrink: 0;
-        height: 150px;
-        background: #222;
-        border: 2px solid #444;
-        border-radius: 12px;
-        overflow: hidden;
-        position: relative;
-        margin: 2.5rem;
-      }
-      .bp-capture-fill {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 0%;
-        background: #6600ff;
-        transition: width 0.12s linear;
-      }
-      .bp-capture-mult {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 10rem;
-        font-weight: 800;
-        color: #ffffff;
-        text-shadow: 0 0 12px rgba(0, 0, 0, 0.9);
-        pointer-events: none;
-      }
-      .bp-bottom {
-        height: 150px;
-        display: flex;
-        flex-direction: column;
-        gap: 0.4rem;
-        padding: 1.4rem;
-      }
-      .bp-horiz-shell {
-        width: 100%;
-        height: 100%;
-        background: #000000;
-        position: relative;
-        overflow: hidden;
-      }
-      .bp-horiz-red {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 50%;
-        background: #000000;
-        transition: width 0.15s linear;
-      }
-    </style>
-    """)
+    ui.add_head_html(KOTH_HEAD_HTML)
 
     # Winner overlay for this client/page
     overlay = install_winner_overlay('koth')
@@ -1050,6 +710,36 @@ async def koth_game_ui():
 
                 phase = state.get('phase', 'idle')
                 running = state.get('running', False)
+                game_id = state.get('game_id', 0)
+                winner = state.get('winner')
+
+                storage = app.storage.user
+                LAST_HANDLED_KEY = 'bp_last_ended_game_koth'
+
+                # Winner overlay
+                # Track last phase + last game id on this page instance
+                # - Reset when a new game starts.
+                if not hasattr(update_ui, "_last_phase"):
+                    update_ui._last_phase = phase
+                    update_ui._winner_shown = False
+                else:
+                    prev_phase = update_ui._last_phase
+
+                    # New game starting: clear winner flag
+                    if prev_phase in ('idle', 'ended') and phase in ('countdown', 'running'):
+                        update_ui._winner_shown = False
+
+                    # Game just ended: show overlay once
+                    if (
+                        not getattr(update_ui, "_winner_shown", False)
+                        and prev_phase in ('running', 'countdown')
+                        and phase == 'ended'
+                        and winner
+                    ):
+                        open_winner(winner)
+                        update_ui._winner_shown = True
+
+                    update_ui._last_phase = phase
 
                 # Update visibility
                 if phase in ('running', 'countdown') or running:
@@ -1058,11 +748,6 @@ async def koth_game_ui():
                 else:
                     start_btn.set_visibility(True)
                     stop_btn.set_visibility(False)
-
-                # Winner overlay
-                winner = state.get('winner')
-                if winner:
-                    open_winner(winner)
 
                 # Update clock
                 if phase == 'countdown':
@@ -1135,103 +820,7 @@ async def threecp_game_ui():
     """3CP game interface with 3 control points"""
     ui.colors(primary='#1976D2')
 
-    ui.add_head_html("""
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: #000;
-        height: 100%;
-        overflow: hidden;
-      }
-      .bp-root {
-        width: 100vw;
-        height: 100vh;
-        background: #000;
-        display: flex;
-        flex-direction: column;
-        color: #fff;
-      }
-      .bp-topbar {
-        height: 52px;
-        background: #111;
-        display: flex;
-        align-items: center;
-        justify-content: between;
-        padding: 0 1rem;
-      }
-      .bp-main-3cp {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 1rem;
-        padding: 1rem;
-      }
-      .bp-clock-3cp {
-        font-size: clamp(4rem, 14vw, 16rem);
-        font-weight: 400;
-        color: #fff;
-        text-align: center;
-      }
-      .bp-points-container {
-        display: flex;
-            gap: 10rem;
-        align-items: flex-start;
-        justify-content: center;
-        width: 100%;
-        max-width: 1400px;
-      }
-      .bp-cp-column {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 1rem;
-        max-width: 350px;
-      }
-      .bp-cp-circle {
-        width: 300px;
-        height: 300px;
-        border-radius: 50%;
-        border: 4px solid #444;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 7rem;
-        font-weight: 800;
-        background: #222;
-        transition: all 0.3s ease;
-      }
-      .bp-cp-bar {
-        width: 100%;
-        height: 60px;
-        background: #222;
-        border: 2px solid #444;
-        border-radius: 8px;
-        position: relative;
-        overflow: hidden;
-      }
-      .bp-cp-bar-fill {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 0%;
-        transition: width 0.15s linear;
-      }
-      .bp-cp-toggles {
-        display: flex;
-        gap: 0.5rem;
-      }
-      .bp-status-3cp {
-        text-align: center;
-        font-size: 1.2rem;
-        color: #ddd;
-      }
-    </style>
-    """)
+    ui.add_head_html(THREECP_HEAD_HTML)
 
     # Winner overlay for this client/page
     overlay = install_winner_overlay('3cp')
@@ -1349,6 +938,37 @@ async def threecp_game_ui():
 
                 phase = state.get('phase', 'idle')
                 running = state.get('running', False)
+                game_id = state.get('game_id', 0)
+                winner = state.get('winner')
+
+                storage = app.storage.user
+                LAST_HANDLED_KEY = 'bp_last_ended_game_3cp'
+
+                # Winner overlay
+                # - Show once per game for this browser tab.
+                # - Reset when a new game starts.
+                if not hasattr(update_ui, "_last_phase"):
+                    update_ui._last_phase = phase
+                    update_ui._winner_shown = False
+                else:
+                    prev_phase = update_ui._last_phase
+
+                    # New game starting: clear winner flag
+                    if prev_phase in ('idle', 'ended') and phase in ('countdown', 'running'):
+                        update_ui._winner_shown = False
+
+                    # Game just ended: show overlay once
+                    if (
+                        not getattr(update_ui, "_winner_shown", False)
+                        and prev_phase in ('running', 'countdown')
+                        and phase == 'ended'
+                        and winner
+                    ):
+                        open_winner(winner)
+                        update_ui._winner_shown = True
+
+                    update_ui._last_phase = phase
+
 
                 # Button visibility
                 if phase in ('running', 'countdown') or running:
@@ -1358,10 +978,6 @@ async def threecp_game_ui():
                     start_btn.set_visibility(True)
                     stop_btn.set_visibility(False)
 
-                # Winner overlay
-                winner = state.get('winner')
-                if winner:
-                    open_winner(winner)
 
                 # Clock
                 if phase == 'countdown':
@@ -1416,6 +1032,275 @@ async def threecp_game_ui():
     task = asyncio.create_task(update_ui())
     game_clock.on('disconnect', lambda _: task.cancel())
 
+# ========================================================================
+# AD GAME PAGE (Attack / Defend, BLUE attacks, RED defends)
+# ========================================================================
+
+@ui.page('/ad')
+async def ad_game_ui():
+    """AD game interface (1–3 control points, BLUE attacks, RED defends)."""
+    ui.colors(primary='#1976D2')
+
+    # Reuse the same CSS as 3CP for layout
+    ui.add_head_html(THREECP_HEAD_HTML)
+
+    # Winner overlay for this client/page
+    overlay = install_winner_overlay('ad')
+    open_winner = overlay['open_winner']
+
+    # Will hold which CP indices are actually used (0,1,2 for CP1,2,3)
+    used_indices = {'indices': [0]}   # default: at least CP1
+    config_loaded = {'done': False}
+
+    with ui.element('div').classes('bp-root'):
+        with ui.element('div').classes('bp-topbar flex justify-between items-center px-4'):
+            attach_sound_opt_in()
+            # LEFT SIDE
+            with ui.row().classes('gap-2 items-center'):
+                ui.button('← HOME', on_click=lambda: ui.navigate.to('/')).props('flat color=white')
+                ui.label('AD MODE').classes('text-white text-lg font-bold')
+
+            # RIGHT SIDE
+            with ui.row().classes('gap-3 items-center'):
+                start_btn = ui.button('START').props('color=green')
+                stop_btn = ui.button('STOP').props('color=orange')
+                stop_btn.set_visibility(False)
+
+                ui.button(
+                    'Settings',
+                    on_click=lambda: ui.navigate.to('/settings?mode=ad'),
+                ).props('flat color=white')
+
+                ui.button(
+                    'Debug',
+                    on_click=lambda: ui.navigate.to('/debug'),
+                ).props('flat color=white')
+
+        # MAIN CONTENT
+        with ui.element('div').classes('bp-main-3cp'):
+            game_clock = ui.label('10:00').classes('bp-clock-3cp')
+            status_label = ui.label('Waiting...').classes('bp-status-3cp')
+
+            # UP TO THREE CONTROL POINTS (1, 2, 3)
+            with ui.element('div').classes('bp-points-container'):
+                cp_elements: list[dict[str, Any]] = []
+                for i, label in enumerate(['1', '2', '3']):
+                    with ui.element('div').classes('bp-cp-column') as col:
+                        circle = ui.element('div').classes('bp-cp-circle')
+                        circle.style('color: #fff;')
+                        with circle:
+                            ui.label(label)
+
+                        with ui.element('div').classes('bp-cp-bar'):
+                            bar_fill = ui.element('div').classes('bp-cp-bar-fill')
+
+                        with ui.element('div').classes('bp-cp-toggles'):
+                            red_tog = ui.toggle(['R OFF', 'R ON'], value='R OFF').props(
+                                'dense push toggle-color=red color=grey-8 text-color=white'
+                            )
+                            blu_tog = ui.toggle(['B OFF', 'B ON'], value='B OFF').props(
+                                'dense push toggle-color=blue color=grey-8 text-color=white'
+                            )
+
+                        cp_elements.append(
+                            {
+                                'column': col,
+                                'circle': circle,
+                                'bar_fill': bar_fill,
+                                'red_toggle': red_tog,
+                                'blu_toggle': blu_tog,
+                            }
+                        )
+
+    # ---- Load AD config once to know which CPs are used ----
+    async def load_ad_config():
+        try:
+            s = await get_session()
+            async with s.get('http://localhost:8080/api/ad/settings/load') as resp:
+                data = await resp.json()
+            mapping = data.get('control_square_mapping', {}) if isinstance(data, dict) else {}
+
+            cp_used = [
+                bool(mapping.get('cp_1_squares')),
+                bool(mapping.get('cp_2_squares')),
+                bool(mapping.get('cp_3_squares')),
+            ]
+
+            # If config is missing or totally empty, fall back to CP1 only
+            if not any(cp_used):
+                cp_used = [True, False, False]
+
+            indices = [i for i, used in enumerate(cp_used) if used]
+            used_indices['indices'] = indices
+
+            # Set column visibility based on config
+            for i, el in enumerate(cp_elements):
+                el['column'].set_visibility(i in indices)
+
+            print(f"[AD UI] loaded config, used_indices = {used_indices['indices']}")
+        except Exception as e:
+            print(f"[AD UI] load_ad_config error: {e}")
+            # Fallback: at least show CP1
+            used_indices['indices'] = [0]
+            for i, el in enumerate(cp_elements):
+                el['column'].set_visibility(i == 0)
+        finally:
+            config_loaded['done'] = True
+
+    # Kick off config load once after mount
+    ui.timer(0.1, load_ad_config, once=True)
+
+    # Event handlers
+    async def start_game():
+        s = await get_session()
+        await s.post('http://localhost:8080/api/ad/start')
+
+    async def stop_game():
+        s = await get_session()
+        await s.post('http://localhost:8080/api/ad/stop')
+
+    start_btn.on('click', start_game)
+    stop_btn.on('click', stop_game)
+
+    def make_toggle_handler(cp_idx: int, team: str):
+        async def handler(e):
+            new_val = e.sender.value
+            print(f"[DEBUG] AD UI toggle cp={cp_idx} team={team} new_value={new_val!r}")
+
+            s = await get_session()
+
+            # enable manual mode
+            try:
+                resp_mode = await s.post('http://localhost:8080/api/ad/manual/mode/true')
+                print(f"[DEBUG] AD UI toggle: manual mode ON -> {resp_mode.status}")
+            except Exception as ex:
+                print(f"[DEBUG] AD UI toggle: error enabling manual mode: {ex}")
+
+            # toggle this CP/team state
+            try:
+                resp = await s.post(f'http://localhost:8080/api/ad/manual/{cp_idx}/{team}/toggle')
+                txt = await resp.text()
+                print(
+                    f"[DEBUG] AD UI toggle: POST /manual/{cp_idx}/{team}/toggle -> "
+                    f"{resp.status} {txt}"
+                )
+            except Exception as ex:
+                print(f"[DEBUG] AD UI toggle: error posting toggle: {ex}")
+
+        return handler
+
+    for i in range(3):
+        cp_elements[i]['red_toggle'].on('update:model-value', make_toggle_handler(i, 'red'))
+        cp_elements[i]['blu_toggle'].on('update:model-value', make_toggle_handler(i, 'blu'))
+
+    # UI update loop
+    async def update_ui():
+        try:
+            while True:
+                try:
+                    s = await get_session()
+                    async with s.get('http://localhost:8080/api/ad/state') as resp:
+                        state = await resp.json()
+                except Exception:
+                    await asyncio.sleep(0.3)
+                    continue
+
+                phase = state.get('phase', 'idle')
+                running = state.get('running', False)
+                winner = state.get('winner')
+                cps = state.get('control_points', []) or []
+
+                # Winner overlay logic (same as 3CP)
+                if not hasattr(update_ui, "_last_phase"):
+                    update_ui._last_phase = phase
+                    update_ui._winner_shown = False
+                else:
+                    prev_phase = update_ui._last_phase
+
+                    # New game starting: clear winner flag
+                    if prev_phase in ('idle', 'ended') and phase in ('countdown', 'running'):
+                        update_ui._winner_shown = False
+
+                    # Game just ended: show overlay once
+                    if (
+                        not getattr(update_ui, "_winner_shown", False)
+                        and prev_phase in ('running', 'countdown')
+                        and phase == 'ended'
+                        and winner
+                    ):
+                        open_winner(winner)
+                        update_ui._winner_shown = True
+
+                    update_ui._last_phase = phase
+
+                # Button visibility
+                if phase in ('running', 'countdown') or running:
+                    start_btn.set_visibility(False)
+                    stop_btn.set_visibility(True)
+                else:
+                    start_btn.set_visibility(True)
+                    stop_btn.set_visibility(False)
+
+                # Clock
+                if phase == 'countdown':
+                    cd = state.get('countdown_remaining', 0)
+                    game_clock.set_text(f'{cd}')
+                    status_label.set_text('COUNTDOWN...')
+                else:
+                    rem = state.get('remaining_seconds', 0)
+                    game_clock.set_text(f'{rem // 60}:{rem % 60:02d}')
+                    if running:
+                        status_label.set_text('GAME RUNNING')
+                    elif state.get('winner'):
+                        status_label.set_text(f"🏆 Winner: {state['winner']}")
+                    else:
+                        status_label.set_text('Waiting...')
+
+                # Map backend CP list (only used CPs) onto the correct circles 1/2/3
+                indices = used_indices['indices']
+                for i, el in enumerate(cp_elements):
+                    # Default: hide if not used by config
+                    el['column'].set_visibility(i in indices)
+
+                # Now apply state visuals to used CPs
+                for logical_idx, cp_index in enumerate(indices):
+                    if logical_idx >= len(cps):
+                        continue
+                    cp_data = cps[logical_idx]
+                    owner = cp_data.get('owner', 'NEUTRAL')
+
+                    # Circle color
+                    if owner == 'RED':
+                        color = '#FF0000'
+                    elif owner == 'BLU':
+                        color = '#0000FF'
+                    else:
+                        color = '#444'
+
+                    cp_elements[cp_index]['circle'].style(
+                        f'border-color: {color}; color: {color};'
+                    )
+
+                    progress = cp_data.get('progress', 0)
+                    capturing = cp_data.get('capturing', '---')
+
+                    if capturing == 'RED':
+                        bar_color = '#FF0000'
+                    elif capturing == 'BLU':
+                        bar_color = '#0000FF'
+                    else:
+                        bar_color = '#666'
+
+                    cp_elements[cp_index]['bar_fill'].style(
+                        f'width: {progress}%; background: {bar_color};'
+                    )
+
+                await asyncio.sleep(0.1)
+        finally:
+            await close_session()
+
+    task = asyncio.create_task(update_ui())
+    game_clock.on('disconnect', lambda _: task.cancel())
 
 # ========================================================================
 # CLOCK-ONLY GAME PAGE
@@ -1426,87 +1311,7 @@ async def clock_game_ui():
     """Simple clock-only game interface (no control points)"""
     ui.colors(primary='#1976D2')
 
-    ui.add_head_html("""
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: #000;
-        height: 100%;
-        overflow: hidden;
-      }
-      .bp-root-clock {
-        width: 100vw;
-        height: 100vh;
-        background: radial-gradient(circle at top, #222 0%, #000 60%);
-        display: flex;
-        flex-direction: column;
-        color: #fff;
-      }
-      .bp-topbar-clock {
-        height: 52px;
-        background: #111;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 1rem;
-      }
-      .bp-main-clock {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 3rem;
-        padding: 2rem;
-      }
-      .bp-clock-face {
-        font-size: clamp(18rem, 30rem, 30rem);
-        font-weight: 400;
-        color: #ffffff;
-        text-shadow: 0 0 40px rgba(0,0,0,0.9);
-      }
-      .bp-controls-clock {
-        display: flex;
-        flex-direction: column;
-        gap: 1.5rem;
-        align-items: center;
-        justify-content: center;
-        min-width: 380px;
-        padding: 1.25rem 1.25rem;
-        border-radius: 16px;
-        background: rgba(15,15,15,0.95);
-        border: 1px solid #444;
-      }
-      .bp-controls-clock .q-field__control {
-        min-height: 4.2rem;
-      }
-      .bp-controls-clock .q-field__native {
-        line-height: 3rem;
-        padding-top: 0.2rem;
-        padding-bottom: 0.2rem;
-      }
-      .bp-time-input-row {
-        display: flex;
-        flex-direction: row;
-        gap: 2rem;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-      }
-      .bp-buttons-row {
-        display: flex;
-        flex-direction: row;
-        gap: 1.5rem;
-        align-items: center;
-        justify-content: center;
-      }
-      .bp-status-clock {
-        font-size: 1.6rem;
-        color: #cccccc;
-      }
-    </style>
-    """)
+    ui.add_head_html(CLOCK_HEAD_HTML)
 
     with ui.element('div').classes('bp-root-clock'):
         # TOP BAR
@@ -1644,8 +1449,10 @@ async def clock_game_ui():
 async def settings_ui(mode: str = 'koth'):
     ui.colors(primary='#1976D2')
 
-    current_mode = mode if mode in ['koth', '3cp'] else 'koth'
-    selected_label = 'KOTH' if current_mode == 'koth' else '3CP'
+    # Allow koth, 3cp, ad
+    current_mode = mode if mode in ['koth', '3cp', 'ad'] else 'koth'
+    selected_label_map = {'koth': 'KOTH', '3cp': '3CP', 'ad': 'AD'}
+    selected_label = selected_label_map[current_mode]
 
     with ui.column().classes('w-full p-8 max-w-4xl mx-auto'):
         with ui.row().classes('w-full items-center justify-between mb-4'):
@@ -1659,12 +1466,18 @@ async def settings_ui(mode: str = 'koth'):
         with ui.tabs().classes('w-full') as mode_tabs:
             ui.tab('KOTH')
             ui.tab('3CP')
+            ui.tab('AD')
 
         mode_tabs.set_value(selected_label)
 
         def on_mode_change(e):
             selected = e.sender.value
-            new_mode = 'koth' if selected == 'KOTH' else '3cp'
+            if selected == 'KOTH':
+                new_mode = 'koth'
+            elif selected == '3CP':
+                new_mode = '3cp'
+            else:
+                new_mode = 'ad'
             ui.navigate.to(f'/settings?mode={new_mode}')
 
         mode_tabs.on('update:model-value', on_mode_change)
@@ -1738,10 +1551,10 @@ async def settings_ui(mode: str = 'koth'):
             # -------------------- 3CP Settings --------------------
             with ui.tab_panel('3CP'):
                 threecp_time_limit = ui.number(
-                    'Time Limit (seconds)', value=600, min=60, max=3600
+                    'Time Limit (seconds)', value=600, min=20, max=3600
                 ).classes('w-full')
                 threecp_capture_time = ui.number(
-                    'Capture Time (seconds)', value=20, min=5, max=120
+                    'Capture Time (seconds)', value=20, min=2, max=120
                 ).classes('w-full')
                 threecp_button_threshold = ui.number(
                     'Button Threshold (seconds)', value=5, min=1, max=30
@@ -1763,19 +1576,19 @@ async def settings_ui(mode: str = 'koth'):
                 ).classes('text-sm text-gray-600 mb-4')
 
                 cp1_input = ui.input(
-                    label='CP-A Squares (comma-separated IDs)',
+                    label='CP-Red Squares (comma-separated IDs)',
                     placeholder='1, 2',
                     value='1',
                 ).classes('w-full')
 
                 cp2_input = ui.input(
-                    label='CP-B Squares (comma-separated IDs)',
+                    label='CP-Center Squares (comma-separated IDs)',
                     placeholder='3, 4',
                     value='3',
                 ).classes('w-full')
 
                 cp3_input = ui.input(
-                    label='CP-C Squares (comma-separated IDs)',
+                    label='CP-Blue Squares (comma-separated IDs)',
                     placeholder='5',
                     value='5',
                 ).classes('w-full')
@@ -1831,6 +1644,103 @@ async def settings_ui(mode: str = 'koth'):
                     'Save 3CP Settings', on_click=save_3cp
                 ).props('color=primary').classes('mt-4')
 
+            # -------------------- AD Settings --------------------
+            with ui.tab_panel('AD'):
+                ad_time_limit = ui.number(
+                    'Time Limit (seconds)', value=600, min=5, max=3600
+                ).classes('w-full')
+                ad_capture_time = ui.number(
+                    'Capture Time (seconds)', value=20, min=2, max=120
+                ).classes('w-full')
+                ad_button_threshold = ui.number(
+                    'Button Threshold (seconds)', value=5, min=1, max=30
+                ).classes('w-full')
+                ad_start_delay = ui.number(
+                    'Start Delay (seconds)', value=5, min=0, max=60
+                ).classes('w-full')
+                ad_time_add = ui.number(
+                    'Time Added Per First Capture (seconds)',
+                    value=120,
+                    min=0,
+                    max=600,
+                ).classes('w-full')
+
+                ui.separator().classes('my-4')
+                ui.label('Control Square Mappings').classes('text-xl font-bold mb-2')
+                ui.label(
+                    'Assign control squares (CS-XX) to each attack/defend point (1,2,3). '
+                    'If a point has no squares, it is not used.'
+                ).classes('text-sm text-gray-600 mb-4')
+
+                cp1_input_ad = ui.input(
+                    label='CP-1 Squares (comma-separated IDs)',
+                    placeholder='1, 2',
+                    value='1',
+                ).classes('w-full')
+
+                cp2_input_ad = ui.input(
+                    label='CP-2 Squares (comma-separated IDs)',
+                    placeholder='3, 4',
+                    value='',
+                ).classes('w-full')
+
+                cp3_input_ad = ui.input(
+                    label='CP-3 Squares (comma-separated IDs)',
+                    placeholder='5',
+                    value='',
+                ).classes('w-full')
+
+                async def save_ad():
+                    def parse_squares(text: str) -> list[int]:
+                        out: list[int] = []
+                        for token in text.split(','):
+                            token = token.strip()
+                            if not token:
+                                continue
+                            digits = ''.join(ch for ch in token if ch.isdigit())
+                            if not digits:
+                                continue
+                            try:
+                                out.append(int(digits))
+                            except ValueError:
+                                continue
+                        return out
+
+                    cp1_squares = parse_squares(cp1_input_ad.value)
+                    cp2_squares = parse_squares(cp2_input_ad.value)
+                    cp3_squares = parse_squares(cp3_input_ad.value)
+
+                    payload = {
+                        'time_limit_seconds': int(ad_time_limit.value),
+                        'capture_seconds': int(ad_capture_time.value),
+                        'capture_button_threshold_seconds': int(ad_button_threshold.value),
+                        'start_delay_seconds': int(ad_start_delay.value),
+                        'add_time_per_first_capture_seconds': int(ad_time_add.value),
+                        'control_square_mapping': {
+                            'cp_1_squares': cp1_squares,
+                            'cp_2_squares': cp2_squares,
+                            'cp_3_squares': cp3_squares,
+                        },
+                    }
+
+                    print('Saving AD settings with payload:', payload)
+
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            'http://localhost:8080/api/ad/settings/save', json=payload
+                        ) as resp:
+                            text = await resp.text()
+                            print('AD /settings/save ->', resp.status, text)
+                            if resp.status != 200:
+                                ui.notify(f'AD save failed: {resp.status}', type='negative')
+                                return
+
+                    ui.notify('AD settings saved!', type='positive')
+
+                ui.button(
+                    'Save AD Settings', on_click=save_ad
+                ).props('color=primary').classes('mt-4')
+
         # Load settings on page load
         async def load_initial_settings():
             if current_mode == 'koth':
@@ -1874,8 +1784,8 @@ async def settings_ui(mode: str = 'koth'):
                 except Exception as e:
                     print(f"[DEBUG] Error loading KOTH settings: {e}")
 
-            else:
-                # ---- 3CP settings load (unchanged) ----
+            elif current_mode == '3cp':
+                # ---- 3CP settings load ----
                 try:
                     async with aiohttp.ClientSession() as session:
                         async with session.get(
@@ -1932,6 +1842,66 @@ async def settings_ui(mode: str = 'koth'):
                         cp3_input.update()
                 except Exception as e:
                     print(f"[DEBUG] Error loading 3CP settings: {e}")
+
+            else:
+                # ---- AD settings load ----
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            'http://localhost:8080/api/ad/settings/load'
+                        ) as resp:
+                            data = await resp.json()
+
+                    print("[DEBUG] load_initial_settings(ad): got data =", data)
+
+                    if data.get('status') != 'not_found':
+                        ad_time_limit.value = data.get('time_limit_seconds', 600)
+                        ad_capture_time.value = data.get('capture_seconds', 20)
+                        ad_button_threshold.value = data.get(
+                            'capture_button_threshold_seconds', 5
+                        )
+                        ad_start_delay.value = data.get(
+                            'start_delay_seconds', 5
+                        )
+                        ad_time_add.value = data.get(
+                            'add_time_per_first_capture_seconds', 120
+                        )
+
+                        mapping = data.get('control_square_mapping', {})
+                        cp1_input_ad.value = ','.join(
+                            map(str, mapping.get('cp_1_squares', []))
+                        )
+                        cp2_input_ad.value = ','.join(
+                            map(str, mapping.get('cp_2_squares', []))
+                        )
+                        cp3_input_ad.value = ','.join(
+                            map(str, mapping.get('cp_3_squares', []))
+                        )
+
+                        print(
+                            "[DEBUG] load_initial_settings(ad): "
+                            "assigned values ->",
+                            "time_limit=", ad_time_limit.value,
+                            "capture=", ad_capture_time.value,
+                            "btn_thresh=", ad_button_threshold.value,
+                            "start_delay=", ad_start_delay.value,
+                            "add_time=", ad_time_add.value,
+                            "cp1=", cp1_input_ad.value,
+                            "cp2=", cp2_input_ad.value,
+                            "cp3=", cp3_input_ad.value,
+                        )
+
+                        ad_time_limit.update()
+                        ad_capture_time.update()
+                        ad_button_threshold.update()
+                        ad_start_delay.update()
+                        ad_time_add.update()
+                        cp1_input_ad.update()
+                        cp2_input_ad.update()
+                        cp3_input_ad.update()
+
+                except Exception as e:
+                    print(f"[DEBUG] Error loading AD settings: {e}")
 
         await load_initial_settings()
 
@@ -2435,6 +2405,85 @@ async def threecp_manual_toggle(cp_index: int, team: str):
 
 
 # ========================================================================
+# API ENDPOINTS - AD (Attack / Defend)
+# ========================================================================
+
+@app.get("/api/ad/state")
+async def ad_get_state():
+    return ad_backend.get_state()
+
+
+@app.post("/api/ad/start")
+async def ad_start():
+    ad_backend.start_game()
+    return {"status": "started"}
+
+
+@app.post("/api/ad/stop")
+async def ad_stop():
+    ad_backend.stop_game()
+    return {"status": "stopped"}
+
+
+@app.post("/api/ad/configure")
+async def ad_configure(options: dict):
+    # Reuse ThreeCPOptions structure for AD
+    opts = ThreeCPOptions.from_dict(options)
+    ad_backend.configure(opts)
+    return {"status": "configured"}
+
+
+@app.post("/api/ad/settings/save")
+async def ad_save_settings(options: dict):
+    # Configure from incoming options and then let AD backend persist if it supports it
+    o = ThreeCPOptions.from_dict(options)
+    ad_backend.configure(o)
+
+    success = settings_manager.save_ad_settings(o)
+    return {"status": "saved" if success else "error"}
+
+
+@app.get("/api/ad/settings/load")
+async def ad_load_settings():
+
+    saved = settings_manager.load_ad_settings()
+    print("[DEBUG] /api/ad/settings/load: raw saved =", saved)
+
+    if saved:
+        options= saved
+        data = options.to_dict()
+        print("[DEBUG] /api/ad/settings/load: returning =", data)
+        return data
+
+    print("[DEBUG] /api/ad/settings/load: not_found")
+    return {"status": "not_found"}
+
+
+@app.get("/api/ad/manual/state")
+async def ad_manual_state():
+    print("[DEBUG] /api/ad/manual/state called")
+    return ad_backend.get_manual_state()
+
+
+@app.post("/api/ad/manual/mode/{enabled}")
+async def ad_set_manual(enabled: bool):
+    print(f"[DEBUG] /api/ad/manual/mode called with enabled={enabled}")
+    ad_backend.set_manual_control(enabled)
+    state = ad_backend.get_manual_state()
+    print(f"[DEBUG] AD manual state after set_manual_control: {state}")
+    return state
+
+
+@app.post("/api/ad/manual/{cp_index}/{team}/toggle")
+async def ad_manual_toggle(cp_index: int, team: str):
+    if 0 <= cp_index < 3 and team in ['red', 'blu']:
+        current = ad_backend.manual_states[cp_index][team]
+        ad_backend.set_manual_state(cp_index, **{team: not current})
+    return ad_backend.get_manual_state()
+
+
+
+# ========================================================================
 # API ENDPOINTS - CLOCK
 # ========================================================================
 
@@ -2478,6 +2527,12 @@ async def threecp_game_loop():
         await asyncio.sleep(0.1)
 
 
+async def ad_game_loop():
+    while True:
+        ad_backend.update()
+        await asyncio.sleep(0.1)
+
+
 async def clock_game_loop():
     while True:
         clock_backend.update()
@@ -2487,7 +2542,9 @@ async def clock_game_loop():
 async def start_game_loops():
     asyncio.create_task(koth_game_loop())
     asyncio.create_task(threecp_game_loop())
+    asyncio.create_task(ad_game_loop())
     asyncio.create_task(clock_game_loop())
+
 
 
 app.on_startup(start_game_loops)

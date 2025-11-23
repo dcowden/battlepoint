@@ -98,9 +98,10 @@ class ThreeCPOptions:
 class UnifiedSettingsManager:
     """Manages settings for both KOTH and 3CP game modes."""
 
-    def __init__(self, koth_file: str = "koth_settings.json", threecp_file: str = "3cp_settings.json"):
+    def __init__(self, koth_file: str = "koth_settings.json", threecp_file: str = "3cp_settings.json", ad_file: str = "ad_settings.json"):
         self.koth_file = koth_file
         self.threecp_file = threecp_file
+        self.ad_file = ad_file
 
     # ========== KOTH Settings ==========
 
@@ -143,7 +144,37 @@ class UnifiedSettingsManager:
             print(f"Error loading KOTH settings: {e}")
             return None
 
-    # ========== 3CP Settings ==========
+    # ========== AD Settings ==========
+
+    def save_ad_settings(self, options: ThreeCPOptions) -> bool:
+        try:
+            data = {
+                "options": options.to_dict(),
+            }
+
+            with open(self.ad_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            return True
+        except Exception as e:
+            print(f"[DEBUG] save_ad_settings error: {e}")
+            return False
+
+    def load_ad_settings(self):
+        if not os.path.exists(self.ad_file):
+            return None
+
+        try:
+
+            with open(self.ad_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            opts = ThreeCPOptions.from_dict(data.get("options", {}))
+            print("[DEBUG] load_ad_settings loaded", opts)
+            return opts
+        except Exception as e:
+            print(f"[DEBUG] load_ad_settings error: {e}")
+            return None
+
 
     def save_3cp_settings(self, options: ThreeCPOptions, volume: int = 10, brightness: int = 50) -> bool:
         try:

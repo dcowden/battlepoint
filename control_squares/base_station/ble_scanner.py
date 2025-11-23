@@ -92,14 +92,22 @@ def pick_usb_hci_index():
 # CONFIG / CONSTANTS
 # ============================================================================
 
-_TILE_PREFIX = "CS-"
-_TEAM_CHARS = ("B", "R")
 
+"""
+static const char ADV_PRESENCE_VALUE_RED   = 'R';
+static const char ADV_PRESENCE_VALUE_BLU   = 'B';
+static const char ADV_PRESENCE_VALUE_BOTH  = 'T';
+static const char ADV_PRESENCE_VALUE_NONE  = 'N';
+static const char ADV_PRESENCE_VALUE_MAG   = 'M';
+"""
+_TILE_PREFIX = "CS-"
+_TEAM_CHARS = ("R", "B","T", "N", "M")
+FRESH_WINDOW_MS = 1000
 
 class EnhancedBLEScanner:
     _CS_PREFIX = "CS-"
     _PLAYER_PREFIX = "PT-"
-    FRESH_WINDOW_MS = 1000  # slightly generous; adjust if you want tighter
+
 
     def __init__(self, clock: Clock, linux_adapter_index: int = 1):
         """
@@ -107,7 +115,7 @@ class EnhancedBLEScanner:
         """
         self.clock = clock
         self.devices: Dict[str, dict] = {}
-        self.fresh_window_ms = EnhancedBLEScanner.FRESH_WINDOW_MS
+        self.fresh_window_ms = FRESH_WINDOW_MS
 
         # Common state
         self._lock = threading.Lock()
@@ -279,7 +287,6 @@ class EnhancedBLEScanner:
         s = mfg_ascii.strip()
         tile_id = None
 
-        # Format 2: "B,CS-02,PT-...,..." etc.
         if tile_id is None:
             parts = s.split(",")
             if len(parts) >= 2:
@@ -452,11 +459,7 @@ class EnhancedBLEScanner:
         if not parts:
             return None
 
-        team = parts[1].strip().upper()
-        if team in ("B", "R","M","T"):
-            return team
-
-        return None
+        return  parts[1].strip().upper()
 
     def _is_control_square(self, info: dict) -> bool:
         """
@@ -472,7 +475,7 @@ class EnhancedBLEScanner:
 
         parts = mf.split(",")
         if len(parts) >= 2:
-            tile_id = parts[1].strip().upper()
+            tile_id = parts[0].strip().upper()
             if tile_id.startswith(self._CS_PREFIX):
                 info["name"] = tile_id
                 return True
@@ -481,92 +484,102 @@ class EnhancedBLEScanner:
 
     # ---------- Player count logic ----------
 
-    def get_player_counts(self) -> dict:
-        red = 0
-        blu = 0
-        now = self.clock.milliseconds()
-        fresh_ms = self.fresh_window_ms
+    def _extract_square_index(self, info: dict) -> Optional[int]:
+        """Try to get CS index (e.g. 'CS-02' -> 2) from name or manufacturer data."""
+        square_idx = None
 
-        with self._lock:
-            for _, info in self.devices.items():
-                if not self._is_control_square(info):
-                    print(f"Warning: skipping {info['name']} ", file=sys.stderr)
-                    continue
-
-                last_seen = info.get("last_seen", 0.0) or 0.0
-                age = now - last_seen
-                if age > fresh_ms:
-                    continue
-
-                mf = info.get("manufacturer_data") or ""
-                team_letter = self.get_player_color(mf)
-                if team_letter == "B":
-                    blu += 1
-                elif team_letter == "R":
-                    red += 1
-
-        red = min(red, MAX_PLAYERS_PER_TEAM)
-        blu = min(blu, MAX_PLAYERS_PER_TEAM)
-        r =  {"red": red, "blu": blu}
-        return r
-
-    def get_player_counts_for_squares(self, square_ids: List[int]) -> Dict[str, int]:
-        """
-        Get player counts only for specified control square IDs.
-
-        square_ids: e.g. [1, 2] meaning CS-01, CS-02.
-        """
-        if not square_ids:
-            return {"red": 0, "blu": 0}
-
-        wanted = set(int(s) for s in square_ids)
-        red = 0
-        blu = 0
-        now = self.clock.milliseconds()
-        fresh_ms = self.fresh_window_ms
-
-        with self._lock:
-            for _, info in self.devices.items():
-                if not self._is_control_square(info):
-                    continue
-
-                last_seen = info.get("last_seen", 0.0) or 0.0
-                age = now - last_seen
-                if age > fresh_ms:
-                    continue
-
+        # First try the device name
+        name = (info.get("name") or "").strip().upper()
+        if name.startswith(self._CS_PREFIX):
+            try:
+                square_idx = int(name.split("-")[1])
+            except Exception:
                 square_idx = None
-                name = (info.get("name") or "").strip().upper()
-                if name.startswith(self._CS_PREFIX):
+
+        # If that failed, try the manufacturer data
+        if square_idx is None:
+            mf = info.get("manufacturer_data") or ""
+            parts = mf.split(",")
+            if len(parts) >= 2:
+                tile = parts[1].strip().upper()
+                if tile.startswith(self._CS_PREFIX):
                     try:
-                        square_idx = int(name.split("-")[1])
+                        square_idx = int(tile.split("-")[1])
                     except Exception:
                         square_idx = None
 
-                if square_idx is None:
-                    mf = info.get("manufacturer_data") or ""
-                    parts = mf.split(",")
-                    if len(parts) >= 2:
-                        tile = parts[1].strip().upper()
-                        if tile.startswith(self._CS_PREFIX):
-                            try:
-                                square_idx = int(tile.split("-")[1])
-                            except Exception:
-                                square_idx = None
+        return square_idx
 
-                if square_idx is None or square_idx not in wanted:
+    def _compute_player_counts(self, wanted_squares: Optional[set[int]] = None) -> Dict[str, int]:
+        red = 0
+        blu = 0
+        mag = 0
+        now = self.clock.milliseconds()
+        fresh_ms = self.fresh_window_ms
+
+        with self._lock:
+            for _, info in self.devices.items():
+                if not self._is_control_square(info):
+                    # Preserve the warning behavior only for the "all squares" case
+                    if wanted_squares is None:
+                        print(f"Warning: skipping {info.get('name')} ", file=sys.stderr)
                     continue
+
+                last_seen = info.get("last_seen", 0.0) or 0.0
+                age = now - last_seen
+                if age > fresh_ms:
+                    continue
+
+                # If we're filtering by specific squares, enforce that here
+                if wanted_squares is not None:
+                    square_idx = self._extract_square_index(info)
+                    if square_idx is None or square_idx not in wanted_squares:
+                        continue
 
                 mf = info.get("manufacturer_data") or ""
                 team_letter = self.get_player_color(mf)
+
+                """
+                 Tile Firmware logic
+                       if (bluePresent && redPresent) {
+                         // both switches: keep previous behavior
+                         teamCharAdv = ADV_PRESENCE_VALUE_BOTH;
+                       } else if (bluePresent) {
+                         teamCharAdv = ADV_PRESENCE_VALUE_BLU;
+                       } else if (redPresent) {
+                         teamCharAdv = ADV_PRESENCE_VALUE_RED;
+                       } else if (magPresent) {
+                         // magnet-only presence: team unknown
+                         teamCharAdv = ADV_PRESENCE_VALUE_MAG;
+                       } else {
+                         teamCharAdv = ADV_PRESENCE_VALUE_NONE;
+                       }
+
+                 :return:
+                 """
                 if team_letter == "B":
                     blu += 1
                 elif team_letter == "R":
                     red += 1
+                elif team_letter == "M":
+                    mag += 1
+                elif team_letter == "T":
+                    blu += 1
+                    red += 1
 
         red = min(red, MAX_PLAYERS_PER_TEAM)
         blu = min(blu, MAX_PLAYERS_PER_TEAM)
-        return {"red": red, "blu": blu}
+        return {"red": red, "blu": blu, "mag": mag}
+
+    def get_player_counts(self) -> Dict[str, int]:
+        return self._compute_player_counts(wanted_squares=None)
+
+    def get_player_counts_for_squares(self, square_ids: List[int]) -> Dict[str, int]:
+        if not square_ids:
+            return {"red": 0, "blu": 0, "mag": 0}
+
+        wanted = {int(s) for s in square_ids}
+        return self._compute_player_counts(wanted_squares=wanted)
 
 
 # ======================================================================

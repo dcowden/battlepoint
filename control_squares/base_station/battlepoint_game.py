@@ -119,7 +119,8 @@ class BaseGame:
         return 0
 
     def get_remaining_seconds_for_team(self, team: Team) -> int:
-        return self.options.time_limit_seconds - self.get_accumulated_seconds(team)
+        rem = self.options.time_limit_seconds - self.get_accumulated_seconds(team)
+        return max(0, rem)
 
     def get_game_type_remaining_seconds(self) -> int:
         # default: global countdown
@@ -309,146 +310,6 @@ class KothGame(BaseGame):
         return False
 
 
-
-# ======================================================================
-# AD (Attack / Defend)
-# ======================================================================
-
-class ADGame(BaseGame):
-    def game_type_init(self):
-        # Red defends; starts owning (C++ also disables red capture)
-        self.control_point.set_owner(Team.RED)
-        # colors follow spirit of C++ (yellow both), but cosmetic
-        self.timer1.fgColor(TeamColor.YELLOW)
-        self.timer1.bgColor(TeamColor.BLACK)
-        self.timer2.fgColor(TeamColor.YELLOW)
-        self.timer2.bgColor(TeamColor.BLACK)
-
-    def update_display(self):
-        remaining = self.get_game_type_remaining_seconds()
-        self.timer1.setValue(remaining)
-        self.timer2.setValue(remaining)
-
-        self.capture_meter.setValue(
-            int(self.control_point.get_capture_progress_percent())
-        )
-
-        owner = self.control_point.get_owner()
-        self.owner_meter.fgColor(get_team_color(owner))
-        self.owner_meter.bgColor(TeamColor.BLACK)
-        if owner == Team.NOBODY:
-            self.owner_meter.setToMin()
-        else:
-            self.owner_meter.setToMax()
-
-    def get_game_type_remaining_seconds(self) -> int:
-        # Fixed global countdown
-        elapsed = self.get_seconds_elapsed()
-        rem = self.options.time_limit_seconds - elapsed
-        return rem if rem > 0 else 0
-
-    def check_victory(self) -> Team:
-        """
-        C++ ADGame::checkVictory:
-
-        - If BLU owns the point at any time -> BLU wins.
-        - If time <= 0 AND BLU is NOT currently capturing -> RED wins.
-        - Otherwise no winner yet (potential overtime).
-        """
-        if self.control_point.get_owner() == Team.BLU:
-            return Team.BLU
-
-        remaining = self.get_game_type_remaining_seconds()
-        if remaining <= 0 and self.control_point.get_capturing() != Team.BLU:
-            return Team.RED
-
-        return Team.NOBODY
-
-    def check_overtime(self) -> bool:
-        """
-        C++ ADGame::checkOvertime:
-
-        - If time <= 0 AND BLU is currently capturing -> overtime.
-        """
-        return (
-            self.get_game_type_remaining_seconds() <= 0
-            and self.control_point.get_capturing() == Team.BLU
-        )
-
-
-# ======================================================================
-# CP (Control Point, timeboxed)
-# ======================================================================
-
-class CPGame(BaseGame):
-    def game_type_init(self):
-        self.control_point.set_owner(Team.NOBODY)
-        # C++ uses RED for timer1 and BLU for timer2; yours were swapped.
-        self.timer1.fgColor(TeamColor.RED)
-        self.timer1.bgColor(TeamColor.BLACK)
-        self.timer2.fgColor(TeamColor.BLUE)
-        self.timer2.bgColor(TeamColor.BLACK)
-
-    def update_display(self):
-        # C++: timer1 = BLU accumulated; timer2 = RED accumulated
-        blu_sec = self.get_accumulated_seconds(Team.BLU)
-        red_sec = self.get_accumulated_seconds(Team.RED)
-
-        self.timer1.setValue(blu_sec)
-        self.timer2.setValue(red_sec)
-
-        self.capture_meter.setValue(
-            int(self.control_point.get_capture_progress_percent())
-        )
-
-        owner = self.control_point.get_owner()
-        self.owner_meter.fgColor(get_team_color(owner))
-        self.owner_meter.bgColor(TeamColor.BLACK)
-        if owner == Team.NOBODY:
-            self.owner_meter.setToMin()
-        else:
-            self.owner_meter.setToMax()
-
-    def get_game_type_remaining_seconds(self) -> int:
-        # Plain global countdown
-        elapsed = self.get_seconds_elapsed()
-        rem = self.options.time_limit_seconds - elapsed
-        return rem if rem > 0 else 0
-
-    def check_victory(self) -> Team:
-        """
-        C++ CPGame::checkVictory:
-
-        - Only once time is up.
-        - Winner is team with more accumulated time.
-        - Equal -> no winner.
-        """
-        if self.get_game_type_remaining_seconds() > 0:
-            return Team.NOBODY
-
-        red_sec = self.get_accumulated_seconds(Team.RED)
-        blu_sec = self.get_accumulated_seconds(Team.BLU)
-
-        if red_sec > blu_sec:
-            return Team.RED
-        if blu_sec > red_sec:
-            return Team.BLU
-        return Team.NOBODY
-
-    def check_overtime(self) -> bool:
-        """
-        C++ CPGame::checkOvertime:
-
-        - If time is up AND anyone is actively capturing -> overtime.
-        (C++ comment "if anyone is on the point, its overtime" lives
-         in a world where overtime is only meaningful once time has expired.)
-        """
-        return (
-            self.get_game_type_remaining_seconds() <= 0
-            and self.control_point.get_capturing() != Team.NOBODY
-        )
-
-
 # ======================================================================
 # GAME FACTORY
 # ======================================================================
@@ -456,11 +317,9 @@ class CPGame(BaseGame):
 def create_game(mode: GameMode) -> BaseGame:
     if mode == GameMode.KOTH:
         return KothGame()
-    elif mode == GameMode.AD:
-        return ADGame()
-    elif mode == GameMode.CP:
-        return CPGame()
-    return KothGame()
+    else:
+        raise NotImplementedError("Dont know how to start other types of games. see multimode app")
+
 
 
 # ========================================================================
@@ -735,11 +594,14 @@ class GameBackend:
         self._countdown_started_ms = 0
         self._last_announced_second = None
 
+        self.game_id = 0
+
     def configure(self, options: GameOptions):
         options.validate()
         self.game_options = options
 
     def start_game(self):
+        self.game_id  += 1
         self.game = create_game(self.game_options.mode)
 
         self.game.init(
@@ -823,11 +685,8 @@ class GameBackend:
 
     # --- proximity hook; EnhancedGameBackend overrides this ---
     def _update_proximity(self):
-        counts = self.scanner.get_player_counts()
-        if hasattr(self.proximity, 'update_counts'):
-            self.proximity.update_counts(counts.get('red', 0), counts.get('blu', 0))
-        else:
-            self.proximity.update(counts.get('red', 0) > 0, counts.get('blu', 0) > 0)
+        pass
+
 
     def on_game_ended(self):
         """Hook for subclasses when a game ends naturally (victory)."""
@@ -943,6 +802,7 @@ class GameBackend:
                 'countdown_remaining': remaining,
                 'meters': meters,
                 'events': events,
+                "game_id": self.game_id
             }
 
         # RUNNING / ENDED
@@ -978,6 +838,7 @@ class GameBackend:
                 'blu_accumulated': self.game.get_accumulated_seconds(Team.BLU),
                 'meters': meters,
                 'events': events,
+                'game_id': self.game_id,
             }
 
         # IDLE
@@ -986,6 +847,7 @@ class GameBackend:
             'phase': 'idle',
             'meters': meters,
             'events': events,
+            'game_id': self.game_id,
         }
 
 
@@ -993,7 +855,7 @@ class GameBackend:
 # ========================================================================
 # ENHANCED GAME BACKEND WITH MANUAL CONTROL TOGGLE
 # ========================================================================
-
+# this is actually KothBackend ( evolutionary reasons )
 class EnhancedGameBackend(GameBackend):
     """GameBackend + sound + settings + BLE + manual/ble proximity switch"""
 
@@ -1029,6 +891,8 @@ class EnhancedGameBackend(GameBackend):
         self.manual_red_on: bool = False
         self.manual_blu_on: bool = False
 
+
+
     def on_game_ended(self):
         # Natural end: winner decided, phase already set to ENDED.
         # Restart menu music if it's not already playing.
@@ -1063,23 +927,42 @@ class EnhancedGameBackend(GameBackend):
     # ----- override proximity update -----
 
     def _update_proximity(self):
+
+        counts = self.scanner.get_player_counts()
+
+        red_on = counts.get('red', 0)
+        blue_on = counts.get('blu', 0)
+        mag_on = counts.get('mag', 0)
+        current_owner = self.control_point.get_owner()
+
+        # adjust for manual control
         if self.manual_control:
-            red = 1 if self.manual_red_on else 0
-            blu = 1 if self.manual_blu_on else 0
-            if hasattr(self.proximity, 'update_counts'):
-                self.proximity.update_counts(red, blu)
-            else:
-                self.proximity.update(bool(red), bool(blu))
+            # Manual mode: allow operator to simulate 1 user on
+            if self.manual_red_on:
+                red_on += 1
+            if self.manual_blu_on:
+                blue_on += 1
+
+        # we dont know the color of a player with magnetic presence.
+        # BUT we can assume that if the current owner is one team,
+        # a magnetic player is the OTHER team. why would a team stand on a point it owns?
+        if red_on == 0 and blue_on == 0:
+            if current_owner == Team.RED:
+                blue_on = mag_on
+            elif current_owner == Team.BLU:
+                red_on = mag_on
+
+
+        if hasattr(self.proximity, 'update_counts'):
+            self.proximity.update_counts(red_on, blue_on)
         else:
-            counts = self.scanner.get_player_counts()
-            if hasattr(self.proximity, 'update_counts'):
-                self.proximity.update_counts(counts.get('red', 0), counts.get('blu', 0))
-            else:
-                self.proximity.update(counts.get('red', 0) > 0, counts.get('blu', 0) > 0)
+            self.proximity.update(red_on > 0, blue_on > 0)
+
 
     # ----- lifecycle -----
 
     def start_game(self):
+        self.game_id += 1
         if self._menu_music_on:
             self.sound_system.stop()
             self._menu_music_on = False
