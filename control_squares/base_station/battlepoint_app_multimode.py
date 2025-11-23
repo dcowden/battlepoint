@@ -893,10 +893,18 @@ async def threecp_game_ui():
     start_btn.on('click', start_game)
     stop_btn.on('click', stop_game)
 
+    syncing = {'flag': False}  # if you later want to push state from backend into UI
+
     def make_toggle_handler(cp_idx: int, team: str):
         async def handler(e):
-            new_val = e.sender.value
-            print(f"[DEBUG] 3CP UI toggle cp={cp_idx} team={team} new_value={new_val!r}")
+            # optional: guard if we later sync from backend
+            if syncing['flag']:
+                return
+
+            new_val = (e.sender.value or '').strip()
+            on = new_val.endswith('ON')   # 'R ON' / 'B ON' -> True, else False
+
+            print(f"[DEBUG] 3CP UI toggle cp={cp_idx} team={team} new_value={new_val!r} on={on}")
 
             s = await get_session()
 
@@ -907,16 +915,18 @@ async def threecp_game_ui():
             except Exception as ex:
                 print(f"[DEBUG] 3CP UI toggle: error enabling manual mode: {ex}")
 
-            # toggle this CP/team state
+            # SET this CP/team state explicitly
             try:
-                resp = await s.post(f'http://localhost:8080/api/3cp/manual/{cp_idx}/{team}/toggle')
+                resp = await s.post(
+                    f'http://localhost:8080/api/3cp/manual/{cp_idx}/{team}/{str(on).lower()}'
+                )
                 txt = await resp.text()
                 print(
-                    f"[DEBUG] 3CP UI toggle: POST /manual/{cp_idx}/{team}/toggle -> "
+                    f"[DEBUG] 3CP UI toggle: POST /manual/{cp_idx}/{team}/{on} -> "
                     f"{resp.status} {txt}"
                 )
             except Exception as ex:
-                print(f"[DEBUG] 3CP UI toggle: error posting toggle: {ex}")
+                print(f"[DEBUG] 3CP UI toggle: error posting set: {ex}")
 
         return handler
 
@@ -1162,10 +1172,17 @@ async def ad_game_ui():
     start_btn.on('click', start_game)
     stop_btn.on('click', stop_game)
 
+    syncing = {'flag': False}
+
     def make_toggle_handler(cp_idx: int, team: str):
         async def handler(e):
-            new_val = e.sender.value
-            print(f"[DEBUG] AD UI toggle cp={cp_idx} team={team} new_value={new_val!r}")
+            if syncing['flag']:
+                return
+
+            new_val = (e.sender.value or '').strip()
+            on = new_val.endswith('ON')
+
+            print(f"[DEBUG] AD UI toggle cp={cp_idx} team={team} new_value={new_val!r} on={on}")
 
             s = await get_session()
 
@@ -1176,18 +1193,21 @@ async def ad_game_ui():
             except Exception as ex:
                 print(f"[DEBUG] AD UI toggle: error enabling manual mode: {ex}")
 
-            # toggle this CP/team state
+            # SET this CP/team state explicitly
             try:
-                resp = await s.post(f'http://localhost:8080/api/ad/manual/{cp_idx}/{team}/toggle')
+                resp = await s.post(
+                    f'http://localhost:8080/api/ad/manual/{cp_idx}/{team}/{str(on).lower()}'
+                )
                 txt = await resp.text()
                 print(
-                    f"[DEBUG] AD UI toggle: POST /manual/{cp_idx}/{team}/toggle -> "
+                    f"[DEBUG] AD UI toggle: POST /manual/{cp_idx}/{team}/{on} -> "
                     f"{resp.status} {txt}"
                 )
             except Exception as ex:
-                print(f"[DEBUG] AD UI toggle: error posting toggle: {ex}")
+                print(f"[DEBUG] AD UI toggle: error posting set: {ex}")
 
         return handler
+
 
     for i in range(3):
         cp_elements[i]['red_toggle'].on('update:model-value', make_toggle_handler(i, 'red'))
@@ -2396,12 +2416,13 @@ async def threecp_set_manual(enabled: bool):
     return state
 
 
-@app.post("/api/3cp/manual/{cp_index}/{team}/toggle")
-async def threecp_manual_toggle(cp_index: int, team: str):
+@app.post("/api/3cp/manual/{cp_index}/{team}/{on}")
+async def threecp_manual_set(cp_index: int, team: str, on: bool):
+    """Set manual state for a CP/team explicitly (no server-side toggling)."""
     if 0 <= cp_index < 3 and team in ['red', 'blu']:
-        current = threecp_backend.manual_states[cp_index][team]
-        threecp_backend.set_manual_state(cp_index, **{team: not current})
+        threecp_backend.set_manual_state(cp_index, **{team: on})
     return threecp_backend.get_manual_state()
+
 
 
 # ========================================================================
@@ -2474,12 +2495,12 @@ async def ad_set_manual(enabled: bool):
     return state
 
 
-@app.post("/api/ad/manual/{cp_index}/{team}/toggle")
-async def ad_manual_toggle(cp_index: int, team: str):
+@app.post("/api/ad/manual/{cp_index}/{team}/{on}")
+async def ad_manual_set(cp_index: int, team: str, on: bool):
     if 0 <= cp_index < 3 and team in ['red', 'blu']:
-        current = ad_backend.manual_states[cp_index][team]
-        ad_backend.set_manual_state(cp_index, **{team: not current})
+        ad_backend.set_manual_state(cp_index, **{team: on})
     return ad_backend.get_manual_state()
+
 
 
 
