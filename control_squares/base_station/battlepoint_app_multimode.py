@@ -16,6 +16,7 @@ from clock_game import ClockBackend
 from ad_game import ADBackend
 from settings import UnifiedSettingsManager, ThreeCPOptions
 import aiohttp
+from typing import Dict, Optional, Callable
 
 # Windows event loop policy
 if sys.platform == 'win32':
@@ -206,7 +207,7 @@ SILENT_WAV = (
     "UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQAAAAA="
 )
 
-def attach_sound_opt_in():
+def attach_sound_opt_in(on_enabled: Optional[Callable[[Client], None]] = None):
     """Client-side sound gate with real capability check.
 
     - If we THINK sound was enabled for this browser, we re-test.
@@ -256,6 +257,9 @@ def attach_sound_opt_in():
                     'font-size:0.7rem;'
                 )
                 btn.set_visibility(False)
+
+                if on_enabled is not None:
+                    on_enabled(client)
 
             print(f"[BROWSER_SOUND] primed+enabled {client.id}")
         else:
@@ -314,6 +318,9 @@ def attach_sound_opt_in():
                 status.set_text('🔇 Tap to enable sound')
                 status.style('font-size:0.7rem;color:#fdd835;')
                 btn.set_visibility(True)
+
+                if on_enabled is not None:
+                    on_enabled(client)
 
             print(f"[BROWSER_SOUND] auto-check failed; require click for {client.id}")
 
@@ -498,7 +505,16 @@ def landing_page():
 
     with ui.element('div').classes('bp-landing'):
         with ui.element('div').classes('bp-card'):
-            ui.html('<div class="bp-title">⚔️ BattlePoint</div>', sanitize=False)
+
+            # Top row: title + sound button for kiosk
+            with ui.row().classes('w-full justify-between items-center mb-2'):
+                ui.html('<div class="bp-title">⚔️ BattlePoint</div>', sanitize=False)
+
+                # When sound becomes enabled on THIS page, start menu music
+                attach_sound_opt_in(
+                    on_enabled=lambda _client: browser_sound_bus.play_menu_track()
+                )
+
             ui.html('<div class="bp-subtitle">Real-life Team Fortress 2 Combat</div>', sanitize=False)
 
             with ui.element('div').classes('bp-mode-grid'):
