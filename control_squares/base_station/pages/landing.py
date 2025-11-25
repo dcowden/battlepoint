@@ -12,8 +12,15 @@ def landing_page(kiosk: str = ''):
     client = ui.context.client  # capture this client
     is_kiosk = (kiosk == '1')
 
+    print(
+        "[DEBUG] landing_page:",
+        "kiosk_param=", repr(kiosk),
+        "client.query=", getattr(client, "query", None),
+    )
+
     if is_kiosk:
         # Mark this browser tab as the kiosk: never use browser audio
+        print("Browser is in KIOSK MODE -- disabling browser sound")
         app.storage.user['browser_sound_disabled'] = True
 
 
