@@ -1,14 +1,19 @@
 from nicegui import ui
 
 
+from nicegui import ui
+
+
 def install_winner_overlay(mode: str) -> dict:
     """
     Install a full-screen winner overlay for the current client.
     Now *dumb*: it always shows when open_winner() is called.
     The per-game suppression is handled in the page's update loop.
+
+    Extended: optionally shows elapsed game time (for competitive AD, etc.).
     """
     winner_dismissed = {'flag': False}
-    last_winner_key = {'key': None}
+    last_winner_key = {'key': None}  # kept in case you're using it elsewhere
 
     def _team_bg(team: str) -> str:
         t = (team or '').strip().upper()
@@ -23,6 +28,20 @@ def install_winner_overlay(mode: str) -> dict:
         if t in ('RED', 'BLU'):
             return f'Winner: {t}'
         return 'Winner'
+
+    def _format_elapsed(seconds: float | int | None) -> str:
+        """Return a simple M:SS string from elapsed seconds."""
+        if seconds is None:
+            return ''
+        try:
+            total = int(seconds)
+        except (TypeError, ValueError):
+            return ''
+        if total < 0:
+            total = 0
+        m = total // 60
+        s = total % 60
+        return f'{m}:{s:02d}'
 
     with ui.dialog() as winner_dialog:
         with ui.element('div').style(
@@ -49,6 +68,12 @@ def install_winner_overlay(mode: str) -> dict:
             )
             winner_subtitle = ui.label('Control point secured').classes('text-3xl')
 
+            # NEW: elapsed time label (hidden unless we have a value)
+            elapsed_label = ui.label('').classes(
+                'text-8xl mt-6'
+            )
+            elapsed_label.visible = False
+
             ui.button(
                 'DISMISS',
                 on_click=lambda: (
@@ -64,10 +89,18 @@ def install_winner_overlay(mode: str) -> dict:
                 'transform:translateX(-50%);'
             )
 
-    def open_winner(team_str: str):
-        """Always show when called; higher-level code decides *when* to call."""
+    def open_winner(team_str: str, elapsed_seconds: float | int | None = None):
+        """
+        Show the winner overlay.
+
+        :param team_str: 'RED', 'BLU', or anything else for neutral.
+        :param elapsed_seconds: elapsed game time in seconds (optional).
+                                If provided, it will be shown on the overlay
+                                as M:SS for competitive AD timing.
+        """
         team_norm = (team_str or '').strip().upper()
         key = f"ended:{team_norm or 'NONE'}"
+        last_winner_key['key'] = key
 
         bg = _team_bg(team_str)
         winner_overlay.style(
@@ -90,6 +123,14 @@ def install_winner_overlay(mode: str) -> dict:
         )
         winner_label.set_text(_winner_text(team_str))
         winner_subtitle.set_text('Control point secured')
+
+        # NEW: handle elapsed time display
+        formatted = _format_elapsed(elapsed_seconds)
+        if formatted:
+            elapsed_label.set_text(f'Elapsed time: {formatted}')
+            elapsed_label.visible = True
+        else:
+            elapsed_label.visible = False
 
         winner_dialog.open()
         winner_dismissed['flag'] = False

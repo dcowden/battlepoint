@@ -3,7 +3,7 @@ import sys
 from typing import Any
 
 from nicegui import ui, app, Client
-from sound_bus import browser_sound_bus,attach_sound_opt_in,BrowserSoundBus,CompositeSoundSystem
+from sound_bus import browser_sound_bus, attach_sound_opt_in, BrowserSoundBus, CompositeSoundSystem
 from multimode_app_static import *
 
 import aiohttp
@@ -173,7 +173,6 @@ async def ad_game_ui():
 
         return handler
 
-
     for i in range(3):
         cp_elements[i]['red_toggle'].on('update:model-value', make_toggle_handler(i, 'red'))
         cp_elements[i]['blu_toggle'].on('update:model-value', make_toggle_handler(i, 'blu'))
@@ -195,7 +194,7 @@ async def ad_game_ui():
                 winner = state.get('winner')
                 cps = state.get('control_points', []) or []
 
-                # Winner overlay logic (same as 3CP)
+                # Winner overlay logic (same as 3CP, but now with elapsed time if available)
                 if not hasattr(update_ui, "_last_phase"):
                     update_ui._last_phase = phase
                     update_ui._winner_shown = False
@@ -213,7 +212,22 @@ async def ad_game_ui():
                         and phase == 'ended'
                         and winner
                     ):
-                        open_winner(winner)
+                        # Try to get elapsed time from backend state if provided
+                        elapsed_seconds = state.get('elapsed_seconds')
+
+                        # Fallback: derive from time limit and remaining if both exist
+                        if elapsed_seconds is None:
+                            total = state.get('time_limit_seconds') or state.get('total_seconds')
+                            rem = state.get('remaining_seconds')
+                            try:
+                                if total is not None and rem is not None:
+                                    total_i = int(total)
+                                    rem_i = int(rem)
+                                    elapsed_seconds = max(0, total_i - rem_i)
+                            except (TypeError, ValueError):
+                                elapsed_seconds = None
+
+                        open_winner(winner, elapsed_seconds)
                         update_ui._winner_shown = True
 
                     update_ui._last_phase = phase
