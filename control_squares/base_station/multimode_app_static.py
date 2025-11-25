@@ -147,7 +147,7 @@ ROOT_HEAD_HTML="""
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 20px;
             padding: 3rem;
-            max-width: 1400px;
+            max-width: 1800px;
             color: white;
         }
         .bp-title {
@@ -186,7 +186,7 @@ ROOT_HEAD_HTML="""
             box-shadow: 0 10px 30px rgba(78, 205, 196, 0.2);
         }
         .bp-mode-title {
-            font-size: 1.8rem;
+            font-size: 2rem;
             font-weight: 700;
             margin-bottom: 0.5rem;
         }

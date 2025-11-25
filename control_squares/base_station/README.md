@@ -1,5 +1,13 @@
-
 # BattlePoint - Real-Life Team Fortress 2 Game
+
+
+## Running
+From the base_station directory (this directory), run
+
+```bash
+python -m battlepoint_app_multimode
+```
+
 
 A Python/NiceGUI implementation of a real-life Team Fortress 2 style capture point game using Raspberry Pi, Bluetooth tags, and physical equipment.
 
