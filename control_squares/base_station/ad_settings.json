@@ -1,6 +1,6 @@
 {
   "options": {
-    "capture_seconds": 5,
+    "capture_seconds": 4,
     "capture_button_threshold_seconds": 1,
     "time_limit_seconds": 20,
     "start_delay_seconds": 2,

@@ -74,7 +74,7 @@ from pages.ad import ad_game_ui
 from pages.clock import clock_game_ui
 from pages.settings import settings_ui
 from pages.debug import debug_ui
-
+from pages.mobile_pages import *
 
 @app.get("/api/manual/state")
 async def generic_manual_state():

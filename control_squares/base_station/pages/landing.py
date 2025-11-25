@@ -1,15 +1,13 @@
 from nicegui import ui, app
+import asyncio
 from sound_bus import browser_sound_bus,attach_sound_opt_in
 from multimode_app_static import ROOT_HEAD_HTML
-
-
+from http_client import get_session
 @ui.page('/')
 def landing_page(kiosk: str = ''):
     ui.colors(primary='#1976D2')
 
     ui.add_head_html(ROOT_HEAD_HTML)
-    client = ui.context.client
-
 
     # One-time detection
     if kiosk == '1':
@@ -17,25 +15,6 @@ def landing_page(kiosk: str = ''):
 
     is_kiosk = app.storage.user.get('is_kiosk', False)
     print(f"[DEBUG] landing_page: kiosk_param={kiosk!r} is_kiosk={is_kiosk} ")
-
-    # if is_kiosk:
-    #     app.storage.user['browser_sound_disabled'] = True
-    #     app.storage.user['bp_sound_enabled'] = False
-    #     browser_sound_bus.disable_for_client(client.id)
-    # else:
-    #     app.storage.user['browser_sound_disabled'] = False
-    #
-    #     def auto_enable_sound_and_music():
-    #         # mark this client as having sound enabled
-    #         app.storage.user['bp_sound_enabled'] = True
-    #         browser_sound_bus.enable_for_client(client.id, from_auto=True)
-    #
-    #         # start / resume menu music for this client
-    #         browser_sound_bus.play_menu_track()
-    #
-    #     # run once shortly after the page is mounted
-    #     ui.timer(0.1, auto_enable_sound_and_music, once=True)
-
 
     with ui.element('div').classes('bp-landing'):
         with ui.element('div').classes('bp-card'):
@@ -49,11 +28,16 @@ def landing_page(kiosk: str = ''):
                     on_enabled=lambda _client: browser_sound_bus.play_menu_track()
                 )
 
-            ui.html('<div class="bp-subtitle">Real-life Team Fortress 2 Combat</div>', sanitize=False)
+            ui.html(
+                '<div class="bp-subtitle">Real-life Team Fortress 2 Combat</div>',
+                sanitize=False,
+            )
 
             with ui.element('div').classes('bp-mode-grid'):
                 # KOTH Card
-                with ui.element('div').classes('bp-mode-card').on('click', lambda: ui.navigate.to('/koth')):
+                with ui.element('div').classes('bp-mode-card').on(
+                    'click', lambda: ui.navigate.to('/koth')
+                ):
                     ui.html(
                         '<div class="bp-mode-title" style="color: #ff6b6b;">🏔️ KING OF THE HILL</div>',
                         sanitize=False,
@@ -65,12 +49,17 @@ def landing_page(kiosk: str = ''):
                         '</div>',
                         sanitize=False,
                     )
-                    ui.button('PLAY KOTH →', on_click=lambda: ui.navigate.to('/koth')).props(
-                        'unelevated color=red-7'
-                    ).classes('w-full')
+                    koth_status = ui.label('Checking...').classes(
+                        'text-xs text-gray-400 mt-1'
+                    )
+                    ui.button(
+                        'PLAY KOTH →', on_click=lambda: ui.navigate.to('/koth')
+                    ).props('unelevated color=red-7').classes('w-full')
 
                 # 3CP Card
-                with ui.element('div').classes('bp-mode-card').on('click', lambda: ui.navigate.to('/3cp')):
+                with ui.element('div').classes('bp-mode-card').on(
+                    'click', lambda: ui.navigate.to('/3cp')
+                ):
                     ui.html(
                         '<div class="bp-mode-title" style="color: #4ecdc4;">🎯 THREE CONTROL POINTS</div>',
                         sanitize=False,
@@ -82,12 +71,17 @@ def landing_page(kiosk: str = ''):
                         '</div>',
                         sanitize=False,
                     )
-                    ui.button('PLAY 3CP →', on_click=lambda: ui.navigate.to('/3cp')).props(
-                        'unelevated color=teal-6'
-                    ).classes('w-full')
+                    threecp_status = ui.label('Checking...').classes(
+                        'text-xs text-gray-400 mt-1'
+                    )
+                    ui.button(
+                        'PLAY 3CP →', on_click=lambda: ui.navigate.to('/3cp')
+                    ).props('unelevated color=teal-6').classes('w-full')
 
                 # NEW: AD Card (Attack/Defend multi-point)
-                with ui.element('div').classes('bp-mode-card').on('click', lambda: ui.navigate.to('/ad')):
+                with ui.element('div').classes('bp-mode-card').on(
+                    'click', lambda: ui.navigate.to('/ad')
+                ):
                     ui.html(
                         '<div class="bp-mode-title" style="color: #9b5de5;">🛡️ ATTACK / DEFEND</div>',
                         sanitize=False,
@@ -99,13 +93,17 @@ def landing_page(kiosk: str = ''):
                         '</div>',
                         sanitize=False,
                     )
-                    ui.button('PLAY AD →', on_click=lambda: ui.navigate.to('/ad')).props(
-                        'unelevated color=deep-purple-5'
-                    ).classes('w-full')
-
+                    ad_status = ui.label('Checking...').classes(
+                        'text-xs text-gray-400 mt-1'
+                    )
+                    ui.button(
+                        'PLAY AD →', on_click=lambda: ui.navigate.to('/ad')
+                    ).props('unelevated color=deep-purple-5').classes('w-full')
 
                 # CLOCK-ONLY Card
-                with ui.element('div').classes('bp-mode-card').on('click', lambda: ui.navigate.to('/clock')):
+                with ui.element('div').classes('bp-mode-card').on(
+                    'click', lambda: ui.navigate.to('/clock')
+                ):
                     ui.html(
                         '<div class="bp-mode-title" style="color: #ffd166;">⏱️ CLOCK ONLY</div>',
                         sanitize=False,
@@ -117,12 +115,17 @@ def landing_page(kiosk: str = ''):
                         '</div>',
                         sanitize=False,
                     )
-                    ui.button('RUN CLOCK →', on_click=lambda: ui.navigate.to('/clock')).props(
-                        'unelevated color=amber-6'
-                    ).classes('w-full')
+                    clock_status = ui.label('Checking...').classes(
+                        'text-xs text-gray-400 mt-1'
+                    )
+                    ui.button(
+                        'RUN CLOCK →', on_click=lambda: ui.navigate.to('/clock')
+                    ).props('unelevated color=amber-6').classes('w-full')
 
             with ui.element('div').classes('bp-info'):
-                ui.label('📋 Game Instructions').classes('text-xl font-bold mb-2')
+                ui.label('📋 Game Instructions').classes(
+                    'text-xl font-bold mb-2'
+                )
                 ui.html(
                     '''
                 <ul style="color: #b0b0b0; line-height: 1.8;">
@@ -138,5 +141,39 @@ def landing_page(kiosk: str = ''):
                 )
 
             with ui.row().classes('w-full justify-center gap-4 mt-4'):
-                ui.button('⚙️ Settings', on_click=lambda: ui.navigate.to('/settings')).props('outline color=white')
-                ui.button('🔧 Debug', on_click=lambda: ui.navigate.to('/debug')).props('outline color=white')
+                ui.button(
+                    '⚙️ Settings',
+                    on_click=lambda: ui.navigate.to('/settings'),
+                ).props('outline color=white')
+                ui.button(
+                    '🔧 Debug',
+                    on_click=lambda: ui.navigate.to('/debug'),
+                ).props('outline color=white')
+
+    async def _check(endpoint: str, label):
+        try:
+            s = await get_session()
+            async with s.get(endpoint) as resp:
+                data = await resp.json()
+            running = bool(data.get('running', False))
+            phase = data.get('phase', 'idle')
+            active = running or phase in ('running', 'countdown')
+            if active:
+                label.set_text('IN PROGRESS')
+                label.classes('text-green-400', remove='text-gray-400 text-red-400')
+            else:
+                label.set_text('Idle')
+                label.classes('text-gray-400', remove='text-green-400 text-red-400')
+        except Exception:
+            label.set_text('Offline')
+            label.classes('text-red-400', remove='text-gray-400 text-green-400')
+
+    async def check_running_states():
+        await asyncio.gather(
+            _check('http://localhost:8080/api/koth/state', koth_status),
+            _check('http://localhost:8080/api/3cp/state', threecp_status),
+            _check('http://localhost:8080/api/ad/state', ad_status),
+            _check('http://localhost:8080/api/clock/state', clock_status),
+        )
+
+    ui.timer(0.2, check_running_states)

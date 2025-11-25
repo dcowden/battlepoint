@@ -1,20 +1,8 @@
 import asyncio
-import sys
-from typing import Any
-
-from nicegui import ui, app, Client
-from sound_bus import browser_sound_bus,attach_sound_opt_in,BrowserSoundBus,CompositeSoundSystem
+from nicegui import ui
+from sound_bus import attach_sound_opt_in
 from multimode_app_static import *
-from battlepoint_game import EnhancedGameBackend,SOUND_MAP,SoundSystem
-from threecp_game import ThreeCPBackend
-from clock_game import ClockBackend
-from ad_game import ADBackend
-from settings import UnifiedSettingsManager, ThreeCPOptions
-import aiohttp
 from http_client import get_session, close_session
-from pages.overlays import install_winner_overlay
-
-
 
 
 @ui.page('/clock')
@@ -40,23 +28,33 @@ async def clock_game_ui():
 
             # Time configuration + start/stop
             with ui.element('div').classes('bp-controls-clock'):
-                ui.label('Round Time (mm:ss)').classes('text-2xl font-semibold')
+                ui.label('Round Time').classes('text-2xl font-semibold mb-2')
 
                 with ui.element('div').classes('bp-time-input-row'):
                     minutes_input = ui.input(
                         label='Minutes',
-                        value='10',
+                        value='10'
                     ).props(
-                        'outlined input-style="font-size: 2.8rem; text-align: center; color: white;"'
-                    )
-                    seconds_input = ui.input(
-                        label='Seconds',
-                        value='0',
-                    ).props(
-                        'outlined input-style="font-size: 2.8rem; text-align: center; color: white;"'
+                        # outlined white border, white text, centered, decent size
+                        'outlined color=white label-color=white '
+                        'input-class="text-white text-center text-2xl"'
+                    ).style(
+                        'max-width: 120px;'
+                        'color: white;'
                     )
 
-                with ui.element('div').classes('bp-buttons-row'):
+                    seconds_input = ui.input(
+                        label='Seconds',
+                        value='0'
+                    ).props(
+                        'outlined color=white label-color=white '
+                        'input-class="text-white text-center text-2xl"'
+                    ).style(
+                        'max-width: 120px;'
+                        'color: white;'
+                    )
+
+                with ui.row().classes('bp-buttons-row gap-3 mt-4'):
                     start_btn = ui.button('START', icon='play_arrow').props('color=green')
                     stop_btn = ui.button('STOP', icon='stop').props('color=orange')
                     stop_btn.set_visibility(False)
@@ -66,11 +64,11 @@ async def clock_game_ui():
     # Handlers
     async def start_clock():
         try:
-            mins = int(minutes_input.value.strip() or '0')
+            mins = int(minutes_input.value or 0)
         except Exception:
             mins = 0
         try:
-            secs = int(seconds_input.value.strip() or '0')
+            secs = int(seconds_input.value or 0)
         except Exception:
             secs = 0
 
@@ -115,8 +113,8 @@ async def clock_game_ui():
                 if not initialized['done']:
                     base = total if phase == 'idle' else remaining
                     m0, s0 = divmod(base, 60)
-                    minutes_input.value = str(m0)
-                    seconds_input.value = f'{s0}'
+                    minutes_input.value = m0
+                    seconds_input.value = s0
                     minutes_input.update()
                     seconds_input.update()
                     initialized['done'] = True

@@ -384,6 +384,7 @@ class EventManager:
     def victory(self, team: Team):
         self._add_event(f"Victory for {team_text(team)}!")
         self._play(12)
+        self.sound_system.play_menu_track()
 
     def overtime(self):
         if self.overtime_timer.can_run():
