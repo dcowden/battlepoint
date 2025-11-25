@@ -568,6 +568,7 @@ class ADBackend:
                 'running': False if self._phase == self._running else self._running,
                 'phase': compute_phase_text(),
                 'countdown_remaining': countdown_remaining,
+                'elapsed_seconds': self.game.get_seconds_elapsed(),
                 'remaining_seconds': self.game.get_remaining_seconds(),
                 'time_limit_seconds': self.options.time_limit_seconds,
                 'time_added_seconds': self.game.time_added_total,
