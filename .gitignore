@@ -6,3 +6,7 @@ __pycache__
 .idea
 .vscode
 *.pyc
+control_squares/base_station/.nicegui
+control_squares/base_station/.venv
+control_squares/base_station/
+control_squares/base_station/__pycache__
