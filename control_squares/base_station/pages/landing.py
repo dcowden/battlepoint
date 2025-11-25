@@ -9,19 +9,22 @@ def landing_page(kiosk: str = ''):
 
     ui.add_head_html(ROOT_HEAD_HTML)
 
-    client = ui.context.client  # capture this client
-    is_kiosk = (kiosk == '1')
+    client = ui.context.client
+    request = ui.context.request
 
-    print(
-        "[DEBUG] landing_page:",
-        "kiosk_param=", repr(kiosk),
-        "client.query=", getattr(client, "query", None),
-    )
+    # One-time detection
+    if kiosk == '1':
+        app.storage.user['is_kiosk'] = True
+
+    is_kiosk = app.storage.user.get('is_kiosk', False)
+    print(f"[DEBUG] landing_page: kiosk_param={kiosk!r} is_kiosk={is_kiosk} url={request.url}")
 
     if is_kiosk:
-        # Mark this browser tab as the kiosk: never use browser audio
-        print("Browser is in KIOSK MODE -- disabling browser sound")
         app.storage.user['browser_sound_disabled'] = True
+        app.storage.user['bp_sound_enabled'] = False
+        browser_sound_bus.disable_for_client(client.id)
+    else:
+        app.storage.user['browser_sound_disabled'] = False
 
 
     # --- AUTO-ENABLE SOUND + MENU MUSIC FOR THIS CLIENT ---
