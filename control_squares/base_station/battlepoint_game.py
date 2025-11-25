@@ -671,7 +671,7 @@ class GameBackend:
         self._phase = GamePhase.IDLE
         self._running = False
         self._last_announced_second = None
-
+        self.event_manager.cancelled()
         self._ensure_ble(False)
 
         # meters → idle
@@ -689,8 +689,7 @@ class GameBackend:
 
 
     def on_game_ended(self):
-        """Hook for subclasses when a game ends naturally (victory)."""
-        pass
+        self.event_manager.cancelled()
 
     def update(self):
         now_ms = self.clock.milliseconds()
@@ -883,7 +882,7 @@ class EnhancedGameBackend(GameBackend):
             self.sound_system.set_volume(volume)
 
         # menu music
-        self.sound_system.play_menu_track()
+        #self.sound_system.play_menu_track()
         self._menu_music_on = True
 
         # manual control
@@ -893,12 +892,6 @@ class EnhancedGameBackend(GameBackend):
 
 
 
-    def on_game_ended(self):
-        # Natural end: winner decided, phase already set to ENDED.
-        # Restart menu music if it's not already playing.
-        if not self._menu_music_on:
-            self.sound_system.play_menu_track()
-            self._menu_music_on = True
 
     # ----- manual control API -----
 

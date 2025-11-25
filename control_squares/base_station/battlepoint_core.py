@@ -393,6 +393,7 @@ class EventManager:
     def cancelled(self):
         self._add_event("Game Cancelled")
         self._play(17)
+        self.sound_system.play_menu_track()
 
     def starts_in_seconds(self, secs: int):
         # only fire specific countdown calls once per game per second-mark

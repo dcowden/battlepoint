@@ -40,7 +40,7 @@ ad_backend = ADBackend(
     sound_system=koth_backend.sound_system,
     scanner=koth_backend.scanner,
 )
-
+composite_sound.play_menu_track()
 settings_manager = UnifiedSettingsManager()
 
 # ---- Load KOTH settings via backend ----

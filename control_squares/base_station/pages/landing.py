@@ -8,36 +8,33 @@ def landing_page(kiosk: str = ''):
     ui.colors(primary='#1976D2')
 
     ui.add_head_html(ROOT_HEAD_HTML)
-
     client = ui.context.client
-    request = ui.context.request
+
 
     # One-time detection
     if kiosk == '1':
         app.storage.user['is_kiosk'] = True
 
     is_kiosk = app.storage.user.get('is_kiosk', False)
-    print(f"[DEBUG] landing_page: kiosk_param={kiosk!r} is_kiosk={is_kiosk} url={request.url}")
+    print(f"[DEBUG] landing_page: kiosk_param={kiosk!r} is_kiosk={is_kiosk} ")
 
-    if is_kiosk:
-        app.storage.user['browser_sound_disabled'] = True
-        app.storage.user['bp_sound_enabled'] = False
-        browser_sound_bus.disable_for_client(client.id)
-    else:
-        app.storage.user['browser_sound_disabled'] = False
-
-
-    # --- AUTO-ENABLE SOUND + MENU MUSIC FOR THIS CLIENT ---
-    def auto_enable_sound_and_music():
-        # mark this client as having sound enabled
-        app.storage.user['bp_sound_enabled'] = True
-        browser_sound_bus.enable_for_client(client.id, from_auto=True)
-
-        # start / resume menu music for this client
-        browser_sound_bus.play_menu_track()
-
-    # run once shortly after the page is mounted
-    ui.timer(0.1, auto_enable_sound_and_music, once=True)
+    # if is_kiosk:
+    #     app.storage.user['browser_sound_disabled'] = True
+    #     app.storage.user['bp_sound_enabled'] = False
+    #     browser_sound_bus.disable_for_client(client.id)
+    # else:
+    #     app.storage.user['browser_sound_disabled'] = False
+    #
+    #     def auto_enable_sound_and_music():
+    #         # mark this client as having sound enabled
+    #         app.storage.user['bp_sound_enabled'] = True
+    #         browser_sound_bus.enable_for_client(client.id, from_auto=True)
+    #
+    #         # start / resume menu music for this client
+    #         browser_sound_bus.play_menu_track()
+    #
+    #     # run once shortly after the page is mounted
+    #     ui.timer(0.1, auto_enable_sound_and_music, once=True)
 
 
     with ui.element('div').classes('bp-landing'):

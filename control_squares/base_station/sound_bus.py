@@ -202,10 +202,10 @@ def attach_sound_opt_in(on_enabled: Optional[Callable[[Client], None]] = None):
     client = ui.context.client
 
     # If this browser is marked as kiosk / no browser sound, bail out
-    if app.storage.user.get('browser_sound_disabled'):
+    if app.storage.user.get('is_kiosk'):
         # clear any persisted "enabled" flag for this browser
         app.storage.user['bp_sound_enabled'] = False
-
+        app.storage.user['browser_sound_disabled'] = True
         # make sure bus doesn't think this client is enabled
         browser_sound_bus.disable_for_client(client.id)
 

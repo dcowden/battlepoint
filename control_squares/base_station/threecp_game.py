@@ -389,8 +389,8 @@ class ThreeCPBackend:
             self._phase = GamePhase.RUNNING
             self._running = True
 
-            if self.sound_system:
-                self.sound_system.stop()
+            #if self.sound_system:
+            #    self.sound_system.stop()
 
     def stop_game(self):
         """Stop the current game."""
