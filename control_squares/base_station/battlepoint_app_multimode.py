@@ -433,6 +433,7 @@ app.on_startup(start_game_loops)
 
 if __name__ in {"__main__", "__mp_main__"}:
     ui.run(
+        host='0.0.0.0',
         title='BattlePoint - Multi-Mode',
         port=8080,
         storage_secret='battlepoint_secret',
