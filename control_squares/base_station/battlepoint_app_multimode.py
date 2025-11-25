@@ -437,4 +437,5 @@ if __name__ in {"__main__", "__mp_main__"}:
         port=8080,
         storage_secret='battlepoint_secret',
         reload=False,
+        show=False
     )
