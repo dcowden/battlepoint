@@ -11,7 +11,7 @@ from pages.overlays import install_winner_overlay
 from http_client import get_session, close_session
 from pages.settings import parse_squares  # for mobile settings
 import aiohttp
-
+from util import make_absolute_url
 
 # =====================================================================
 # MOBILE LANDING / HUB
@@ -152,10 +152,10 @@ def mobile_landing_page(admin: str = ''):
 
     async def check_running_states():
         await asyncio.gather(
-            _check('http://localhost:8080/api/koth/state', koth_status),
-            _check('http://localhost:8080/api/3cp/state', threecp_status),
-            _check('http://localhost:8080/api/ad/state', ad_status),
-            _check('http://localhost:8080/api/clock/state', clock_status),
+            _check(make_absolute_url('/api/koth/state'), koth_status),
+            _check(make_absolute_url('/api/3cp/state'), threecp_status),
+            _check(make_absolute_url('/api/ad/state'), ad_status),
+            _check(make_absolute_url('/api/clock/state'), clock_status),
         )
 
     ui.timer(0.2, check_running_states)
@@ -292,11 +292,11 @@ async def mobile_koth_game_ui():
 
     async def start_game():
         s = await get_session()
-        await s.post('http://localhost:8080/api/koth/start')
+        await s.post(make_absolute_url('/api/koth/start'))
 
     async def stop_game():
         s = await get_session()
-        await s.post('http://localhost:8080/api/koth/stop')
+        await s.post(make_absolute_url('/api/koth/stop'))
 
     start_btn.on('click', start_game)
     stop_btn.on('click', stop_game)
@@ -308,18 +308,14 @@ async def mobile_koth_game_ui():
             return
         s = await get_session()
         new_val = (red_toggle.value == 'R ON')
-        await s.post(
-            f'http://localhost:8080/api/koth/manual/red/{str(new_val).lower()}'
-        )
+        await s.post(make_absolute_url(f'/api/koth/manual/red/{str(new_val).lower()}'))
 
     async def on_blue_toggle(_e):
         if syncing['flag']:
             return
         s = await get_session()
         new_val = (blue_toggle.value == 'B ON')
-        await s.post(
-            f'http://localhost:8080/api/koth/manual/blu/{str(new_val).lower()}'
-        )
+        await s.post(make_absolute_url(f'/api/koth/manual/blu/{str(new_val).lower()}'))
 
     red_toggle.on('update:model-value', on_red_toggle)
     blue_toggle.on('update:model-value', on_blue_toggle)
@@ -329,8 +325,7 @@ async def mobile_koth_game_ui():
             while True:
                 try:
                     s = await get_session()
-                    async with s.get(
-                        'http://localhost:8080/api/koth/state'
+                    async with s.get(make_absolute_url('/api/koth/state')
                     ) as resp:
                         state = await resp.json()
                 except Exception:
@@ -563,11 +558,11 @@ async def mobile_threecp_game_ui():
 
     async def start_game():
         s = await get_session()
-        await s.post('http://localhost:8080/api/3cp/start')
+        await s.post(make_absolute_url('/api/3cp/start'))
 
     async def stop_game():
         s = await get_session()
-        await s.post('http://localhost:8080/api/3cp/stop')
+        await s.post(make_absolute_url('/api/3cp/stop'))
 
     start_btn.on('click', start_game)
     stop_btn.on('click', stop_game)
@@ -588,7 +583,7 @@ async def mobile_threecp_game_ui():
             s = await get_session()
             try:
                 resp_mode = await s.post(
-                    'http://localhost:8080/api/3cp/manual/mode/true'
+                    make_absolute_url('/api/3cp/manual/mode/true')
                 )
                 print(
                     f"[DEBUG] 3CP MOBILE toggle: "
@@ -600,9 +595,9 @@ async def mobile_threecp_game_ui():
                 )
 
             try:
-                resp = await s.post(
-                    f'http://localhost:8080/api/3cp/manual/{cp_idx}/{team}/{str(on).lower()}'
-                )
+                resp = await s.post(make_absolute_url(
+                    f'/api/3cp/manual/{cp_idx}/{team}/{str(on).lower()}'
+                ))
                 txt = await resp.text()
                 print(
                     f"[DEBUG] 3CP MOBILE toggle: POST /manual/{cp_idx}/{team}/{on} "
@@ -629,7 +624,7 @@ async def mobile_threecp_game_ui():
                 try:
                     s = await get_session()
                     async with s.get(
-                        'http://localhost:8080/api/3cp/state'
+                        make_absolute_url('/api/3cp/state')
                     ) as resp:
                         state = await resp.json()
                 except Exception:
@@ -824,7 +819,7 @@ async def mobile_ad_game_ui():
         try:
             s = await get_session()
             async with s.get(
-                'http://localhost:8080/api/ad/settings/load'
+                make_absolute_url('/api/ad/settings/load')
             ) as resp:
                 data = await resp.json()
             mapping = (
@@ -861,11 +856,11 @@ async def mobile_ad_game_ui():
 
     async def start_game():
         s = await get_session()
-        await s.post('http://localhost:8080/api/ad/start')
+        await s.post(make_absolute_url('/api/ad/start'))
 
     async def stop_game():
         s = await get_session()
-        await s.post('http://localhost:8080/api/ad/stop')
+        await s.post(make_absolute_url('/api/ad/stop'))
 
     start_btn.on('click', start_game)
     stop_btn.on('click', stop_game)
@@ -887,7 +882,7 @@ async def mobile_ad_game_ui():
             s = await get_session()
             try:
                 resp_mode = await s.post(
-                    'http://localhost:8080/api/ad/manual/mode/true'
+                    make_absolute_url('/api/ad/manual/mode/true')
                 )
                 print(
                     f"[DEBUG] AD MOBILE toggle: manual mode ON -> "
@@ -899,9 +894,9 @@ async def mobile_ad_game_ui():
                 )
 
             try:
-                resp = await s.post(
-                    f'http://localhost:8080/api/ad/manual/{cp_idx}/{team}/{str(on).lower()}'
-                )
+                resp = await s.post(make_absolute_url(
+                    f'/api/ad/manual/{cp_idx}/{team}/{str(on).lower()}'
+                ))
                 txt = await resp.text()
                 print(
                     f"[DEBUG] AD MOBILE toggle: POST /manual/{cp_idx}/{team}/{on} "
@@ -927,8 +922,7 @@ async def mobile_ad_game_ui():
             while True:
                 try:
                     s = await get_session()
-                    async with s.get(
-                        'http://localhost:8080/api/ad/state'
+                    async with s.get(make_absolute_url('/api/ad/state')
                     ) as resp:
                         state = await resp.json()
                 except Exception:
@@ -1166,14 +1160,14 @@ async def mobile_clock_game_ui():
 
         s = await get_session()
         await s.post(
-            'http://localhost:8080/api/clock/configure',
+            make_absolute_url('/api/clock/configure'),
             json={'time_limit_seconds': total_seconds},
         )
-        await s.post('http://localhost:8080/api/clock/start')
+        await s.post(make_absolute_url('/api/clock/start'))
 
     async def stop_clock():
         s = await get_session()
-        await s.post('http://localhost:8080/api/clock/stop')
+        await s.post(make_absolute_url('/api/clock/stop'))
 
     start_btn.on('click', start_clock)
     stop_btn.on('click', stop_clock)
@@ -1185,7 +1179,7 @@ async def mobile_clock_game_ui():
             while True:
                 try:
                     s = await get_session()
-                    async with s.get('http://localhost:8080/api/clock/state') as resp:
+                    async with s.get(make_absolute_url('/api/clock/state')) as resp:
                         state = await resp.json()
                 except Exception:
                     await asyncio.sleep(0.3)
@@ -1330,8 +1324,7 @@ async def mobile_settings_ui(mode: str = 'koth'):
                         }
                         try:
                             async with aiohttp.ClientSession() as session:
-                                async with session.post(
-                                    'http://localhost:8080/api/koth/configure',
+                                async with session.post(make_absolute_url('/api/koth/configure'),
                                     json=payload,
                                 ) as resp:
                                     if resp.status != 200:
@@ -1341,7 +1334,7 @@ async def mobile_settings_ui(mode: str = 'koth'):
                                         )
                                         return
                                 async with session.post(
-                                    'http://localhost:8080/api/koth/settings/save'
+                                    make_absolute_url('/api/koth/settings/save')
                                 ) as resp:
                                     if resp.status != 200:
                                         ui.notify(
@@ -1435,7 +1428,7 @@ async def mobile_settings_ui(mode: str = 'koth'):
                         try:
                             async with aiohttp.ClientSession() as session:
                                 async with session.post(
-                                    'http://localhost:8080/api/3cp/settings/save',
+                                    make_absolute_url('/api/3cp/settings/save'),
                                     json=payload,
                                 ) as resp:
                                     if resp.status != 200:
@@ -1524,7 +1517,7 @@ async def mobile_settings_ui(mode: str = 'koth'):
                         try:
                             async with aiohttp.ClientSession() as session:
                                 async with session.post(
-                                    'http://localhost:8080/api/ad/settings/save',
+                                    make_absolute_url('/api/ad/settings/save'),
                                     json=payload,
                                 ) as resp:
                                     if resp.status != 200:
@@ -1550,7 +1543,7 @@ async def mobile_settings_ui(mode: str = 'koth'):
             async with aiohttp.ClientSession() as session:
                 if current_mode == 'koth':
                     async with session.get(
-                        'http://localhost:8080/api/koth/settings/load'
+                        make_absolute_url('/api/koth/settings/load')
                     ) as resp:
                         data = await resp.json()
                     if data.get('status') != 'not_found':
@@ -1581,7 +1574,7 @@ async def mobile_settings_ui(mode: str = 'koth'):
 
                 elif current_mode == '3cp':
                     async with session.get(
-                        'http://localhost:8080/api/3cp/settings/load'
+                        make_absolute_url('/api/3cp/settings/load')
                     ) as resp:
                         data = await resp.json()
                     if data.get('status') != 'not_found':
@@ -1624,7 +1617,7 @@ async def mobile_settings_ui(mode: str = 'koth'):
 
                 else:
                     async with session.get(
-                        'http://localhost:8080/api/ad/settings/load'
+                        make_absolute_url('/api/ad/settings/load')
                     ) as resp:
                         data = await resp.json()
                     if data.get('status') != 'not_found':
@@ -1769,7 +1762,7 @@ def mobile_debug_ui(admin: str = ''):
         try:
             s = await get_session()
             async with s.get(
-                'http://localhost:8080/api/manual/state'
+                make_absolute_url('/api/manual/state')
             ) as resp:
                 st = await resp.json()
             enabled = bool(st.get('manual_control'))
@@ -1787,7 +1780,7 @@ def mobile_debug_ui(admin: str = ''):
             s = await get_session()
             enabled = bool(manual_switch.value)
             await s.post(
-                f'http://localhost:8080/api/manual/mode/{str(enabled).lower()}'
+                make_absolute_url(f'/api/manual/mode/{str(enabled).lower()}')
             )
             manual_status.set_text(
                 f"Manual control is {'ON' if enabled else 'OFF'}; "
@@ -1804,7 +1797,7 @@ def mobile_debug_ui(admin: str = ''):
 
     async def start_ble_scan():
         s = await get_session()
-        await s.post('http://localhost:8080/api/bluetooth/start')
+        await s.post(make_absolute_url('/api/bluetooth/start'))
         start_scan_btn.set_visibility(False)
         stop_scan_btn.set_visibility(True)
         ble_status.set_text('Status: Scanning...')
@@ -1812,7 +1805,7 @@ def mobile_debug_ui(admin: str = ''):
 
     async def stop_ble_scan():
         s = await get_session()
-        await s.post('http://localhost:8080/api/bluetooth/stop')
+        await s.post(make_absolute_url('/api/bluetooth/stop'))
         start_scan_btn.set_visibility(True)
         stop_scan_btn.set_visibility(False)
         ble_status.set_text('Status: Not scanning')
@@ -1828,7 +1821,7 @@ def mobile_debug_ui(admin: str = ''):
         s = await get_session()
         try:
             # game state
-            async with s.get('http://localhost:8080/api/koth/state') as resp:
+            async with s.get(make_absolute_url('/api/koth/state') )as resp:
                 state = await resp.json()
                 state_display.value = state
                 state_display.update()
@@ -1861,7 +1854,7 @@ def mobile_debug_ui(admin: str = ''):
             await sync_manual_from_backend()
 
             async with s.get(
-                'http://localhost:8080/api/bluetooth/devices'
+                make_absolute_url('/api/bluetooth/devices')
             ) as resp:
                 ble_data = await resp.json()
 

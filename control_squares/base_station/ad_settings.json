@@ -9,7 +9,9 @@
       "cp_1_squares": [
         5
       ],
-      "cp_2_squares": [],
+      "cp_2_squares": [
+        3
+      ],
       "cp_3_squares": []
     }
   }

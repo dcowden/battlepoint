@@ -4,6 +4,7 @@ from sound_bus import attach_sound_opt_in
 from multimode_app_static import *
 from pages.overlays import install_winner_overlay
 from http_client import get_session, close_session
+from util import make_absolute_url
 
 @ui.page('/koth')
 async def koth_game_ui():
@@ -76,11 +77,11 @@ async def koth_game_ui():
     # Event handlers
     async def start_game():
         s = await get_session()
-        await s.post('http://localhost:8080/api/koth/start')
+        await s.post(make_absolute_url('/api/koth/start'))
 
     async def stop_game():
         s = await get_session()
-        await s.post('http://localhost:8080/api/koth/stop')
+        await s.post(make_absolute_url('/api/koth/stop'))
 
     start_btn.on('click', start_game)
     stop_btn.on('click', stop_game)
@@ -93,14 +94,14 @@ async def koth_game_ui():
             return
         s = await get_session()
         new_val = (red_toggle.value == 'R ON')
-        await s.post(f'http://localhost:8080/api/koth/manual/red/{str(new_val).lower()}')
+        await s.post(make_absolute_url(f'/api/koth/manual/red/{str(new_val).lower()}'))
 
     async def on_blue_toggle(_e):
         if syncing['flag']:
             return
         s = await get_session()
         new_val = (blue_toggle.value == 'B ON')
-        await s.post(f'http://localhost:8080/api/koth/manual/blu/{str(new_val).lower()}')
+        await s.post(make_absolute_url(f'/api/koth/manual/blu/{str(new_val).lower()}'))
 
     red_toggle.on('update:model-value', on_red_toggle)
     blue_toggle.on('update:model-value', on_blue_toggle)
@@ -111,7 +112,7 @@ async def koth_game_ui():
             while True:
                 try:
                     s = await get_session()
-                    async with s.get('http://localhost:8080/api/koth/state') as resp:
+                    async with s.get(make_absolute_url('/api/koth/state') )as resp:
                         state = await resp.json()
                 except Exception:
                     await asyncio.sleep(0.3)

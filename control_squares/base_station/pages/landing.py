@@ -3,6 +3,7 @@ import asyncio
 from sound_bus import browser_sound_bus,attach_sound_opt_in
 from multimode_app_static import ROOT_HEAD_HTML
 from http_client import get_session
+from util import make_absolute_url
 @ui.page('/')
 def landing_page(kiosk: str = ''):
     ui.colors(primary='#1976D2')
@@ -170,10 +171,10 @@ def landing_page(kiosk: str = ''):
 
     async def check_running_states():
         await asyncio.gather(
-            _check('http://localhost:8080/api/koth/state', koth_status),
-            _check('http://localhost:8080/api/3cp/state', threecp_status),
-            _check('http://localhost:8080/api/ad/state', ad_status),
-            _check('http://localhost:8080/api/clock/state', clock_status),
+            _check(make_absolute_url('/api/koth/state'), koth_status),
+            _check(make_absolute_url('/api/3cp/state'), threecp_status),
+            _check(make_absolute_url('/api/ad/state'), ad_status),
+            _check(make_absolute_url('/api/clock/state'), clock_status),
         )
 
     ui.timer(0.2, check_running_states)

@@ -3,7 +3,7 @@ from nicegui import ui
 from sound_bus import attach_sound_opt_in
 from multimode_app_static import *
 from http_client import get_session, close_session
-
+from util import make_absolute_url
 
 @ui.page('/clock')
 async def clock_game_ui():
@@ -79,14 +79,14 @@ async def clock_game_ui():
 
         s = await get_session()
         await s.post(
-            'http://localhost:8080/api/clock/configure',
+            make_absolute_url('/api/clock/configure'),
             json={'time_limit_seconds': total_seconds},
         )
-        await s.post('http://localhost:8080/api/clock/start')
+        await s.post(make_absolute_url('/api/clock/start'))
 
     async def stop_clock():
         s = await get_session()
-        await s.post('http://localhost:8080/api/clock/stop')
+        await s.post(make_absolute_url('/api/clock/stop'))
 
     start_btn.on('click', start_clock)
     stop_btn.on('click', stop_clock)
@@ -98,7 +98,7 @@ async def clock_game_ui():
             while True:
                 try:
                     s = await get_session()
-                    async with s.get('http://localhost:8080/api/clock/state') as resp:
+                    async with s.get(make_absolute_url('/api/clock/state')) as resp:
                         state = await resp.json()
                 except Exception:
                     await asyncio.sleep(0.3)

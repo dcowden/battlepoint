@@ -11,6 +11,7 @@ from ad_game import ADBackend
 from settings import UnifiedSettingsManager, ThreeCPOptions
 import aiohttp
 
+from util import make_absolute_url
 
 # Windows event loop policy
 if sys.platform == 'win32':

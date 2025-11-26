@@ -1,6 +1,6 @@
 from nicegui import ui
 import aiohttp
-
+from util import make_absolute_url
 
 def parse_squares(text: str) -> list[int]:
     out: list[int] = []
@@ -91,7 +91,7 @@ async def settings_ui(mode: str = 'koth'):
                     try:
                         async with aiohttp.ClientSession() as session:
                             async with session.post(
-                                'http://localhost:8080/api/koth/configure', json=payload
+                                make_absolute_url('/api/koth/configure'), json=payload
                             ) as resp:
                                 text = await resp.text()
                                 print('KOTH /configure status:', resp.status, 'body:', text)
@@ -102,7 +102,7 @@ async def settings_ui(mode: str = 'koth'):
                                     return
 
                             async with session.post(
-                                'http://localhost:8080/api/koth/settings/save'
+                                make_absolute_url('/api/koth/settings/save')
                             ) as resp:
                                 text = await resp.text()
                                 print('KOTH /settings/save status:', resp.status, 'body:', text)
@@ -188,7 +188,7 @@ async def settings_ui(mode: str = 'koth'):
 
                     async with aiohttp.ClientSession() as session:
                         async with session.post(
-                            'http://localhost:8080/api/3cp/settings/save', json=payload
+                            make_absolute_url('/api/3cp/settings/save'), json=payload
                         ) as resp:
                             text = await resp.text()
                             print('3CP /settings/save ->', resp.status, text)
@@ -271,7 +271,7 @@ async def settings_ui(mode: str = 'koth'):
 
                     async with aiohttp.ClientSession() as session:
                         async with session.post(
-                            'http://localhost:8080/api/ad/settings/save', json=payload
+                            make_absolute_url('/api/ad/settings/save'), json=payload
                         ) as resp:
                             text = await resp.text()
                             print('AD /settings/save ->', resp.status, text)
@@ -293,7 +293,7 @@ async def settings_ui(mode: str = 'koth'):
                 try:
                     async with aiohttp.ClientSession() as session:
                         async with session.get(
-                            'http://localhost:8080/api/koth/settings/load'
+                            make_absolute_url('/api/koth/settings/load')
                         ) as resp:
                             data = await resp.json()
 
@@ -334,7 +334,7 @@ async def settings_ui(mode: str = 'koth'):
                 try:
                     async with aiohttp.ClientSession() as session:
                         async with session.get(
-                            'http://localhost:8080/api/3cp/settings/load'
+                            make_absolute_url('/api/3cp/settings/load')
                         ) as resp:
                             data = await resp.json()
 
@@ -393,7 +393,7 @@ async def settings_ui(mode: str = 'koth'):
                 try:
                     async with aiohttp.ClientSession() as session:
                         async with session.get(
-                            'http://localhost:8080/api/ad/settings/load'
+                            make_absolute_url('/api/ad/settings/load')
                         ) as resp:
                             data = await resp.json()
 

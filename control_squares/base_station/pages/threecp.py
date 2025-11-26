@@ -12,6 +12,7 @@ from ad_game import ADBackend
 import aiohttp
 from http_client import get_session, close_session
 from pages.overlays import install_winner_overlay
+from util import make_absolute_url
 
 # ========================================================================
 # 3CP GAME PAGE
@@ -86,11 +87,11 @@ async def threecp_game_ui():
     # Event handlers
     async def start_game():
         s = await get_session()
-        await s.post('http://localhost:8080/api/3cp/start')
+        await s.post(make_absolute_url('/api/3cp/start'))
 
     async def stop_game():
         s = await get_session()
-        await s.post('http://localhost:8080/api/3cp/stop')
+        await s.post(make_absolute_url('/api/3cp/stop'))
 
     start_btn.on('click', start_game)
     stop_btn.on('click', stop_game)
@@ -112,7 +113,7 @@ async def threecp_game_ui():
 
             # enable manual mode
             try:
-                resp_mode = await s.post('http://localhost:8080/api/3cp/manual/mode/true')
+                resp_mode = await s.post(make_absolute_url('/api/3cp/manual/mode/true'))
                 print(f"[DEBUG] 3CP UI toggle: manual mode ON -> {resp_mode.status}")
             except Exception as ex:
                 print(f"[DEBUG] 3CP UI toggle: error enabling manual mode: {ex}")
@@ -120,7 +121,7 @@ async def threecp_game_ui():
             # SET this CP/team state explicitly
             try:
                 resp = await s.post(
-                    f'http://localhost:8080/api/3cp/manual/{cp_idx}/{team}/{str(on).lower()}'
+                    make_absolute_url(f'/api/3cp/manual/{cp_idx}/{team}/{str(on).lower()}')
                 )
                 txt = await resp.text()
                 print(
@@ -142,7 +143,7 @@ async def threecp_game_ui():
             while True:
                 try:
                     s = await get_session()
-                    async with s.get('http://localhost:8080/api/3cp/state') as resp:
+                    async with s.get(make_absolute_url('/api/3cp/state')) as resp:
                         state = await resp.json()
                 except Exception:
                     await asyncio.sleep(0.3)

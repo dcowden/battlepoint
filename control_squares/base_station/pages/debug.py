@@ -13,7 +13,7 @@ from ad_game import ADBackend
 import aiohttp
 from http_client import get_session, close_session
 from pages.overlays import install_winner_overlay
-
+from util import make_absolute_url
 
 @ui.page('/debug')
 def debug_ui(from_page: str = '', admin: str = ''):
@@ -146,7 +146,7 @@ def debug_ui(from_page: str = '', admin: str = ''):
     async def sync_manual_from_backend():
         try:
             s = await get_session()
-            async with s.get('http://localhost:8080/api/manual/state') as resp:
+            async with s.get(make_absolute_url('/api/manual/state')) as resp:
                 st = await resp.json()
             enabled = bool(st.get('manual_control'))
             manual_switch.value = enabled
@@ -163,8 +163,8 @@ def debug_ui(from_page: str = '', admin: str = ''):
             s = await get_session()
             enabled = bool(manual_switch.value)
             await s.post(
-                f'http://localhost:8080/api/manual/mode/{str(enabled).lower()}'
-            )
+                make_absolute_url(f'/api/manual/mode/{str(enabled).lower()}'
+            ))
             manual_status.set_text(
                 f"Manual control is {'ON' if enabled else 'OFF'} "
                 "(BLE scanning still runs; in manual mode BLE does not change proximity)."
@@ -179,7 +179,7 @@ def debug_ui(from_page: str = '', admin: str = ''):
 
     async def start_ble_scan():
         s = await get_session()
-        await s.post('http://localhost:8080/api/bluetooth/start')
+        await s.post(make_absolute_url('/api/bluetooth/start'))
         start_scan_btn.set_visibility(False)
         stop_scan_btn.set_visibility(True)
         ble_status.set_text('Status: Scanning...')
@@ -188,7 +188,7 @@ def debug_ui(from_page: str = '', admin: str = ''):
 
     async def stop_ble_scan():
         s = await get_session()
-        await s.post('http://localhost:8080/api/bluetooth/stop')
+        await s.post(make_absolute_url('/api/bluetooth/stop'))
         start_scan_btn.set_visibility(True)
         stop_scan_btn.set_visibility(False)
         ble_status.set_text('Status: Not scanning')
@@ -213,7 +213,7 @@ def debug_ui(from_page: str = '', admin: str = ''):
         s = await get_session()
 
         try:
-            async with s.get('http://localhost:8080/api/koth/state') as resp:
+            async with s.get(make_absolute_url('/api/koth/state')) as resp:
                 state = await resp.json()
                 state_display.value = state
                 state_display.update()
@@ -247,7 +247,7 @@ def debug_ui(from_page: str = '', admin: str = ''):
 
             await sync_manual_from_backend()
 
-            async with s.get('http://localhost:8080/api/bluetooth/devices') as resp:
+            async with s.get(make_absolute_url('/api/bluetooth/devices')) as resp:
                 ble_data = await resp.json()
 
                 if ble_data.get('scanning'):
