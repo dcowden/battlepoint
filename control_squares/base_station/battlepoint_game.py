@@ -689,7 +689,8 @@ class GameBackend:
 
 
     def on_game_ended(self):
-        self.event_manager.cancelled()
+        #self.event_manager.cancelled()
+        pass
 
     def update(self):
         now_ms = self.clock.milliseconds()
@@ -886,7 +887,7 @@ class EnhancedGameBackend(GameBackend):
         self._menu_music_on = True
 
         # manual control
-        self.manual_control: bool = False  # False: BLE drives proximity
+        self.manual_control: bool = True  # False: BLE drives proximity
         self.manual_red_on: bool = False
         self.manual_blu_on: bool = False
 

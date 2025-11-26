@@ -115,31 +115,32 @@ class ThreeCPGame(BaseGame):
 
     def _update_capture_locks(self):
         """Update which teams can capture which points based on progression rules."""
-        cp_a_owner = self.cp_owners[0]
-        cp_b_owner = self.cp_owners[1]
-        cp_c_owner = self.cp_owners[2]
+        cp_red_owner = self.cp_owners[0]
+        cp_center_owner = self.cp_owners[1]
+        cp_blue_owner = self.cp_owners[2]
+        cp_red = self.control_points[0]
+        cp_center = self.control_points[1]
+        cp_blue = self.control_points[2]
 
-        # CP-A (index 0): RED's home point
-        # BLU can only capture if they own B
-        if cp_b_owner == CPOwnerState.BLU:
-            self.control_points[0].set_red_capture(True)  # RED can defend/recap
-            self.control_points[0].set_blu_capture(True)
+        # 1. either team can capture the center
+        # 2. you can only capture the other teams' point if you own the middle
+
+        cp_center.set_red_capture(True)
+        cp_center.set_blu_capture(True)
+
+        if cp_center_owner == CPOwnerState.RED:
+            cp_blue.set_red_capture(True)
+            cp_blue.set_blu_capture(True)
         else:
-            self.control_points[0].set_red_capture(True)
-            self.control_points[0].set_blu_capture(False)
+            cp_blue.set_red_capture(False)
+            cp_blue.set_blu_capture(True)
 
-        # CP-B (index 1): Middle point - both teams can always fight over it
-        self.control_points[1].set_red_capture(True)
-        self.control_points[1].set_blu_capture(True)
-
-        # CP-C (index 2): BLU's home point
-        # RED can only capture if they own B
-        if cp_b_owner == CPOwnerState.RED:
-            self.control_points[2].set_red_capture(True)
-            self.control_points[2].set_blu_capture(True)  # BLU can defend/recap
+        if cp_center_owner == CPOwnerState.BLU:
+            cp_red.set_red_capture(True)
+            cp_red.set_blu_capture(True)
         else:
-            self.control_points[2].set_red_capture(False)
-            self.control_points[2].set_blu_capture(True)
+            cp_red.set_red_capture(True)
+            cp_red.set_blu_capture(False)
 
     def start(self):
         """Start the game."""

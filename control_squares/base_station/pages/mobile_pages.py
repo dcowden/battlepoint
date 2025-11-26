@@ -163,12 +163,10 @@ def mobile_landing_page(admin: str = ''):
 # =====================================================================
 # MOBILE KOTH
 # =====================================================================
-
 @ui.page('/m/koth')
 async def mobile_koth_game_ui():
-    """Mobile KOTH UI: stacked layout, big clock, vertical meters."""
+    """Mobile KOTH UI: stacked layout, big clock, horizontal meters + circular CP indicator."""
     ui.colors(primary='#1976D2')
-    # ui.add_head_html(KOTH_HEAD_HTML)  # optional
 
     overlay = install_winner_overlay('koth')
     open_winner = overlay['open_winner']
@@ -218,62 +216,74 @@ async def mobile_koth_game_ui():
                     'dense push toggle-color=red color=grey-8 text-color=white'
                 )
 
-            # Blue meter card
-            with ui.card().classes('w-full bg-gray-900 text-blue-300'):
-                ui.label('BLUE TIMER').classes(
-                    'text-sm font-semibold mb-1'
-                )
-                with ui.element('div').classes(
-                    'w-full h-32 border border-blue-500 rounded-md overflow-hidden flex flex-col justify-end'
-                ):
-                    blue_fill = ui.element('div').classes(
-                        'w-full bg-blue-500'
-                    ).style('height: 0%;')
-
-            # Capture bar card
-            with ui.card().classes('w-full bg-gray-900 text-purple-300'):
-                ui.label('CAPTURE').classes(
-                    'text-sm font-semibold mb-1'
-                )
-                with ui.element('div').classes(
-                    'w-full h-4 bg-gray-800 rounded-full overflow-hidden'
-                ):
-                    capture_fill = ui.element('div').classes(
-                        'h-full bg-purple-500'
-                    ).style('width: 0%;')
-                capture_mult_label = ui.label('').classes(
-                    'text-xs text-right text-purple-300 mt-1'
-                )
-
-            # Red meter card
+            # RED TIMER – horizontal, fills from right to left
             with ui.card().classes('w-full bg-gray-900 text-red-300'):
                 ui.label('RED TIMER').classes(
                     'text-sm font-semibold mb-1'
                 )
                 with ui.element('div').classes(
-                    'w-full h-32 border border-red-500 rounded-md overflow-hidden flex flex-col justify-end'
+                    'w-full h-8 bg-gray-800 rounded-full overflow-hidden '
+                    'flex flex-row-reverse items-stretch'
                 ):
-                    red_fill = ui.element('div').classes(
-                        'w-full bg-red-500'
-                    ).style('height: 0%;')
+                    red_timer_fill = ui.element('div').classes(
+                        'h-full bg-red-500'
+                    ).style('width: 0%;')
 
-            # Ownership bar
-            with ui.card().classes('w-full bg-gray-900 text-gray-200'):
-                ui.label('OWNERSHIP').classes(
+            # BLU TIMER – horizontal, fills from right to left
+            with ui.card().classes('w-full bg-gray-900 text-blue-300'):
+                ui.label('BLU TIMER').classes(
                     'text-sm font-semibold mb-1'
                 )
                 with ui.element('div').classes(
-                    'w-full h-4 bg-gray-800 rounded-full overflow-hidden'
+                    'w-full h-8 bg-gray-800 rounded-full overflow-hidden '
+                    'flex flex-row-reverse items-stretch'
                 ):
-                    horiz_red = ui.element('div').classes(
-                        'h-full bg-red-500'
-                    ).style('width: 50%;')
+                    blu_timer_fill = ui.element('div').classes(
+                        'h-full bg-blue-500'
+                    ).style('width: 0%;')
 
-            # CP info
+            # CONTROL POINT: circular capture (ring) + ownership (center)
             with ui.card().classes('w-full bg-gray-900 text-gray-200 mt-1'):
-                ui.label('Control Point').classes(
+                ui.label('CONTROL POINT').classes(
                     'text-sm font-semibold mb-1'
                 )
+
+                with ui.element('div').classes(
+                    'w-full flex justify-center items-center py-2'
+                ):
+                    with ui.element('div').classes(
+                        'relative w-40 h-40 flex items-center justify-center'
+                    ):
+                        # Thick outer ring: capture progress
+                        capture_ring = ui.element('div').classes(
+                            'absolute inset-0'
+                        ).style(
+                            'width: 100%; '
+                            'height: 100%; '
+                            'border-radius: 9999px; '
+                            'background: #222222;'
+                        )
+
+                        # Ownership circle in the middle
+                        owner_circle = ui.element('div').classes(
+                            'relative flex items-center justify-center'
+                        ).style(
+                            'width: 70%; '
+                            'height: 70%; '
+                            'border-radius: 9999px; '
+                            'border: 4px solid #111111; '
+                            'background: #000000;'
+                        )
+
+                        owner_label = ui.label('').classes(
+                            'text-xs font-bold z-10 pointer-events-none'
+                        )
+
+                capture_mult_label = ui.label('').classes(
+                    'text-xs text-center text-purple-300 mt-1'
+                )
+
+                # CP info text
                 cp_owner = ui.label('Owner: ---').classes('text-xs')
                 cp_capturing = ui.label('Capturing: ---').classes('text-xs')
                 cp_contested = ui.label('Contested: False').classes('text-xs')
@@ -380,40 +390,65 @@ async def mobile_koth_game_ui():
 
                 meters = state.get('meters', {})
 
+                # NOTE: keep mapping consistent with your original code:
+                # timer1 -> BLU, timer2 -> RED (default colors)
                 m1 = meters.get('timer1')
                 if m1:
-                    red_fill.style(
-                        f'height: {m1.get("percent", 0)}%; '
-                        f'background: {m1.get("fg", "#0000FF")};'
+                    pct = max(0, min(100, m1.get('percent', 0)))
+                    fg = m1.get('fg', '#0000FF')
+                    blu_timer_fill.style(
+                        f'width: {pct}%; '
+                        f'height: 100%; '
+                        f'background: {fg};'
                     )
 
                 m2 = meters.get('timer2')
                 if m2:
-                    blue_fill.style(
-                        f'height: {m2.get("percent", 0)}%; '
-                        f'background: {m2.get("fg", "#FF0000")};'
+                    pct = max(0, min(100, m2.get('percent', 0)))
+                    fg = m2.get('fg', '#FF0000')
+                    red_timer_fill.style(
+                        f'width: {pct}%; '
+                        f'height: 100%; '
+                        f'background: {fg};'
                     )
 
+                # Capture ring (outer circle)
                 m_cap = meters.get('capture')
                 if m_cap:
-                    capture_fill.style(
-                        f'width: {m_cap.get("percent", 0)}%; '
-                        f'background: {m_cap.get("fg", "#6600ff")};'
+                    pct = max(0, min(100, m_cap.get('percent', 0)))
+                    fg = m_cap.get('fg', '#6600ff')
+                    capture_ring.style(
+                        'width: 100%; '
+                        'height: 100%; '
+                        'border-radius: 9999px; '
+                        f'background: conic-gradient({fg} 0 {pct}%, '
+                        f'#222222 {pct}% 100%);'
                     )
 
-                m_owner = state.get('meters', {}).get('owner')
+                # Ownership center color
+                m_owner = meters.get('owner')
+                cp = state.get('control_point', {})
+                owner_name = cp.get('owner', '---')
+
                 if m_owner:
-                    pct = m_owner.get('percent', 50)
                     fg = m_owner.get('fg') or '#FF0000'
                     if fg.lower() in ('#000000', 'black'):
-                        pct = 50
-                        fg = '#000000'
-                    horiz_red.style(
-                        f'width: {pct}%; background: {fg};'
+                        fg = '#333333'
+                    owner_circle.style(
+                        'width: 70%; '
+                        'height: 70%; '
+                        'border-radius: 9999px; '
+                        'border: 4px solid #111111; '
+                        f'background: {fg}; '
+                        'display: flex; align-items: center; '
+                        'justify-content: center;'
                     )
 
-                cp = state.get('control_point', {})
-                cp_owner.set_text(f"Owner: {cp.get('owner', '---')}")
+                # Center label text based on owner
+                #owner_label.set_text(owner_name if owner_name != '---' else '')
+
+                # CP info labels
+                cp_owner.set_text(f"Owner: {owner_name}")
                 cp_capturing.set_text(
                     f"Capturing: {cp.get('capturing', '---')}"
                 )

@@ -3,7 +3,7 @@ import sys
 
 
 from nicegui import ui, app
-from sound_bus import BrowserSoundBus,CompositeSoundSystem
+from sound_bus import browser_sound_bus,BrowserSoundBus,CompositeSoundSystem
 from battlepoint_game import EnhancedGameBackend,SoundSystem
 from threecp_game import ThreeCPBackend
 from clock_game import ClockBackend
@@ -16,8 +16,6 @@ import aiohttp
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-
-browser_sound_bus = BrowserSoundBus(base_url='/sounds')
 native_sound = SoundSystem(base_dir='sounds')
 composite_sound = CompositeSoundSystem(
     local=native_sound,

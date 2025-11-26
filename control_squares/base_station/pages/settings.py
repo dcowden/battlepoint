@@ -25,7 +25,7 @@ async def settings_ui(mode: str = 'koth'):
     current_mode = mode if mode in ['koth', '3cp', 'ad'] else 'koth'
     selected_label_map = {'koth': 'KOTH', '3cp': '3CP', 'ad': 'AD'}
     selected_label = selected_label_map[current_mode]
-
+    print("Running Settings Page")
     with ui.column().classes('w-full p-8 max-w-4xl mx-auto'):
         with ui.row().classes('w-full items-center justify-between mb-4'):
             ui.label(f'{current_mode.upper()} Settings').classes('text-3xl font-bold')
@@ -287,6 +287,7 @@ async def settings_ui(mode: str = 'koth'):
 
         # Load settings on page load
         async def load_initial_settings():
+            print("load initial settings")
             if current_mode == 'koth':
                 # ---- KOTH settings load ----
                 try:
