@@ -352,12 +352,12 @@ class EventManager:
     def control_point_being_captured(self, team: Team):
         if self.capture_timer.can_run():
             self._add_event(f"Control Point Being Captured by {team_text(team)}")
-            self._play(3)
+            self._play(50)
 
     def control_point_contested(self):
         if self.contest_timer.can_run():
             self._add_event("Control Point is Contested!")
-            self._play(2)
+            self._play(51)
 
     def control_point_captured(self, team: Team):
         self._add_event(f"Control Point Captured by {team_text(team)}")
