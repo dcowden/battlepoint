@@ -461,7 +461,7 @@ class ADBackend:
         for cp_idx in range(3):
             square_ids = mapping.get_squares_for_cp(cp_idx + 1)
             counts = self.scanner.get_player_counts_for_squares(square_ids)
-
+            current_owner = self.control_points[cp_idx].get_owner()
             red_on = counts.get('red', 0)
             blue_on = counts.get('blu', 0)
             mag_on = counts.get('mag', 0)
@@ -474,7 +474,10 @@ class ADBackend:
                     blue_on += 1
 
             # AD rule: magnetic presence counts as BLUE (attacker)
-            blue_on += mag_on
+            if current_owner == Team.RED:
+                blue_on += mag_on
+            elif current_owner == Team.BLU:
+                red_on += mag_on
 
             self.proximities[cp_idx].update_counts(red_on, blue_on)
 

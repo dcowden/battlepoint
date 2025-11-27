@@ -563,8 +563,9 @@ class ControlPoint:
         # NEW: scale by player count (1..3)
         red_count = proximity.get_red_count()
         blu_count = proximity.get_blu_count()
-
+        print(f'Player Counts: red={red_count}, blue={blu_count}')
         if is_one_team_on:
+            print("one team is on the point")
             if self._capturing == self._on:
                 if self._on == Team.RED:
                     self._inc_capture(dt * max(1, red_count))
@@ -574,6 +575,7 @@ class ControlPoint:
                 # reverse/decay is not amplified; we count normal time
                 self._dec_capture(dt)
         elif self._on == Team.NOBODY:
+            print("Nobody is on the point")
             # keep your existing "finish if within last delta" logic
             if (
                 prev_capturing != Team.NOBODY
@@ -590,7 +592,8 @@ class ControlPoint:
                     self._dec_capture(dt)
             else:
                 self._dec_capture(dt)
-
+        elif self._on == Team.BOTH:
+            print("Both teams are on the point")
         self._check_capture()
         self._last_update_time = self.clock.milliseconds()
 

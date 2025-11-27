@@ -1,8 +1,8 @@
 {
   "mode": 0,
-  "capture_seconds": 5,
+  "capture_seconds": 15,
   "capture_button_threshold_seconds": 4,
-  "time_limit_seconds": 10,
+  "time_limit_seconds": 180,
   "start_delay_seconds": 7,
   "volume": 10,
   "brightness": 50
