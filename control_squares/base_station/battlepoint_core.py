@@ -510,8 +510,6 @@ class ControlPoint:
     def set_owner(self, team: Team):
         self._owner = team
 
-
-
     def update(self, proximity: Proximity):
         red_on = proximity.is_red_close()
         blu_on = proximity.is_blu_close()

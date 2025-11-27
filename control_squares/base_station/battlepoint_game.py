@@ -425,6 +425,12 @@ SOUND_MAP = {
     47: "announcer_ends_8sec.mp3",
     48: "announcer_ends_9sec.mp3",
     49: "announcer_time_added.mp3",
+    50: "0038_Announcer_control_point_warning_captured.mp3",
+    51: "0039_Announcer_control_point_warning_contested.mp3",
+    52: "0041_announcer_prepare_to_attack_control_points.mp3",
+    53: "0040_announcer_running_out_of_time.mp3",
+    54: "0042_Announcer_alert_center_control_being_captured.mp3",
+
 }
 
 class SoundSystem:
@@ -940,10 +946,7 @@ class EnhancedGameBackend(GameBackend):
         # we dont know the color of a player with magnetic presence.
         # BUT we can assume that if the current owner is one team,
         # a magnetic player is the OTHER team. why would a team stand on a point it owns?
-        if current_owner == Team.RED:
-            blue_on += mag_on
-        elif current_owner == Team.BLU:
-            red_on += mag_on
+
 
 
         if hasattr(self.proximity, 'update_counts'):
