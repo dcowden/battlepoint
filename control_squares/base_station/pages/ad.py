@@ -61,14 +61,44 @@ async def ad_game_ui():
                 cp_elements: list[dict[str, Any]] = []
                 for i, label in enumerate(['1', '2', '3']):
                     with ui.element('div').classes('bp-cp-column') as col:
-                        circle = ui.element('div').classes('bp-cp-circle')
-                        circle.style('color: #fff;')
-                        with circle:
-                            ui.label(label)
+                        # --- CAPTURE RING + OWNER CIRCLE (desktop version of mobile KOTH) ---
+                        with ui.element('div').classes('flex justify-center items-center mb-2'):
+                            with ui.element('div').classes(
+                                'relative w-40 h-40 flex items-center justify-center'
+                            ):
+                                # Outer capture ring (PARENT)
+                                capture_ring = ui.element('div').classes(
+                                    'w-full h-full rounded-full flex items-center justify-center'
+                                ).style(
+                                    'width: 100%; '
+                                    'height: 100%; '
+                                    'border-radius: 9999px; '
+                                    'background: #222222; '
+                                    'display: flex; '
+                                    'align-items: center; '
+                                    'justify-content: center; '
+                                )
 
-                        with ui.element('div').classes('bp-cp-bar'):
-                            bar_fill = ui.element('div').classes('bp-cp-bar-fill')
+                                # Inner ownership circle (CHILD of ring)
+                                with capture_ring:
+                                    owner_circle = ui.element('div').classes(
+                                        'flex items-center justify-center'
+                                    ).style(
+                                        'width: 70%; '
+                                        'height: 70%; '
+                                        'border-radius: 9999px; '
+                                        'border: 4px solid #111111; '
+                                        'background: #000000; '
+                                        'display: flex; '
+                                        'align-items: center; '
+                                        'justify-content: center; '
+                                    )
 
+                        owner_label = ui.label(label).classes(
+                            'text-4xl font-bold text-white pointer-events-none'
+                        )
+
+                        # TOGGLES
                         with ui.element('div').classes('bp-cp-toggles'):
                             red_tog = ui.toggle(['R OFF', 'R ON'], value='R OFF').props(
                                 'dense push toggle-color=red color=grey-8 text-color=white'
@@ -80,8 +110,9 @@ async def ad_game_ui():
                         cp_elements.append(
                             {
                                 'column': col,
-                                'circle': circle,
-                                'bar_fill': bar_fill,
+                                'capture_ring': capture_ring,
+                                'owner_circle': owner_circle,
+                                'owner_label': owner_label,
                                 'red_toggle': red_tog,
                                 'blu_toggle': blu_tog,
                             }
@@ -253,43 +284,53 @@ async def ad_game_ui():
                     else:
                         status_label.set_text('Waiting...')
 
-                # Map backend CP list (only used CPs) onto the correct circles 1/2/3
+                # Map backend CP list (only used CPs) onto the correct columns 1/2/3
                 indices = used_indices['indices']
                 for i, el in enumerate(cp_elements):
-                    # Default: hide if not used by config
                     el['column'].set_visibility(i in indices)
 
-                # Now apply state visuals to used CPs
+                # Apply state visuals to used CPs
                 for logical_idx, cp_index in enumerate(indices):
                     if logical_idx >= len(cps):
                         continue
                     cp_data = cps[logical_idx]
                     owner = cp_data.get('owner', 'NEUTRAL')
+                    capturing = cp_data.get('capturing', '---')
+                    progress = cp_data.get('progress', 0)
 
-                    # Circle color
+                    # --- OWNER CENTER (solid color) ---
                     if owner == 'RED':
-                        color = '#FF0000'
+                        owner_color = '#FF0000'
                     elif owner == 'BLU':
-                        color = '#0000FF'
+                        owner_color = '#0000FF'
                     else:
-                        color = '#444'
+                        owner_color = '#444444'
 
-                    cp_elements[cp_index]['circle'].style(
-                        f'border-color: {color}; color: {color};'
+                    cp_elements[cp_index]['owner_circle'].style(
+                        'width: 70%; '
+                        'height: 70%; '
+                        'border-radius: 9999px; '
+                        'border: 4px solid #111111; '
+                        f'background: {owner_color}; '
+                        'display: flex; align-items: center; justify-content: center;'
                     )
 
-                    progress = cp_data.get('progress', 0)
-                    capturing = cp_data.get('capturing', '---')
-
+                    # --- CAPTURE RING (progress around center) ---
                     if capturing == 'RED':
-                        bar_color = '#FF0000'
+                        ring_color = '#FF0000'
                     elif capturing == 'BLU':
-                        bar_color = '#0000FF'
+                        ring_color = '#0000FF'
                     else:
-                        bar_color = '#666'
+                        ring_color = '#666666'
 
-                    cp_elements[cp_index]['bar_fill'].style(
-                        f'width: {progress}%; background: {bar_color};'
+                    pct = max(0, min(100, progress))
+                    cp_elements[cp_index]['capture_ring'].style(
+                        'width: 100%; '
+                        'height: 100%; '
+                        'border-radius: 9999px; '
+                        'display: flex; align-items: center; justify-content: center; '
+                        f'background: conic-gradient({ring_color} 0 {pct}%, '
+                        f'#222222 {pct}% 100%);'
                     )
 
                 await asyncio.sleep(0.1)
@@ -298,3 +339,5 @@ async def ad_game_ui():
 
     task = asyncio.create_task(update_ui())
     game_clock.on('disconnect', lambda _: task.cancel())
+
+

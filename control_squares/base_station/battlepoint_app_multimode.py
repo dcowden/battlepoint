@@ -58,6 +58,12 @@ if threecp_saved:
     opts, vol, _ = threecp_saved
     threecp_backend.configure(opts)
 
+ad_saved = settings_manager.load_ad_settings()
+if ad_saved:
+    opts = ad_saved
+    ad_backend.configure(opts)
+
+
 # Shared HTTP session helper (used by pages / debug)
 _session: aiohttp.ClientSession | None = None
 

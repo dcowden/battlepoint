@@ -43,11 +43,15 @@ async def threecp_game_ui():
                 stop_btn = ui.button('STOP').props('color=orange')
                 stop_btn.set_visibility(False)
 
-                ui.button('Settings', on_click=lambda: ui.navigate.to('/settings?mode=3cp')
-                          ).props('flat color=white')
+                ui.button(
+                    'Settings',
+                    on_click=lambda: ui.navigate.to('/settings?mode=3cp')
+                ).props('flat color=white')
 
-                ui.button('Debug', on_click=lambda: ui.navigate.to('/debug')
-                          ).props('flat color=white')
+                ui.button(
+                    'Debug',
+                    on_click=lambda: ui.navigate.to('/debug')
+                ).props('flat color=white')
 
         # MAIN CONTENT
         with ui.element('div').classes('bp-main-3cp'):
@@ -58,15 +62,46 @@ async def threecp_game_ui():
             with ui.element('div').classes('bp-points-container'):
                 cp_elements: list[dict[str, Any]] = []
                 for i, label in enumerate(['R', 'C', 'B']):
-                    with ui.element('div').classes('bp-cp-column'):
-                        circle = ui.element('div').classes('bp-cp-circle')
-                        circle.style('color: #fff;')
-                        with circle:
-                            ui.label(label)
+                    with ui.element('div').classes('bp-cp-column') as col:
+                        # --- CAPTURE RING + OWNER CIRCLE (desktop version of mobile KOTH) ---
+                        with ui.element('div').classes('flex justify-center items-center mb-2'):
+                            with ui.element('div').classes(
+                                'relative w-40 h-40 flex items-center justify-center'
+                            ):
+                                # Outer capture ring (PARENT)
+                                capture_ring = ui.element('div').classes(
+                                    'w-full h-full rounded-full flex items-center justify-center'
+                                ).style(
+                                    'width: 100%; '
+                                    'height: 100%; '
+                                    'border-radius: 9999px; '
+                                    'background: #222222; '
+                                    'display: flex; '
+                                    'align-items: center; '
+                                    'justify-content: center; '
+                                )
 
-                        with ui.element('div').classes('bp-cp-bar'):
-                            bar_fill = ui.element('div').classes('bp-cp-bar-fill')
+                                # Inner ownership circle (CHILD of ring)
+                                with capture_ring:
+                                    owner_circle = ui.element('div').classes(
+                                        'flex items-center justify-center'
+                                    ).style(
+                                        'width: 70%; '
+                                        'height: 70%; '
+                                        'border-radius: 9999px; '
+                                        'border: 4px solid #111111; '
+                                        'background: #000000; '
+                                        'display: flex; '
+                                        'align-items: center; '
+                                        'justify-content: center; '
+                                    )
 
+                        # Label under the circle so it doesn't offset center
+                        owner_label = ui.label(label).classes(
+                            'text-4xl font-bold text-white pointer-events-none text-center'
+                        )
+
+                        # Toggles
                         with ui.element('div').classes('bp-cp-toggles'):
                             red_tog = ui.toggle(['R OFF', 'R ON'], value='R OFF').props(
                                 'dense push toggle-color=red color=grey-8 text-color=white'
@@ -77,8 +112,10 @@ async def threecp_game_ui():
 
                         cp_elements.append(
                             {
-                                'circle': circle,
-                                'bar_fill': bar_fill,
+                                'column': col,
+                                'capture_ring': capture_ring,
+                                'owner_circle': owner_circle,
+                                'owner_label': owner_label,
                                 'red_toggle': red_tog,
                                 'blu_toggle': blu_tog,
                             }
@@ -158,8 +195,6 @@ async def threecp_game_ui():
                 LAST_HANDLED_KEY = 'bp_last_ended_game_3cp'
 
                 # Winner overlay
-                # - Show once per game for this browser tab.
-                # - Reset when a new game starts.
                 if not hasattr(update_ui, "_last_phase"):
                     update_ui._last_phase = phase
                     update_ui._winner_shown = False
@@ -182,7 +217,6 @@ async def threecp_game_ui():
 
                     update_ui._last_phase = phase
 
-
                 # Button visibility
                 if phase in ('running', 'countdown') or running:
                     start_btn.set_visibility(False)
@@ -190,7 +224,6 @@ async def threecp_game_ui():
                 else:
                     start_btn.set_visibility(True)
                     stop_btn.set_visibility(False)
-
 
                 # Clock
                 if phase == 'countdown':
@@ -214,29 +247,43 @@ async def threecp_game_ui():
                 for i in range(min(3, len(cps))):
                     cp_data = cps[i]
                     owner = owners[i] if i < len(owners) else 'NEUTRAL'
-
-                    # Circle color
-                    if owner == 'RED':
-                        color = '#FF0000'
-                    elif owner == 'BLU':
-                        color = '#0000FF'
-                    else:
-                        color = '#444'
-
-                    cp_elements[i]['circle'].style(f'border-color: {color}; color: {color};')
-
-                    # Bar
-                    progress = cp_data.get('progress', 0)
                     capturing = cp_data.get('capturing', '---')
+                    progress = cp_data.get('progress', 0)
 
-                    if capturing == 'RED':
-                        bar_color = '#FF0000'
-                    elif capturing == 'BLU':
-                        bar_color = '#0000FF'
+                    # --- OWNER CENTER (solid color) ---
+                    if owner == 'RED':
+                        owner_color = '#FF0000'
+                    elif owner == 'BLU':
+                        owner_color = '#0000FF'
                     else:
-                        bar_color = '#666'
+                        owner_color = '#444444'
 
-                    cp_elements[i]['bar_fill'].style(f'width: {progress}%; background: {bar_color};')
+                    cp_elements[i]['owner_circle'].style(
+                        'width: 70%; '
+                        'height: 70%; '
+                        'border-radius: 9999px; '
+                        'border: 4px solid #111111; '
+                        f'background: {owner_color}; '
+                        'display: flex; align-items: center; justify-content: center;'
+                    )
+
+                    # --- CAPTURE RING (progress around center) ---
+                    if capturing == 'RED':
+                        ring_color = '#FF0000'
+                    elif capturing == 'BLU':
+                        ring_color = '#0000FF'
+                    else:
+                        ring_color = '#666666'
+
+                    pct = max(0, min(100, progress))
+                    cp_elements[i]['capture_ring'].style(
+                        'width: 100%; '
+                        'height: 100%; '
+                        'border-radius: 9999px; '
+                        'display: flex; align-items: center; justify-content: center; '
+                        f'background: conic-gradient({ring_color} 0 {pct}%, '
+                        f'#222222 {pct}% 100%);'
+                    )
 
                 await asyncio.sleep(0.1)
         finally:
