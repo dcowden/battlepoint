@@ -348,6 +348,22 @@ class EventManager:
         self._ends_announced.clear()
         self._starting_game_announced = False
 
+
+    """
+        sound ids
+        center being captured: 54
+        center being contested: 2
+        final being captured: 14
+        final being contested: 15
+        [generic] control being captured: 50
+        [generic] control being contested: 51
+        The problem with the control point having event manager is that
+        the right message is dependent on the game mode we're in--
+        ie, the control point cant send messages becaues it doesnt know which
+        control point it is center, final, etc. 
+        Sso really we have to move tohse out of control point
+    """
+
     # === match C ===
     def control_point_being_captured(self, team: Team):
         if self.capture_timer.can_run():

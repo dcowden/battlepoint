@@ -472,6 +472,7 @@ class ThreeCPBackend:
         for i in range(3):
             self.game.update_control_point(i, self.proximities[i])
 
+        #TODO: really play the right messages based on game context
         # Check victory/overtime
         winner = self.game.check_victory()
         if winner != Team.NOBODY:

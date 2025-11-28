@@ -946,7 +946,10 @@ class EnhancedGameBackend(GameBackend):
         # we dont know the color of a player with magnetic presence.
         # BUT we can assume that if the current owner is one team,
         # a magnetic player is the OTHER team. why would a team stand on a point it owns?
-
+        if current_owner == Team.RED:
+            blue_on += mag_on
+        elif current_owner == Team.BLU:
+            red_on += mag_on
 
 
         if hasattr(self.proximity, 'update_counts'):
