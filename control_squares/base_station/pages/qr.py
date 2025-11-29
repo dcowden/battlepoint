@@ -72,7 +72,11 @@ def generate_qr_svg_bytes(data: str) -> bytes:
 
 
 def svg_response(svg_bytes: bytes):
-    return fastapi.Response(content=svg_bytes, media_type="image/svg+xml")
+    return fastapi.Response(
+        content=svg_bytes,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},  # optional, but helps browsers
+    )
 
 
 # ---------------------------------------------------------
@@ -93,29 +97,36 @@ class QRInfo:
 
 
 # ---------------------------------------------------------
+# PRE-GENERATED SVG CACHE
+# ---------------------------------------------------------
+
+class QRCache:
+    app_svg = generate_qr_svg_bytes(QRInfo.app_url)
+    wifi1_svg = generate_qr_svg_bytes(QRInfo.wifi1_payload)
+    wifi2_svg = generate_qr_svg_bytes(QRInfo.wifi2_payload)
+
+
+# ---------------------------------------------------------
 # QR IMAGE ENDPOINTS
 # ---------------------------------------------------------
 
 @app.get('/qr/app.svg')
 def qr_app_svg():
-    svg = generate_qr_svg_bytes(QRInfo.app_url)
-    return svg_response(svg)
+    return svg_response(QRCache.app_svg)
 
 
 @app.get('/qr/wifi1.svg')
 def qr_wifi1_svg():
-    svg = generate_qr_svg_bytes(QRInfo.wifi1_payload)
-    return svg_response(svg)
+    return svg_response(QRCache.wifi1_svg)
 
 
 @app.get('/qr/wifi2.svg')
 def qr_wifi2_svg():
-    svg = generate_qr_svg_bytes(QRInfo.wifi2_payload)
-    return svg_response(svg)
+    return svg_response(QRCache.wifi2_svg)
 
 
 # ---------------------------------------------------------
-# NICEGUI PAGE AT /qr
+# NICEGUI PAGE AT /qr (unchanged except uses QR_SIZE, QRInfo)
 # ---------------------------------------------------------
 
 @ui.page('/qr')
