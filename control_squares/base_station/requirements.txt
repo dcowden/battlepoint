@@ -3,7 +3,8 @@ nicegui>=1.4.0
 
 # Async support
 aiohttp>=3.8.0
-
+psutil
+qrcode
 # Testing
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
