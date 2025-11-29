@@ -1,41 +1,47 @@
 from nicegui import ui, app
 import asyncio
-from sound_bus import browser_sound_bus,attach_sound_opt_in
+from sound_bus import browser_sound_bus, attach_sound_opt_in
 from multimode_app_static import ROOT_HEAD_HTML
 from http_client import get_session
 from util import make_absolute_url
+from pages.qr import QRInfo   # <-- use the same IP + URL logic as /qr page
+
+QR_SIZE = 300  # QR size in pixels (width and height), match pages/qr.py
+
+
 @ui.page('/')
 def landing_page(kiosk: str = ''):
     ui.colors(primary='#1976D2')
-
     ui.add_head_html(ROOT_HEAD_HTML)
 
-    # One-time detection
+    # Kiosk detection
     if kiosk == '1':
         app.storage.user['is_kiosk'] = True
-
     is_kiosk = app.storage.user.get('is_kiosk', False)
     print(f"[DEBUG] landing_page: kiosk_param={kiosk!r} is_kiosk={is_kiosk} ")
 
     with ui.element('div').classes('bp-landing'):
         with ui.element('div').classes('bp-card'):
 
-            # Top row: title + sound button for kiosk
+            # -----------------------------
+            # Title Row
+            # -----------------------------
             with ui.row().classes('w-full justify-between items-center mb-2'):
                 ui.html('<div class="bp-title">⚔️ BattlePoint</div>', sanitize=False)
 
-                # When sound becomes enabled on THIS page, start menu music
                 attach_sound_opt_in(
                     on_enabled=lambda _client: browser_sound_bus.play_menu_track()
                 )
 
-            ui.html(
-                '<div class="bp-subtitle">Real-life Team Fortress 2 Combat</div>',
-                sanitize=False,
-            )
+            # NOTE: subtitle removed for vertical space
+            # ui.html('<div class="bp-subtitle">Real-life Team Fortress 2 Combat</div>', sanitize=False)
 
+            # -----------------------------
+            # Mode Grid
+            # -----------------------------
             with ui.element('div').classes('bp-mode-grid'):
-                # KOTH Card
+
+                # ---------------- KOTH ----------------
                 with ui.element('div').classes('bp-mode-card').on(
                     'click', lambda: ui.navigate.to('/koth')
                 ):
@@ -57,7 +63,7 @@ def landing_page(kiosk: str = ''):
                         'PLAY KOTH →', on_click=lambda: ui.navigate.to('/koth')
                     ).props('unelevated color=red-7').classes('w-full')
 
-                # 3CP Card
+                # ---------------- 3CP ----------------
                 with ui.element('div').classes('bp-mode-card').on(
                     'click', lambda: ui.navigate.to('/3cp')
                 ):
@@ -79,7 +85,7 @@ def landing_page(kiosk: str = ''):
                         'PLAY 3CP →', on_click=lambda: ui.navigate.to('/3cp')
                     ).props('unelevated color=teal-6').classes('w-full')
 
-                # NEW: AD Card (Attack/Defend multi-point)
+                # ---------------- AD ----------------
                 with ui.element('div').classes('bp-mode-card').on(
                     'click', lambda: ui.navigate.to('/ad')
                 ):
@@ -101,7 +107,7 @@ def landing_page(kiosk: str = ''):
                         'PLAY AD →', on_click=lambda: ui.navigate.to('/ad')
                     ).props('unelevated color=deep-purple-5').classes('w-full')
 
-                # CLOCK-ONLY Card
+                # ---------------- CLOCK ----------------
                 with ui.element('div').classes('bp-mode-card').on(
                     'click', lambda: ui.navigate.to('/clock')
                 ):
@@ -123,25 +129,60 @@ def landing_page(kiosk: str = ''):
                         'RUN CLOCK →', on_click=lambda: ui.navigate.to('/clock')
                     ).props('unelevated color=amber-6').classes('w-full')
 
-            with ui.element('div').classes('bp-info'):
-                ui.label('📋 Game Instructions').classes(
-                    'text-xl font-bold mb-2'
-                )
-                ui.html(
-                    '''
-                <ul style="color: #b0b0b0; line-height: 1.8;">
-                    <li><strong>KOTH:</strong> One control point. Own it to drain your timer. Reach 0:00 to win.</li>
-                    <li><strong>3CP:</strong> Three points (A-B-C). Capture in sequence to push forward and win.</li>
-                    <li><strong>AD:</strong> BLUE (attack) captures points 1→2→3 in order while RED defends. All points start RED and cannot be recaptured.</li>
-                    <li><strong>Clock:</strong> Simple round timer with audio cues; no control points.</li>
-                    <li><strong>Setup:</strong> Use Bluetooth devices or manual controls (Debug page) to simulate players for KOTH/3CP.</li>
-                    <li><strong>Settings:</strong> Configure capture times, game duration, and control square mappings.</li>
-                </ul>
-                ''',
-                    sanitize=False,
-                )
+            # ---------------------------------------------------------------------
+            # QR CODE STRIP (white background, values underneath, using QRInfo.app_url)
+            # ---------------------------------------------------------------------
+            with ui.element('div').classes('w-full mt-6'):
 
-            with ui.row().classes('w-full justify-center gap-4 mt-4'):
+                with ui.row().classes('w-full justify-center gap-32'):
+
+                    # ----- APP URL -----
+                    with ui.column().classes('items-center gap-2'):
+                        ui.label('Join Game').classes('text-2xl font-bold text-white')
+
+                        with ui.element('div').classes('bg-white p-2 rounded shadow-md'):
+                            ui.image('/qr/app.svg').style(
+                                f'width: {QR_SIZE}px; height: {QR_SIZE}px;'
+                            )
+
+                        ui.label('URL:').classes('text-2xl font-bold text-white')
+                        # Use the same IP-based URL as QRInfo.app_url
+                        ui.label(QRInfo.app_url).classes(
+                            'text-xl text-white break-all text-center max-w-xs'
+                        )
+
+                    # ----- WiFi 1 -----
+                    with ui.column().classes('items-center gap-2'):
+                        ui.label('WiFi: bluedirt-mobile').classes(
+                            'text-2xl font-bold text-white'
+                        )
+
+                        with ui.element('div').classes('bg-white p-2 rounded shadow-md'):
+                            ui.image('/qr/wifi1.svg').style(
+                                f'width: {QR_SIZE}px; height: {QR_SIZE}px;'
+                            )
+
+                        ui.label('Password:').classes('text-2xl font-bold text-white')
+                        ui.label('bluedirt4281!').classes('text-2xl text-white')
+
+                    # ----- WiFi 2 -----
+                    with ui.column().classes('items-center gap-2'):
+                        ui.label('WiFi: battlepoint').classes(
+                            'text-2xl font-bold text-white'
+                        )
+
+                        with ui.element('div').classes('bg-white p-2 rounded shadow-md'):
+                            ui.image('/qr/wifi2.svg').style(
+                                f'width: {QR_SIZE}px; height: {QR_SIZE}px;'
+                            )
+
+                        ui.label('Password:').classes('text-2xl font-bold text-white')
+                        ui.label('BattlePoint123').classes('text-2xl text-white')
+
+            # -----------------------------
+            # Settings / Debug buttons
+            # -----------------------------
+            with ui.row().classes('w-full justify-center gap-4 mt-6'):
                 ui.button(
                     '⚙️ Settings',
                     on_click=lambda: ui.navigate.to('/settings'),
@@ -151,6 +192,9 @@ def landing_page(kiosk: str = ''):
                     on_click=lambda: ui.navigate.to('/debug'),
                 ).props('outline color=white')
 
+    # -----------------------------
+    # GAME STATUS POLLING
+    # -----------------------------
     async def _check(endpoint: str, label):
         try:
             s = await get_session()
