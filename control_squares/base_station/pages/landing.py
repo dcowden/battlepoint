@@ -136,9 +136,24 @@ def landing_page(kiosk: str = ''):
 
                 with ui.row().classes('w-full justify-center gap-32'):
 
+
+                    # ----- WiFi 1 -----
+                    with ui.column().classes('items-center gap-2'):
+                        ui.label('1 WiFi: bluedirt-mobile').classes(
+                            'text-2xl font-bold text-white'
+                        )
+
+                        with ui.element('div').classes('bg-white p-2 rounded shadow-md'):
+                            ui.image('/qr/wifi1.svg').style(
+                                f'width: {QR_SIZE}px; height: {QR_SIZE}px;'
+                            )
+
+                        ui.label('Password:').classes('text-2xl font-bold text-white')
+                        ui.label('bluedirt4281!').classes('text-2xl text-white')
+
                     # ----- APP URL -----
                     with ui.column().classes('items-center gap-2'):
-                        ui.label('Join Game').classes('text-2xl font-bold text-white')
+                        ui.label('2. Join Game').classes('text-2xl font-bold text-white')
 
                         with ui.element('div').classes('bg-white p-2 rounded shadow-md'):
                             ui.image('/qr/app.svg').style(
@@ -151,33 +166,19 @@ def landing_page(kiosk: str = ''):
                             'text-xl text-white break-all text-center max-w-xs'
                         )
 
-                    # ----- WiFi 1 -----
-                    with ui.column().classes('items-center gap-2'):
-                        ui.label('WiFi: bluedirt-mobile').classes(
-                            'text-2xl font-bold text-white'
-                        )
-
-                        with ui.element('div').classes('bg-white p-2 rounded shadow-md'):
-                            ui.image('/qr/wifi1.svg').style(
-                                f'width: {QR_SIZE}px; height: {QR_SIZE}px;'
-                            )
-
-                        ui.label('Password:').classes('text-2xl font-bold text-white')
-                        ui.label('bluedirt4281!').classes('text-2xl text-white')
-
-                    # ----- WiFi 2 -----
-                    with ui.column().classes('items-center gap-2'):
-                        ui.label('WiFi: battlepoint').classes(
-                            'text-2xl font-bold text-white'
-                        )
-
-                        with ui.element('div').classes('bg-white p-2 rounded shadow-md'):
-                            ui.image('/qr/wifi2.svg').style(
-                                f'width: {QR_SIZE}px; height: {QR_SIZE}px;'
-                            )
-
-                        ui.label('Password:').classes('text-2xl font-bold text-white')
-                        ui.label('BattlePoint123').classes('text-2xl text-white')
+                    # # ----- WiFi 2 -----
+                    # with ui.column().classes('items-center gap-2'):
+                    #     ui.label('WiFi: battlepoint').classes(
+                    #         'text-2xl font-bold text-white'
+                    #     )
+                    #
+                    #     with ui.element('div').classes('bg-white p-2 rounded shadow-md'):
+                    #         ui.image('/qr/wifi2.svg').style(
+                    #             f'width: {QR_SIZE}px; height: {QR_SIZE}px;'
+                    #         )
+                    #
+                    #     ui.label('Password:').classes('text-2xl font-bold text-white')
+                    #     ui.label('BattlePoint123').classes('text-2xl text-white')
 
             # -----------------------------
             # Settings / Debug buttons
