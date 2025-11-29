@@ -3,10 +3,9 @@
 .piolibdeps
 .vscode/c_cpp_properties.json
 __pycache__
-.idea
+.idea/
 .vscode
 *.pyc
 control_squares/base_station/.nicegui
 control_squares/base_station/.venv
-control_squares/base_station/
 control_squares/base_station/__pycache__
